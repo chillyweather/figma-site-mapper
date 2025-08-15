@@ -1,0 +1,51 @@
+# Node & PNPM
+# =================================
+node_modules/
+pnpm-lock.yaml
+.npmrc
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+pid.[0-9]*.log
+pid.[0-9]*.log.unsupported
+*.pid
+*.seed
+*.log
+*.log.*
+
+# Build & Output Artifacts
+# =================================
+/packages/plugin/dist
+/screenshots
+/coverage
+
+# Environment Variables
+# =================================
+.env
+.env.*
+!.env.example
+
+# TypeScript
+# =================================
+*.tsbuildinfo
+
+# Playwright Browsers
+# =================================
+/node_modules/.bin/playwright
+/playwright-report/
+/test-results/
+
+# OS & Editor Specific
+# =================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
