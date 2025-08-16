@@ -19,7 +19,8 @@ pid.[0-9]*.log.unsupported
 # Build & Output Artifacts
 # =================================
 /packages/plugin/dist
-/screenshots
+/packages/backend/screenshots/
+/packages/backend/storage/
 /coverage
 
 # Environment Variables
