@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import { crawlQueue } from './queue.js'
 
 const server = Fastify({
   logger: true
@@ -6,6 +7,20 @@ const server = Fastify({
 
 server.get('/', async (request, reply) => {
   return { hello: 'world' }
+})
+
+server.post('/crawl', async (request, reply) => {
+  //add validation
+  const { url } = request.body as { url: string };
+
+  if (!url) {
+    reply.status(400).send({ error: "URL is required" })
+    return
+  }
+
+  await runCrawler(url)
+
+  return { message: "Crawl started and completed!", url }
 })
 
 const start = async () => {
@@ -17,4 +32,4 @@ const start = async () => {
   }
 }
 
-start()
+start()  

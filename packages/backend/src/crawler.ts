@@ -33,10 +33,9 @@ const crawler = new PlaywrightCrawler({
   maxRequestsPerCrawl: 10,
 });
 
-async function runCrawler() {
+export async function runCrawler(startUrl: string) {
   console.log('🚀 Starting the crawler...')
-  await crawler.run(["https://crawlee.dev"])
+  await crawler.run([startUrl])
   console.log('✅ Crawler finished.')
 }
 
-runCrawler() 
