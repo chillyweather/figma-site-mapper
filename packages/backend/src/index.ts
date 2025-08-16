@@ -18,9 +18,9 @@ server.post('/crawl', async (request, reply) => {
     return
   }
 
-  await runCrawler(url)
+  const job = await crawlQueue.add("crawl", { url });
 
-  return { message: "Crawl started and completed!", url }
+  return { message: "Crawl jop successfully queued.", jobId: job.id }
 })
 
 const start = async () => {
