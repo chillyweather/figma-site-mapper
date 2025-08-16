@@ -3,7 +3,7 @@
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_H1jh0R93Wy",
+      "id": "session_1zpqK5HkIl",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:51.057Z",
-      "createdAt": "2025-08-16T06:43:51.057Z",
+      "expiresAt": "2025-08-16T12:51:08.456Z",
+      "createdAt": "2025-08-16T12:01:08.456Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_keVkDnyvIi",
+      "id": "session_W5QJ03mIm0",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -34,46 +34,46 @@
         "cookies": [
           {
             "key": "intercom-id-kod1r788",
-            "value": "3aea07c1-5f62-4836-bb59-6978ab54feee",
-            "expires": "2026-05-13T07:17:16.000Z",
+            "value": "095e9a87-aedc-4d1f-bc4d-7e643bd90f83",
+            "expires": "2026-05-13T12:34:33.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-08-16T06:43:55.915Z",
-            "lastAccessed": "2025-08-16T06:43:56.636Z"
+            "creation": "2025-08-16T12:01:15.660Z",
+            "lastAccessed": "2025-08-16T12:01:15.660Z"
           },
           {
             "key": "intercom-session-kod1r788",
-            "expires": "2025-08-23T06:43:56.000Z",
+            "expires": "2025-08-23T12:01:13.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-08-16T06:43:55.915Z",
-            "lastAccessed": "2025-08-16T06:43:56.636Z"
+            "creation": "2025-08-16T12:01:15.661Z",
+            "lastAccessed": "2025-08-16T12:01:15.661Z"
           },
           {
             "key": "intercom-device-id-kod1r788",
-            "value": "fa0f1b84-a3bd-4a2a-8180-f41e65ab1b6a",
-            "expires": "2026-05-13T07:17:16.000Z",
+            "value": "52035562-f700-45b6-8103-1d8e7ff61acd",
+            "expires": "2026-05-13T12:34:33.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-08-16T06:43:55.915Z",
-            "lastAccessed": "2025-08-16T06:43:56.636Z"
+            "creation": "2025-08-16T12:01:15.661Z",
+            "lastAccessed": "2025-08-16T12:01:15.661Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:51.059Z",
-      "createdAt": "2025-08-16T06:43:51.059Z",
+      "expiresAt": "2025-08-16T12:51:08.458Z",
+      "createdAt": "2025-08-16T12:01:08.458Z",
       "usageCount": 5,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_5tbt8LjJY2",
+      "id": "session_ymI05imvgB",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -86,14 +86,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:53.798Z",
-      "createdAt": "2025-08-16T06:43:53.798Z",
+      "expiresAt": "2025-08-16T12:51:11.356Z",
+      "createdAt": "2025-08-16T12:01:11.356Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_wqqSpcZ99e",
+      "id": "session_lwQ7dIo1X5",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -106,14 +106,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:53.799Z",
-      "createdAt": "2025-08-16T06:43:53.799Z",
+      "expiresAt": "2025-08-16T12:51:11.357Z",
+      "createdAt": "2025-08-16T12:01:11.357Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_3Xf4RL1yDp",
+      "id": "session_mWcsUqETNu",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -126,14 +126,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:55.014Z",
-      "createdAt": "2025-08-16T06:43:55.014Z",
+      "expiresAt": "2025-08-16T12:51:12.413Z",
+      "createdAt": "2025-08-16T12:01:12.413Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_Kdnhs1F1GD",
+      "id": "session_QeSgpceMJ6",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -146,8 +146,8 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-08-16T07:33:55.629Z",
-      "createdAt": "2025-08-16T06:43:55.629Z",
+      "expiresAt": "2025-08-16T12:51:13.046Z",
+      "createdAt": "2025-08-16T12:01:13.046Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
