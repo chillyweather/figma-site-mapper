@@ -1,29 +1,25 @@
 {
-  "dependencies": {
-    "@create-figma-plugin/ui": "^4.0.1",
-    "@create-figma-plugin/utilities": "^4.0.1",
-    "preact": ">=10",
-    "prismjs": "1.29.0",
-    "react-simple-code-editor": "0.13.1"
+  "name": "plugin",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "pnpm run build:ui && pnpm run build:code && pnpm run fix-ui-path",
+    "build:ui": "vite build",
+    "build:code": "vite build --config vite.code.config.ts",
+    "fix-ui-path": "test -f dist/src/ui.html && mv dist/src/ui.html dist/ui.html && rmdir dist/src 2>/dev/null || true",
+    "watch": "concurrently \"vite build --watch\" \"vite build --config vite.code.config.ts --watch\"",
+    "dev": "pnpm run watch"
   },
   "devDependencies": {
-    "@create-figma-plugin/build": "^4.0.1",
-    "@create-figma-plugin/tsconfig": "^4.0.1",
-    "@figma/plugin-typings": "1.109.0",
-    "@types/prismjs": "1.26.3",
-    "typescript": ">=5"
+    "@figma/plugin-typings": "^1.92.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "vite-plugin-singlefile": "^0.13.5"
   },
-  "scripts": {
-    "build": "build-figma-plugin --typecheck --minify",
-    "watch": "build-figma-plugin --typecheck --watch"
-  },
-  "figma-plugin": {
-    "editorType": [
-      "figma"
-    ],
-    "id": "react-editor",
-    "name": "React Editor",
-    "main": "src/main.ts",
-    "ui": "src/ui.tsx"
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

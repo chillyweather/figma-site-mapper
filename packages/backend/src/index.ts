@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import { crawlQueue } from './queue.js'
+import { request } from 'playwright'
 
 const server = Fastify({
   logger: true
@@ -7,6 +8,19 @@ const server = Fastify({
 
 server.get('/', async (request, reply) => {
   return { hello: 'world' }
+})
+
+server.get("/status/:jobId", async (request, reply) => {
+  const { jobId } = request.params as { jobId: string }
+
+  return {
+    jobId,
+    status: "completed",
+    progress: 100,
+    result: {
+      manifestUrl: "http://localhost:3006/static/mock-manifest.json"
+    }
+  }
 })
 
 server.post('/crawl', async (request, reply) => {
