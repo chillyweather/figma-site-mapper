@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const App: React.FC = () => {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState('https://crawlee.dev');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -13,35 +15,50 @@ const App: React.FC = () => {
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: 'start-crawl',
-          url: url.trim(),
-        },
-      },
-      '*'
-    );
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim() } }, '*');
   };
 
   const handleClose = () => {
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: 'close',
-        },
-      },
-      '*'
-    );
+    parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
   };
 
-  React.useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const { type, jobId } = event.data.pluginMessage || {};
+  // This effect starts/stops the polling
+  useEffect(() => {
+    if (jobId && !intervalRef.current) {
+      intervalRef.current = window.setInterval(() => {
+        parent.postMessage({ pluginMessage: { type: 'get-status', jobId } }, '*');
+      }, 3000);
+    }
 
-      if (type === 'crawl-started') {
-        setStatus(`Crawl started! Job ID: ${jobId}`);
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [jobId]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'crawl-started') {
+        setStatus(`Crawl started! Job ID: ${msg.jobId}`);
+        setJobId(msg.jobId);
         setIsLoading(false);
+      }
+
+      if (msg.type === 'status-update') {
+        setStatus(`Job ${msg.jobId}: ${msg.status} (${msg.progress}%)`);
+
+        if (msg.status === 'completed') {
+          if (intervalRef.current) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          setStatus(`Crawl complete! Manifest at: ${msg.manifestUrl}`);
+        }
       }
     };
 
@@ -56,77 +73,31 @@ const App: React.FC = () => {
       </h3>
 
       <form onSubmit={handleSubmit} style={{ marginBottom: '16px' }}>
-        <div style={{ marginBottom: '12px' }}>
-          <label
-            htmlFor="url"
-            style={{ display: 'block', marginBottom: '4px', fontSize: '12px' }}
-          >
-            Website URL:
-          </label>
-          <input
-            id="url"
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com"
-            required
-            disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '12px',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
-
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://example.com"
+          required
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+        />
         <button
           type="submit"
-          disabled={isLoading || !url.trim()}
-          style={{
-            width: '100%',
-            padding: '8px 16px',
-            backgroundColor: isLoading ? '#ccc' : '#0066cc',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-          }}
+          disabled={isLoading || !!jobId || !url.trim()}
+          style={{ width: '100%', padding: '8px 16px' }}
         >
-          {isLoading ? 'Starting Crawl...' : 'Start Crawl'}
+          {isLoading ? 'Starting...' : (jobId ? 'Crawl in Progress' : 'Start Crawl')}
         </button>
       </form>
 
       {status && (
-        <div
-          style={{
-            padding: '8px',
-            backgroundColor: '#f0f0f0',
-            borderRadius: '4px',
-            fontSize: '11px',
-            marginBottom: '12px',
-          }}
-        >
+        <div style={{ padding: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '11px', marginBottom: '12px', wordBreak: 'break-all' }}>
           {status}
         </div>
       )}
 
-      <button
-        onClick={handleClose}
-        style={{
-          width: '100%',
-          padding: '6px 16px',
-          backgroundColor: 'transparent',
-          color: '#666',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          fontSize: '12px',
-          cursor: 'pointer',
-        }}
-      >
+      <button onClick={handleClose} style={{ width: '100%', padding: '6px 16px', backgroundColor: 'transparent', border: '1px solid #ccc' }}>
         Close
       </button>
     </div>

@@ -1,9 +1,13 @@
 import Fastify from 'fastify'
 import { crawlQueue } from './queue.js'
-import { request } from 'playwright'
+import cors from "@fastify/cors"
 
 const server = Fastify({
   logger: true
+})
+
+await server.register(cors, {
+  origin: "*",
 })
 
 server.get('/', async (request, reply) => {
