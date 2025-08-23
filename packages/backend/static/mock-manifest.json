@@ -1,0 +1,16 @@
+{
+  "startUrl": "https://example.com",
+  "crawlDate": "2025-08-23T09:53:31.000Z",
+  "pages": [
+    {
+      "url": "https://example.com/",
+      "title": "Homepage",
+      "screenshot": "example_com_.png"
+    },
+    {
+      "url": "https://example.com/about",
+      "title": "About Us",
+      "screenshot": "example_com_about.png"
+    }
+  ]
+}

@@ -33,6 +33,17 @@ figma.ui.onmessage = async (msg) => {
       const response = await fetch(`http://localhost:3006/status/${jobId}`);
       const result = await response.json();
 
+      if (result.status === "completed" && result.result?.manifestUrl) {
+        console.log("Job complete! Fetching manifest from:", result.result.manifestUrl);
+
+        const manifestResponse = await fetch(result.result.manifestUrl);
+        const manifestData = await manifestResponse.json();
+
+        console.log("Successfully fetched manifest: ", manifestData);
+
+        figma.notify("Crawl complete and manifest fetched!");
+      }
+
       figma.ui.postMessage({
         type: "status-update",
         status: result.status,
