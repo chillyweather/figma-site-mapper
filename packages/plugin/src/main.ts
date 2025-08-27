@@ -1,6 +1,5 @@
 figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
 
-// --- NEW: Type Definitions ---
 interface TreeNode {
   url: string;
   title: string;
@@ -109,7 +108,26 @@ async function renderSitemap(manifestData: { tree: TreeNode }) {
   for (const item of nodesToRender) {
     const { node, x, y } = item;
     const nodeFrame = figma.createFrame();
-    // ... (rest of the node creation logic is the same)
+    nodeFrame.name = node.title;
+    nodeFrame.x = x;
+    nodeFrame.y = y;
+    nodeFrame.fills = [];
+    nodeFrame.layoutMode = 'VERTICAL';
+    nodeFrame.itemSpacing = 8;
+
+    const rect = figma.createRectangle();
+    rect.resize(NODE_WIDTH, NODE_HEIGHT);
+    rect.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
+    rect.cornerRadius = 8;
+
+    const label = figma.createText();
+    label.characters = node.title;
+    label.textAlignHorizontal = 'CENTER';
+    label.resize(NODE_WIDTH, 40);
+
+    nodeFrame.appendChild(rect);
+    nodeFrame.appendChild(label);
+    sitemapFrame.appendChild(nodeFrame);
   }
 
   figma.currentPage.appendChild(sitemapFrame);
@@ -160,6 +178,7 @@ figma.ui.onmessage = async (msg) => {
         console.log("Successfully fetched manifest: ", manifestData);
 
         figma.notify("Crawl complete and manifest fetched!");
+        await renderSitemap(manifestData);
       }
 
       figma.ui.postMessage({

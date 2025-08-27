@@ -108,7 +108,7 @@ export async function runCrawler(startUrl: string) {
       log.error(`Request ${request.url} failed.`);
     },
 
-    maxRequestsPerCrawl: 100,
+    maxRequestsPerCrawl: 10,
   });
 
   await crawler.run([canonicalStartUrl]);
