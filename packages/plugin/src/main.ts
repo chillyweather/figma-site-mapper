@@ -1,24 +1,18 @@
 import { renderSitemap } from "./figmaRendering/renderSitemap";
+import { TreeNode } from "./types";
 
 const BACKEND_URL = 'https://efba33f8e90c.ngrok-free.app';
 
 
 figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
 
-export interface TreeNode {
-  url: string;
-  title: string;
-  screenshot: string;
-  thumbnail: string;
-  children: TreeNode[];
-}
 
-export interface QueueItem {
-  node: TreeNode;
-  x: number;
-  y: number;
-  parentCenter: { x: number; y: number } | null;
-}
+// export interface QueueItem {
+//   node: TreeNode;
+//   x: number;
+//   y: number;
+//   parentCenter: { x: number; y: number } | null;
+// }
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {

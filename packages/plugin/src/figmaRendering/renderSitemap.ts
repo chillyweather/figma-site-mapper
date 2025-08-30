@@ -1,4 +1,4 @@
-import { TreeNode, QueueItem } from "../main";
+import { TreeNode } from "../types";
 import { createScreenshotPages } from "./utils/createScreenshotPages";
 import { flattenTree } from "./utils/flattenTree";
 

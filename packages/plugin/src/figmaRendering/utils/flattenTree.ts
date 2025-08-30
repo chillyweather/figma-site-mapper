@@ -1,6 +1,5 @@
-import { TreeNode } from "../../main";
 
-// --- Helper function with types ---
+import { TreeNode } from "../../types"
 
 export function flattenTree(node: TreeNode): TreeNode[] {
   if (!node) return [];
