@@ -1,5 +1,8 @@
 import { renderSitemap } from "./figmaRendering/renderSitemap";
 
+const BACKEND_URL = 'https://efba33f8e90c.ngrok-free.app';
+
+
 figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
 
 export interface TreeNode {
@@ -22,12 +25,12 @@ figma.ui.onmessage = async (msg) => {
     const { url } = msg;
 
     try {
-      const response = await fetch("http://localhost:3006/crawl", {
+      const response = await fetch(`${BACKEND_URL}/crawl`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL }),
       });
 
       const result = await response.json();
@@ -48,7 +51,7 @@ figma.ui.onmessage = async (msg) => {
     const { jobId } = msg;
 
     try {
-      const response = await fetch(`http://localhost:3006/status/${jobId}`);
+      const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
       const result = await response.json();
 
       if (result.status === "completed" && result.result?.manifestUrl) {

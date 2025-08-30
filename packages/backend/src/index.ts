@@ -41,15 +41,14 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url } = request.body as { url: string };
-  const ngrokUrl = request.headers['x-forwarded-host'] || `https://${request.hostname}`;
+  const { url, publicUrl } = request.body as { url: string, publicUrl: string };
 
-  if (!url) {
-    reply.status(400).send({ error: "URL is required" })
+  if (!url || !publicUrl) {
+    reply.status(400).send({ error: "URL and publicUrl is required" })
     return
   }
 
-  const job = await crawlQueue.add("crawl", { url, publicUrl: ngrokUrl });
+  const job = await crawlQueue.add("crawl", { url, publicUrl });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }
 })

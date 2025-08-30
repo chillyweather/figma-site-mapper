@@ -61,7 +61,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string) {
+export async function runCrawler(startUrl: string, publicUrl: string) {
   console.log('🚀 Starting the crawler...')
 
   const canonicalStartUrl = new URL(startUrl).toString();
@@ -95,8 +95,8 @@ export async function runCrawler(startUrl: string) {
       crawledPages.push({
         url: request.url,
         title: title,
-        screenshot: screenshotFileName,
-        thumbnail: thumbnailFileName
+        screenshot: `${publicUrl}/screenshots/${screenshotFileName}`,
+        thumbnail: `${publicUrl}/screenshots/${thumbnailFileName}`,
       })
 
       await enqueueLinks({
