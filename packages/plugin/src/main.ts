@@ -1,18 +1,10 @@
 import { renderSitemap } from "./figmaRendering/renderSitemap";
-import { TreeNode } from "./types";
+import { createScreenshotPages } from "./figmaRendering/utils/createScreenshotPages";
+import { flattenTree } from "./figmaRendering/utils/flattenTree";
 
-const BACKEND_URL = 'https://efba33f8e90c.ngrok-free.app';
-
+const BACKEND_URL = 'http://localhost:3006';
 
 figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
-
-
-// export interface QueueItem {
-//   node: TreeNode;
-//   x: number;
-//   y: number;
-//   parentCenter: { x: number; y: number } | null;
-// }
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
@@ -45,6 +37,7 @@ figma.ui.onmessage = async (msg) => {
     const { jobId } = msg;
 
     try {
+
       const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
       const result = await response.json();
 
@@ -55,9 +48,20 @@ figma.ui.onmessage = async (msg) => {
         );
 
         const manifestResponse = await fetch(result.result.manifestUrl);
+        
+        if (!manifestResponse.ok) {
+          console.error("Failed to fetch manifest:", manifestResponse.status, manifestResponse.statusText);
+          figma.notify("Error: Could not fetch manifest from backend.", { error: true });
+          return;
+        }
+        
         const manifestData = await manifestResponse.json();
 
         console.log("Successfully fetched manifest: ", manifestData);
+
+        console.log("Creating screeshot pages...")
+        const pages = flattenTree(manifestData.tree)
+        await createScreenshotPages(pages)
 
         figma.notify("Crawl complete and manifest fetched!");
         await renderSitemap(manifestData);
@@ -65,6 +69,7 @@ figma.ui.onmessage = async (msg) => {
 
       figma.ui.postMessage({
         type: "status-update",
+        jobId,
         status: result.status,
         progress: result.progress,
         manifestUrl: result.result?.manifestUrl,

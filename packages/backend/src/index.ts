@@ -22,20 +22,75 @@ await server.register(fastifyStatic, {
   prefix: "/static/"
 })
 
+await server.register(async function (fastify) {
+  await fastify.register(fastifyStatic, {
+    root: path.join(__dirname, "..", "screenshots"),
+    prefix: "/screenshots/"
+  })
+})
+
 server.get('/', async (request, reply) => {
   return { hello: 'world' }
 })
 
 server.get("/status/:jobId", async (request, reply) => {
   const { jobId } = request.params as { jobId: string }
+  const manifestPath = path.join(__dirname, "..", "screenshots", "manifest.json");
 
-  return {
-    jobId,
-    status: "completed",
-    progress: 100,
-    result: {
-      manifestUrl: "http://localhost:3006/static/mock-manifest.json"
+  try {
+    const job = await crawlQueue.getJob(jobId);
+    
+    if (!job) {
+      // Check if manifest file exists as fallback
+      const fs = await import('fs/promises');
+      try {
+        await fs.access(manifestPath);
+        // Manifest exists, assume job completed
+        return {
+          jobId,
+          status: 'completed',
+          progress: 100,
+          result: {
+            manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+          }
+        };
+      } catch {
+        return reply.status(404).send({ error: "Job not found" });
+      }
     }
+
+    const state = await job.getState();
+    const progress = job.progress as number;
+    
+    let status: string;
+    let result = null;
+    
+    switch (state) {
+      case 'completed':
+        status = 'completed';
+        result = {
+          manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+        };
+        break;
+      case 'failed':
+        status = 'failed';
+        break;
+      case 'active':
+        status = 'processing';
+        break;
+      default:
+        status = 'pending';
+    }
+
+    return {
+      jobId,
+      status,
+      progress: typeof progress === 'number' ? progress : 0,
+      result
+    };
+  } catch (error) {
+    server.log.error(`Error getting job status: ${error}`);
+    return reply.status(500).send({ error: "Internal server error" });
   }
 })
 
