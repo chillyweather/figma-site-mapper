@@ -28,36 +28,46 @@ export async function createScreenshotPages(
     pageIdMap.set(page.url, newPage.id);
 
     try {
-      let imageBytes: Uint8Array;
-      let imageUrl = page.screenshot;
-      
-      // First try the main screenshot
-      try {
-        imageBytes = await fetchImageAsUint8Array(page.screenshot);
+      const screenshots = page.screenshot;
+      let yOffset = 0;
+
+      // Handle multiple screenshot slices
+      for (let i = 0; i < screenshots.length; i++) {
+        const screenshotUrl = screenshots[i];
+        let imageBytes: Uint8Array;
+        let imageUrl = screenshotUrl;
         
-        // Check if image is too large for Figma
-        if (isImageTooLarge(imageBytes)) {
-          console.log(`Image too large for ${page.url}, trying thumbnail...`);
+        try {
+          imageBytes = await fetchImageAsUint8Array(screenshotUrl);
+          
+          // Check if image is too large for Figma
+          if (isImageTooLarge(imageBytes)) {
+            console.log(`Image slice ${i + 1} too large for ${page.url}, trying thumbnail...`);
+            imageBytes = await fetchImageAsUint8Array(page.thumbnail);
+            imageUrl = page.thumbnail;
+          }
+        } catch (sliceError) {
+          console.log(`Failed to fetch slice ${i + 1} for ${page.url}, trying thumbnail...`);
           imageBytes = await fetchImageAsUint8Array(page.thumbnail);
           imageUrl = page.thumbnail;
         }
-      } catch (mainError) {
-        console.log(`Failed to fetch main image for ${page.url}, trying thumbnail...`);
-        imageBytes = await fetchImageAsUint8Array(page.thumbnail);
-        imageUrl = page.thumbnail;
+
+        const imageHash = figma.createImage(imageBytes).hash;
+
+        const rect = figma.createRectangle();
+        rect.resize(1440, 1024);
+        rect.fills = [{ type: "IMAGE", scaleMode: "FIT", imageHash }];
+        rect.x = 0;
+        rect.y = yOffset;
+        newPage.appendChild(rect);
+        
+        yOffset += 1024; // Move down for next slice
+        
+        console.log(`Successfully created slice ${i + 1} for ${page.url} using ${imageUrl}`);
       }
-
-      const imageHash = figma.createImage(imageBytes).hash;
-
-      const rect = figma.createRectangle();
-      rect.resize(1440, 1024);
-      rect.fills = [{ type: "IMAGE", scaleMode: "FIT", imageHash }];
-      newPage.appendChild(rect);
-      
-      console.log(`Successfully created page for ${page.url} using ${imageUrl}`);
     } catch (error) {
-      console.error(`Failed to place image for ${page.url}:`, error);
-      figma.notify(`Error placing image for ${page.url}`, { error: true });
+      console.error(`Failed to place images for ${page.url}:`, error);
+      figma.notify(`Error placing images for ${page.url}`, { error: true });
     }
   }
 

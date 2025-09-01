@@ -85,11 +85,22 @@ export async function runCrawler(startUrl: string, publicUrl: string) {
       await sharp(fullPageBuffer).toFile(screenshotPath); //<<<=== full page screenshot
       log.info(`Saved full screenshot to ${screenshotPath}`)
 
-      await sharp(fullPageBuffer)//<<<=== thumbnail
-        .extract({ top: 0, left: 0, width: 1280, height: 520 })
-        .resize(300)
+      // Create thumbnail - handle cases where image might be smaller than expected
+      const thumbnailImage = sharp(fullPageBuffer);
+      const thumbnailMetadata = await thumbnailImage.metadata();
+      
+      const imageWidth = thumbnailMetadata.width || 1280;
+      const imageHeight = thumbnailMetadata.height || 520;
+      
+      // Ensure we don't extract dimensions larger than the actual image, and minimum 1px
+      const extractWidth = Math.max(1, Math.min(imageWidth, 1280));
+      const extractHeight = Math.max(1, Math.min(imageHeight, 520));
+      
+      await thumbnailImage
+        .extract({ top: 0, left: 0, width: extractWidth, height: extractHeight })
+        .resize(300, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
         .toFile(thumbnailPath);
-      log.info(`Saved full thumbnail to ${thumbnailPath}`)
+      log.info(`Saved thumbnail (${extractWidth}x${extractHeight}) to ${thumbnailPath}`)
 
 
       crawledPages.push({
