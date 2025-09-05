@@ -1,6 +1,6 @@
 {
 	"id": "6hYlcWeSRTnZP48",
-	"json": "{\"id\":\"6hYlcWeSRTnZP48\",\"url\":\"https://crawlee.dev/js/docs/quick-start\",\"loadedUrl\":\"https://crawlee.dev/js/docs/quick-start\",\"uniqueKey\":\"https://crawlee.dev/js/docs/quick-start\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"crawlDepth\":2,\"enqueueStrategy\":\"same-hostname\",\"state\":4}},\"handledAt\":\"2025-09-05T12:49:20.342Z\"}",
+	"json": "{\"id\":\"6hYlcWeSRTnZP48\",\"url\":\"https://crawlee.dev/js/docs/quick-start\",\"loadedUrl\":\"https://crawlee.dev/js/docs/quick-start\",\"uniqueKey\":\"https://crawlee.dev/js/docs/quick-start\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"crawlDepth\":2,\"enqueueStrategy\":\"same-hostname\",\"state\":4}},\"handledAt\":\"2025-09-05T13:12:10.568Z\"}",
 	"method": "GET",
 	"orderNo": null,
 	"retryCount": 0,
