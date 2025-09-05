@@ -28,7 +28,6 @@ server.get('/', async (request, reply) => {
 server.post('/progress/:jobId', async (request, reply) => {
     const { jobId } = request.params;
     const { stage, currentPage, totalPages, currentUrl, progress } = request.body;
-    console.log(`📊 Progress API received: jobId=${jobId}, stage=${stage}, url=${currentUrl}, page=${currentPage}/${totalPages}, progress=${progress}%`);
     try {
         const job = await crawlQueue.getJob(jobId);
         if (!job) {

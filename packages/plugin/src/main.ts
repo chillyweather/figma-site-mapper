@@ -42,7 +42,6 @@ figma.ui.onmessage = async (msg) => {
 
       const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
       const result = await response.json();
-      console.log('Backend status response:', result);
 
       if (result.status === "completed" && result.result?.manifestUrl) {
         console.log(

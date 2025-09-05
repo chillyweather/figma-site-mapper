@@ -52,7 +52,7 @@ export async function createScreenshotPages(
 
   for (const page of pages) {
     const newPage = figma.createPage();
-    newPage.name = `Screenshot: ${page.title.substring(0, 50)}`;
+    newPage.name = page.title.substring(0, 50);
     pageIdMap.set(page.url, newPage.id);
 
     try {

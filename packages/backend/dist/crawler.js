@@ -155,7 +155,6 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         if (jobId) {
             try {
                 const progress = totalPages && currentPage ? Math.round((currentPage / totalPages) * 100) : 0;
-                console.log(`🔄 Progress update: ${stage} - ${currentUrl || 'unknown'} (${currentPage || 0}/${totalPages || 0}) ${progress}%`);
                 await fetch(`${publicUrl}/progress/${jobId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -181,11 +180,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         },
         async requestHandler({ request, page, log, enqueueLinks }) {
             currentPage++;
-            console.log(`📄 Processing page ${currentPage}/${totalPages}: ${request.url}`);
             await updateProgress('crawling', currentPage, totalPages, request.url);
             const title = await page.title();
             log.info(`Crawled ${request.url} - Title: ${title}`);
-            console.log(`📸 Taking screenshot of: ${request.url}`);
             await updateProgress('screenshot', currentPage, totalPages, request.url);
             const fullPageBuffer = await page.screenshot({ fullPage: true });
             // Slice the screenshot into manageable pieces
@@ -208,7 +205,6 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     });
     // Get total pages count before starting
     totalPages = maxRequestsPerCrawl || 100; // Default to 100 if no limit
-    console.log(`🎯 Starting crawl with jobId: ${jobId}, maxPages: ${totalPages}`);
     await updateProgress('starting', 0, totalPages, canonicalStartUrl);
     await crawler.run([canonicalStartUrl]);
     console.log(`📊 Total pages crawled: ${crawledPages.length}`);
