@@ -5,6 +5,7 @@ const App: React.FC = () => {
   const [url, setUrl] = useState('https://crawlee.dev');
   const [maxRequests, setMaxRequests] = useState('10');
   const [screenshotWidth, setScreenshotWidth] = useState('1440');
+  const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -22,10 +23,14 @@ const App: React.FC = () => {
     const screenshotWidthValue = screenshotWidth.trim() === '' ? 1440 : parseInt(screenshotWidth);
     const screenshotWidthParam = isNaN(screenshotWidthValue) || screenshotWidthValue <= 0 ? 1440 : screenshotWidthValue;
 
+    // Parse device scale factor: default to 1 if invalid
+    const deviceScaleFactorValue = deviceScaleFactor.trim() === '' ? 1 : parseInt(deviceScaleFactor);
+    const deviceScaleFactorParam = isNaN(deviceScaleFactorValue) || deviceScaleFactorValue < 1 || deviceScaleFactorValue > 2 ? 1 : deviceScaleFactorValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam } }, '*');
   };
 
   const handleClose = () => {
@@ -116,6 +121,18 @@ const App: React.FC = () => {
         />
         <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
           Screenshot width in pixels (320-3840px)
+        </div>
+        <select
+          value={deviceScaleFactor}
+          onChange={(e) => setDeviceScaleFactor(e.target.value)}
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+        >
+          <option value="1">1x Resolution</option>
+          <option value="2">2x Resolution (Higher Quality)</option>
+        </select>
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Higher resolution screenshots take longer to process
         </div>
         <button
           type="submit"

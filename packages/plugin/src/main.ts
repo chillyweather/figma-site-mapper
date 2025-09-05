@@ -7,7 +7,7 @@ figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl, screenshotWidth: width } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor } = msg;
     
     // Store the screenshot width for later use
     screenshotWidth = width || 1440;
@@ -18,7 +18,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1 }),
       });
 
       const result = await response.json();

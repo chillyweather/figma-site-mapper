@@ -186,7 +186,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number) {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1) {
   console.log('🚀 Starting the crawler...')
 
   const canonicalStartUrl = new URL(startUrl).toString();
@@ -194,6 +194,11 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   const crawledPages: PageData[] = [];
 
   const crawler = new PlaywrightCrawler({
+    launchContext: {
+      launchOptions: {
+        args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : []
+      }
+    },
     async requestHandler({ request, page, log, enqueueLinks }) {
       const title = await page.title();
       log.info(`Crawled ${request.url} - Title: ${title}`);

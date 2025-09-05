@@ -2,10 +2,10 @@ import { Worker } from "bullmq";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
 const processor = async (job) => {
-    const { url, publicUrl, maxRequestsPerCrawl } = job.data;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor } = job.data;
     console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
     try {
-        await runCrawler(url, publicUrl, maxRequestsPerCrawl);
+        await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1);
         console.log(`✅ Finished job ${job.id}`);
     }
     catch (error) {
