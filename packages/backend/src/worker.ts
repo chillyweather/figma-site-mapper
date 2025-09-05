@@ -8,7 +8,7 @@ const processor = async (job: Job) => {
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
 
   try {
-    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1)
+    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id)
     console.log(`✅ Finished job ${job.id}`)
   } catch (error) {
     console.error(`❌ Job ${job.id} failed:`, error)

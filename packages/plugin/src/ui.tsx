@@ -65,7 +65,28 @@ const App: React.FC = () => {
       }
 
       if (msg.type === 'status-update') {
-        setStatus(`Job ${msg.jobId}: ${msg.status} (${msg.progress}%)`);
+        let statusText = `Job ${msg.jobId}: ${msg.status}`;
+        
+        if (msg.detailedProgress) {
+          const { stage, currentPage, totalPages, currentUrl, progress } = msg.detailedProgress;
+          statusText = `Job ${msg.jobId}: ${msg.status} - ${stage}`;
+          
+          if (currentUrl) {
+            statusText += ` - ${currentUrl}`;
+          }
+          
+          if (currentPage && totalPages) {
+            statusText += ` (${currentPage}/${totalPages})`;
+          }
+          
+          if (typeof progress === 'number') {
+            statusText += ` ${progress}%`;
+          }
+        } else if (msg.progress && typeof msg.progress === 'number') {
+          statusText += ` (${msg.progress}%)`;
+        }
+        
+        setStatus(statusText);
 
         if (msg.status === 'completed') {
           if (intervalRef.current) {

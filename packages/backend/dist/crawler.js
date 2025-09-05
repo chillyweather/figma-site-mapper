@@ -144,10 +144,34 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId) {
     console.log('🚀 Starting the crawler...');
     const canonicalStartUrl = new URL(startUrl).toString();
     const crawledPages = [];
+    let currentPage = 0;
+    let totalPages = 0;
+    // Function to update job progress
+    const updateProgress = async (stage, currentPage, totalPages, currentUrl) => {
+        if (jobId) {
+            try {
+                const progress = totalPages && currentPage ? Math.round((currentPage / totalPages) * 100) : 0;
+                await fetch(`${publicUrl}/progress/${jobId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        stage,
+                        currentPage,
+                        totalPages,
+                        currentUrl,
+                        progress
+                    })
+                });
+            }
+            catch (error) {
+                console.warn(`Failed to update progress for job ${jobId}:`, error);
+            }
+        }
+    };
     const crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
@@ -155,10 +179,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
         },
         async requestHandler({ request, page, log, enqueueLinks }) {
+            currentPage++;
+            await updateProgress('crawling', currentPage, totalPages, request.url);
             const title = await page.title();
             log.info(`Crawled ${request.url} - Title: ${title}`);
+            await updateProgress('screenshot', currentPage, totalPages, request.url);
             const fullPageBuffer = await page.screenshot({ fullPage: true });
             // Slice the screenshot into manageable pieces
+            await updateProgress('processing', currentPage, totalPages, request.url);
             const screenshotSlices = await sliceScreenshot(fullPageBuffer, request.url, publicUrl);
             log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${request.url}`);
             crawledPages.push({
@@ -175,6 +203,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         },
         maxRequestsPerCrawl: maxRequestsPerCrawl || undefined,
     });
+    // Get total pages count before starting
+    totalPages = maxRequestsPerCrawl || 0;
+    await updateProgress('starting', 0, totalPages, canonicalStartUrl);
     await crawler.run([canonicalStartUrl]);
     console.log(`📊 Total pages crawled: ${crawledPages.length}`);
     console.log('📄 Crawled pages:', crawledPages.map(p => p.url));
