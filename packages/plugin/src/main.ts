@@ -1,6 +1,4 @@
 import { renderSitemap } from "./figmaRendering/renderSitemap";
-import { createScreenshotPages } from "./figmaRendering/utils/createScreenshotPages";
-import { flattenTree } from "./figmaRendering/utils/flattenTree";
 
 const BACKEND_URL = 'http://localhost:3006';
 let screenshotWidth = 1440; // Default screenshot width
@@ -62,10 +60,6 @@ figma.ui.onmessage = async (msg) => {
         const manifestData = await manifestResponse.json();
 
         console.log("Successfully fetched manifest: ", manifestData);
-
-        console.log("Creating screeshot pages...")
-        const pages = flattenTree(manifestData.tree)
-        await createScreenshotPages(pages, screenshotWidth)
 
         figma.notify("Crawl complete and manifest fetched!");
         await renderSitemap(manifestData, screenshotWidth);
