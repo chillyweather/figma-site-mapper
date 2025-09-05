@@ -30,7 +30,19 @@ export async function createScreenshotPages(
 
     try {
       const screenshots = page.screenshot;
-      let yOffset = 0;
+      
+      // Create a vertical autolayout frame for all screenshots
+      const screenshotsFrame = figma.createFrame();
+      screenshotsFrame.name = `${page.title} Screenshots`;
+      screenshotsFrame.layoutMode = "VERTICAL";
+      screenshotsFrame.primaryAxisAlignItems = "MIN";
+      screenshotsFrame.counterAxisAlignItems = "MIN";
+      screenshotsFrame.itemSpacing = -100; // Negative spacing to compensate for overlap
+      screenshotsFrame.paddingTop = 0;
+      screenshotsFrame.paddingBottom = 0;
+      screenshotsFrame.paddingLeft = 0;
+      screenshotsFrame.paddingRight = 0;
+      screenshotsFrame.fills = [];
 
       // Handle multiple screenshot slices
       for (let i = 0; i < screenshots.length; i++) {
@@ -58,14 +70,19 @@ export async function createScreenshotPages(
         const rect = figma.createRectangle();
         rect.resize(screenshotWidth, 1024);
         rect.fills = [{ type: "IMAGE", scaleMode: "FIT", imageHash }];
-        rect.x = 0;
-        rect.y = yOffset;
-        newPage.appendChild(rect);
         
-        yOffset += 1024; // Move down for next slice
+        screenshotsFrame.appendChild(rect);
         
         console.log(`Successfully created slice ${i + 1} for ${page.url} using ${imageUrl}`);
       }
+      
+      // Resize frame to fit content
+      screenshotsFrame.layoutAlign = "STRETCH";
+      screenshotsFrame.primaryAxisSizingMode = "AUTO";
+      screenshotsFrame.counterAxisSizingMode = "AUTO";
+      
+      newPage.appendChild(screenshotsFrame);
+      
     } catch (error) {
       console.error(`Failed to place images for ${page.url}:`, error);
       figma.notify(`Error placing images for ${page.url}`, { error: true });
