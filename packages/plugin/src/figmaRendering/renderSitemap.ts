@@ -2,11 +2,11 @@ import { TreeNode } from "../types";
 import { createScreenshotPages } from "./utils/createScreenshotPages";
 import { flattenTree } from "./utils/flattenTree";
 
-export async function renderSitemap(manifestData: { tree: TreeNode }) {
+export async function renderSitemap(manifestData: { tree: TreeNode }, screenshotWidth: number = 1440) {
   const pages = flattenTree(manifestData.tree);
   console.log("pages", pages);
 
-  const pageIdMap = await createScreenshotPages(pages);
+  const pageIdMap = await createScreenshotPages(pages, screenshotWidth);
   //
   //   const NODE_WIDTH = 320;
   //   const NODE_HEIGHT = 240;

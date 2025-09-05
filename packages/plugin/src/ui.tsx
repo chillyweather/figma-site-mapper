@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 const App: React.FC = () => {
   const [url, setUrl] = useState('https://crawlee.dev');
   const [maxRequests, setMaxRequests] = useState('10');
+  const [screenshotWidth, setScreenshotWidth] = useState('1440');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -17,10 +18,14 @@ const App: React.FC = () => {
     const maxRequestsValue = maxRequests.trim() === '' ? 0 : parseInt(maxRequests);
     const maxRequestsPerCrawl = (isNaN(maxRequestsValue) || maxRequestsValue === 0 || maxRequestsValue >= 999) ? undefined : maxRequestsValue;
 
+    // Parse screenshot width: default to 1440 if invalid or empty
+    const screenshotWidthValue = screenshotWidth.trim() === '' ? 1440 : parseInt(screenshotWidth);
+    const screenshotWidthParam = isNaN(screenshotWidthValue) || screenshotWidthValue <= 0 ? 1440 : screenshotWidthValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam } }, '*');
   };
 
   const handleClose = () => {
@@ -98,6 +103,19 @@ const App: React.FC = () => {
         />
         <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
           Leave empty, 0, or ≥999 for unlimited requests
+        </div>
+        <input
+          type="number"
+          value={screenshotWidth}
+          onChange={(e) => setScreenshotWidth(e.target.value)}
+          placeholder="Screenshot width (1440)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="320"
+          max="3840"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Screenshot width in pixels (320-3840px)
         </div>
         <button
           type="submit"

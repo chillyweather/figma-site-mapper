@@ -17,7 +17,8 @@ function isImageTooLarge(imageBytes: Uint8Array): boolean {
 }
 
 export async function createScreenshotPages(
-  pages: TreeNode[]
+  pages: TreeNode[],
+  screenshotWidth: number = 1440
 ): Promise<Map<string, string>> {
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
@@ -55,7 +56,7 @@ export async function createScreenshotPages(
         const imageHash = figma.createImage(imageBytes).hash;
 
         const rect = figma.createRectangle();
-        rect.resize(1440, 1024);
+        rect.resize(screenshotWidth, 1024);
         rect.fills = [{ type: "IMAGE", scaleMode: "FIT", imageHash }];
         rect.x = 0;
         rect.y = yOffset;

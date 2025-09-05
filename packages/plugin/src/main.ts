@@ -3,12 +3,16 @@ import { createScreenshotPages } from "./figmaRendering/utils/createScreenshotPa
 import { flattenTree } from "./figmaRendering/utils/flattenTree";
 
 const BACKEND_URL = 'http://localhost:3006';
+let screenshotWidth = 1440; // Default screenshot width
 
-figma.showUI(__html__, { width: 320, height: 440, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width } = msg;
+    
+    // Store the screenshot width for later use
+    screenshotWidth = width || 1440;
 
     try {
       const response = await fetch(`${BACKEND_URL}/crawl`, {
@@ -61,10 +65,10 @@ figma.ui.onmessage = async (msg) => {
 
         console.log("Creating screeshot pages...")
         const pages = flattenTree(manifestData.tree)
-        await createScreenshotPages(pages)
+        await createScreenshotPages(pages, screenshotWidth)
 
         figma.notify("Crawl complete and manifest fetched!");
-        await renderSitemap(manifestData);
+        await renderSitemap(manifestData, screenshotWidth);
       }
 
       figma.ui.postMessage({
