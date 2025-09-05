@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 const App: React.FC = () => {
   const [url, setUrl] = useState('https://crawlee.dev');
+  const [maxRequests, setMaxRequests] = useState('10');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -12,10 +13,14 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!url.trim()) return;
 
+    // Parse max requests: empty, 0, or >= 999 means infinity (no limit)
+    const maxRequestsValue = maxRequests.trim() === '' ? 0 : parseInt(maxRequests);
+    const maxRequestsPerCrawl = (isNaN(maxRequestsValue) || maxRequestsValue === 0 || maxRequestsValue >= 999) ? undefined : maxRequestsValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim() } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl } }, '*');
   };
 
   const handleClose = () => {
@@ -82,6 +87,18 @@ const App: React.FC = () => {
           disabled={isLoading || !!jobId}
           style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
         />
+        <input
+          type="number"
+          value={maxRequests}
+          onChange={(e) => setMaxRequests(e.target.value)}
+          placeholder="Max requests (10)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="0"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Leave empty, 0, or ≥999 for unlimited requests
+        </div>
         <button
           type="submit"
           disabled={isLoading || !!jobId || !url.trim()}

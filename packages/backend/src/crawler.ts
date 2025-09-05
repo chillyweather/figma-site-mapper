@@ -7,7 +7,6 @@ interface PageData {
   url: string;
   title: string;
   screenshot: string;
-  thumbnail: string;
 }
 
 const screenshotDir = path.join(process.cwd(), "screenshots");
@@ -61,7 +60,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string) {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number) {
   console.log('🚀 Starting the crawler...')
 
   const canonicalStartUrl = new URL(startUrl).toString();
@@ -77,37 +76,17 @@ export async function runCrawler(startUrl: string, publicUrl: string) {
 
       const safeFileName = getSafeFilename(request.url);
       const screenshotFileName = `${safeFileName}.png`;
-      const thumbnailFileName = `${safeFileName}_thumb.png`;
 
       const screenshotPath = path.join(screenshotDir, screenshotFileName)
-      const thumbnailPath = path.join(screenshotDir, thumbnailFileName)
 
       await sharp(fullPageBuffer).toFile(screenshotPath); //<<<=== full page screenshot
       log.info(`Saved full screenshot to ${screenshotPath}`)
-
-      // Create thumbnail - handle cases where image might be smaller than expected
-      const thumbnailImage = sharp(fullPageBuffer);
-      const thumbnailMetadata = await thumbnailImage.metadata();
-      
-      const imageWidth = thumbnailMetadata.width || 1280;
-      const imageHeight = thumbnailMetadata.height || 520;
-      
-      // Ensure we don't extract dimensions larger than the actual image, and minimum 1px
-      const extractWidth = Math.max(1, Math.min(imageWidth, 1280));
-      const extractHeight = Math.max(1, Math.min(imageHeight, 520));
-      
-      await thumbnailImage
-        .extract({ top: 0, left: 0, width: extractWidth, height: extractHeight })
-        .resize(300, null, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
-        .toFile(thumbnailPath);
-      log.info(`Saved thumbnail (${extractWidth}x${extractHeight}) to ${thumbnailPath}`)
 
 
       crawledPages.push({
         url: request.url,
         title: title,
         screenshot: `${publicUrl}/screenshots/${screenshotFileName}`,
-        thumbnail: `${publicUrl}/screenshots/${thumbnailFileName}`,
       })
 
       await enqueueLinks({
@@ -119,7 +98,7 @@ export async function runCrawler(startUrl: string, publicUrl: string) {
       log.error(`Request ${request.url} failed.`);
     },
 
-    maxRequestsPerCrawl: 10,
+    maxRequestsPerCrawl: maxRequestsPerCrawl || undefined,
   });
 
   await crawler.run([canonicalStartUrl]);

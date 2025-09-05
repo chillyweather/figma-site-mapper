@@ -4,11 +4,11 @@ import { flattenTree } from "./figmaRendering/utils/flattenTree";
 
 const BACKEND_URL = 'http://localhost:3006';
 
-figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 440, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url } = msg;
+    const { url, maxRequestsPerCrawl } = msg;
 
     try {
       const response = await fetch(`${BACKEND_URL}/crawl`, {
@@ -16,7 +16,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl }),
       });
 
       const result = await response.json();
@@ -48,13 +48,13 @@ figma.ui.onmessage = async (msg) => {
         );
 
         const manifestResponse = await fetch(result.result.manifestUrl);
-        
+
         if (!manifestResponse.ok) {
           console.error("Failed to fetch manifest:", manifestResponse.status, manifestResponse.statusText);
           figma.notify("Error: Could not fetch manifest from backend.", { error: true });
           return;
         }
-        
+
         const manifestData = await manifestResponse.json();
 
         console.log("Successfully fetched manifest: ", manifestData);
