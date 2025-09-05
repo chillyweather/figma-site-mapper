@@ -4,13 +4,13 @@
     "tree": {
       "url": "https://example.com/",
       "title": "Homepage",
-      "screenshot": "example_com_.png",
+      "screenshot": ["example_com_.png"],
       "thumbnail": "example_com__thumb.png",
       "children": [
         {
           "url": "https://example.com/about",
           "title": "About Us",
-          "screenshot": "example_com_about.png",
+          "screenshot": ["example_com_about.png"],
           "thumbnail": "example_com_about_thumb.png",
           "children": []
         }

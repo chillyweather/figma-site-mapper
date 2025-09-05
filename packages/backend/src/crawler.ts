@@ -6,7 +6,7 @@ import path from "path"
 interface PageData {
   url: string;
   title: string;
-  screenshot: string;
+  screenshot: string[];
 }
 
 const screenshotDir = path.join(process.cwd(), "screenshots");
@@ -16,6 +16,118 @@ if (!fs.existsSync(screenshotDir)) {
 
 function getSafeFilename(url: string): string {
   return url.replace(/[^a-zA-Z0-9]/g, '_');
+}
+
+async function sliceScreenshot(
+  imageBuffer: Buffer, 
+  url: string, 
+  publicUrl: string,
+  maxHeight: number = 4096,
+  overlap: number = 100
+): Promise<string[]> {
+  try {
+    const image = sharp(imageBuffer);
+    const metadata = await image.metadata();
+    
+    if (!metadata.height || !metadata.width) {
+      throw new Error('Could not get image dimensions');
+    }
+    
+    const { width, height } = metadata;
+    
+    console.log(`📐 Original screenshot dimensions: ${width}x${height} for ${url}`);
+    
+    // Validate dimensions
+    if (width <= 0 || height <= 0) {
+      throw new Error(`Invalid image dimensions: ${width}x${height}`);
+    }
+    
+    // If image is already small enough, return as single slice
+    if (height <= maxHeight) {
+      const safeFileName = getSafeFilename(url);
+      const screenshotFileName = `${safeFileName}.png`;
+      const screenshotPath = path.join(screenshotDir, screenshotFileName);
+      
+      await image.toFile(screenshotPath);
+      return [`${publicUrl}/screenshots/${screenshotFileName}`];
+    }
+    
+    // Fix for edge case where height is less than overlap
+    if (height <= overlap) {
+      console.log(`⚠️  Image height (${height}) <= overlap (${overlap}), saving as single slice`);
+      const safeFileName = getSafeFilename(url);
+      const screenshotFileName = `${safeFileName}.png`;
+      const screenshotPath = path.join(screenshotDir, screenshotFileName);
+      
+      await image.toFile(screenshotPath);
+      return [`${publicUrl}/screenshots/${screenshotFileName}`];
+    }
+    
+    // More accurate calculation for number of slices
+    const numSlices = Math.max(1, Math.ceil((height - maxHeight) / (maxHeight - overlap)) + 1);
+    const slices: string[] = [];
+    
+    console.log(`🖼️  Slicing large screenshot (${width}x${height}) into ${numSlices} pieces for ${url}`);
+    
+    for (let i = 0; i < numSlices; i++) {
+      // Calculate the starting position for this slice
+      let sliceTop = i * (maxHeight - overlap);
+      let sliceHeight = maxHeight;
+      
+      // For the last slice, adjust height to not exceed image bounds
+      if (i === numSlices - 1) {
+        sliceHeight = height - sliceTop;
+        // If the last slice would be too small, adjust the previous slice instead
+        if (sliceHeight < overlap) {
+          sliceTop = height - maxHeight;
+          sliceHeight = maxHeight;
+        }
+      }
+      
+      console.log(`📝 Processing slice ${i + 1}/${numSlices}: top=${sliceTop}, height=${sliceHeight}, image bounds=${height}`);
+      
+      console.log(`📝 Processing slice ${i + 1}/${numSlices}: top=${sliceTop}, height=${sliceHeight}`);
+      
+      // Validate extract bounds before attempting extraction
+      if (sliceTop >= height) {
+        console.error(`❌ Invalid sliceTop: ${sliceTop} >= ${height}`);
+        continue;
+      }
+      
+      if (sliceTop + sliceHeight > height) {
+        console.error(`❌ Invalid extract area: ${sliceTop} + ${sliceHeight} = ${sliceTop + sliceHeight} > ${height}`);
+        continue;
+      }
+      
+      const safeFileName = getSafeFilename(url);
+      const sliceFileName = `${safeFileName}_slice_${i + 1}_of_${numSlices}.png`;
+      const slicePath = path.join(screenshotDir, sliceFileName);
+      
+      try {
+        // Extract slice from original image - use clone to avoid modifying original
+        await image
+          .clone()
+          .extract({ 
+            left: 0, 
+            top: sliceTop, 
+            width: width, 
+            height: sliceHeight 
+          })
+          .toFile(slicePath);
+        
+        slices.push(`${publicUrl}/screenshots/${sliceFileName}`);
+        console.log(`📸 Created slice ${i + 1}/${numSlices}: ${width}x${sliceHeight}px at y=${sliceTop}`);
+      } catch (error) {
+        console.error(`❌ Failed to create slice ${i + 1}/${numSlices}:`, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+    }
+    
+    return slices;
+  } catch (error) {
+    console.error(`❌ sliceScreenshot failed for ${url}:`, error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 }
 
 function countTreeNodes(node: PageData & { children: PageData[] }): number {
@@ -88,19 +200,14 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
 
       const fullPageBuffer = await page.screenshot({ fullPage: true });
 
-      const safeFileName = getSafeFilename(request.url);
-      const screenshotFileName = `${safeFileName}.png`;
-
-      const screenshotPath = path.join(screenshotDir, screenshotFileName)
-
-      await sharp(fullPageBuffer).toFile(screenshotPath); //<<<=== full page screenshot
-      log.info(`Saved full screenshot to ${screenshotPath}`)
-
+      // Slice the screenshot into manageable pieces
+      const screenshotSlices = await sliceScreenshot(fullPageBuffer, request.url, publicUrl);
+      log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${request.url}`)
 
       crawledPages.push({
         url: request.url,
         title: title,
-        screenshot: `${publicUrl}/screenshots/${screenshotFileName}`,
+        screenshot: screenshotSlices,
       })
 
       await enqueueLinks({
