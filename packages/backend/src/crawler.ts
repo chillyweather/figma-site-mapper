@@ -18,6 +18,14 @@ function getSafeFilename(url: string): string {
   return url.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+function countTreeNodes(node: PageData & { children: PageData[] }): number {
+  let count = 1; // Count current node
+  for (const child of node.children) {
+    count += countTreeNodes(child as PageData & { children: PageData[] });
+  }
+  return count;
+}
+
 function buildTree(pages: PageData[], startUrl: string): PageData | null {
   if (pages.length === 0) {
     return null;
@@ -55,6 +63,12 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
 
     if (parentNode) {
       parentNode.children.push(node);
+    } else {
+      console.log(`⚠️  Orphaned page (no parent found): ${canonicalUrl} (looking for parent: ${parentUrl})`);
+      // If no parent found, add as child of root
+      if (root) {
+        root.children.push(node);
+      }
     }
   }
   return root;
@@ -103,7 +117,12 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
 
   await crawler.run([canonicalStartUrl]);
 
+  console.log(`📊 Total pages crawled: ${crawledPages.length}`);
+  console.log('📄 Crawled pages:', crawledPages.map(p => p.url));
+
   const siteTree = buildTree(crawledPages, canonicalStartUrl);
+
+  console.log(`🌲 Tree built with ${siteTree ? countTreeNodes(siteTree as PageData & { children: PageData[] }) : 0} nodes`);
 
   const manifest = {
     startUrl: canonicalStartUrl,
