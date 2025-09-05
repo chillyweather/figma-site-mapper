@@ -65,6 +65,7 @@ const App: React.FC = () => {
       }
 
       if (msg.type === 'status-update') {
+        console.log('UI received status update:', msg);
         let statusText = `Job ${msg.jobId}: ${msg.status}`;
         
         if (msg.detailedProgress) {
@@ -87,6 +88,7 @@ const App: React.FC = () => {
         }
         
         setStatus(statusText);
+        console.log('Progress update:', statusText);
 
         if (msg.status === 'completed') {
           if (intervalRef.current) {
