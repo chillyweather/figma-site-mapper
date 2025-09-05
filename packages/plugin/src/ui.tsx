@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 
 const App: React.FC = () => {
   const [url, setUrl] = useState('https://crawlee.dev');
+  const [maxRequests, setMaxRequests] = useState('10');
+  const [screenshotWidth, setScreenshotWidth] = useState('1440');
+  const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -12,10 +15,22 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!url.trim()) return;
 
+    // Parse max requests: empty, 0, or >= 999 means infinity (no limit)
+    const maxRequestsValue = maxRequests.trim() === '' ? 0 : parseInt(maxRequests);
+    const maxRequestsPerCrawl = (isNaN(maxRequestsValue) || maxRequestsValue === 0 || maxRequestsValue >= 999) ? undefined : maxRequestsValue;
+
+    // Parse screenshot width: default to 1440 if invalid or empty
+    const screenshotWidthValue = screenshotWidth.trim() === '' ? 1440 : parseInt(screenshotWidth);
+    const screenshotWidthParam = isNaN(screenshotWidthValue) || screenshotWidthValue <= 0 ? 1440 : screenshotWidthValue;
+
+    // Parse device scale factor: default to 1 if invalid
+    const deviceScaleFactorValue = deviceScaleFactor.trim() === '' ? 1 : parseInt(deviceScaleFactor);
+    const deviceScaleFactorParam = isNaN(deviceScaleFactorValue) || deviceScaleFactorValue < 1 || deviceScaleFactorValue > 2 ? 1 : deviceScaleFactorValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim() } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam } }, '*');
   };
 
   const handleClose = () => {
@@ -50,7 +65,28 @@ const App: React.FC = () => {
       }
 
       if (msg.type === 'status-update') {
-        setStatus(`Job ${msg.jobId}: ${msg.status} (${msg.progress}%)`);
+        let statusText = `Job ${msg.jobId}: ${msg.status}`;
+        
+        if (msg.detailedProgress) {
+          const { stage, currentPage, totalPages, currentUrl, progress } = msg.detailedProgress;
+          statusText = `Job ${msg.jobId}: ${msg.status} - ${stage}`;
+          
+          if (currentUrl) {
+            statusText += ` - ${currentUrl}`;
+          }
+          
+          if (currentPage && totalPages) {
+            statusText += ` (${currentPage}/${totalPages})`;
+          }
+          
+          if (typeof progress === 'number') {
+            statusText += ` ${progress}%`;
+          }
+        } else if (msg.progress && typeof msg.progress === 'number') {
+          statusText += ` (${msg.progress}%)`;
+        }
+        
+        setStatus(statusText);
 
         if (msg.status === 'completed') {
           if (intervalRef.current) {
@@ -82,6 +118,43 @@ const App: React.FC = () => {
           disabled={isLoading || !!jobId}
           style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
         />
+        <input
+          type="number"
+          value={maxRequests}
+          onChange={(e) => setMaxRequests(e.target.value)}
+          placeholder="Max requests (10)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="0"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Leave empty, 0, or ≥999 for unlimited requests
+        </div>
+        <input
+          type="number"
+          value={screenshotWidth}
+          onChange={(e) => setScreenshotWidth(e.target.value)}
+          placeholder="Screenshot width (1440)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="320"
+          max="3840"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Screenshot width in pixels (320-3840px)
+        </div>
+        <select
+          value={deviceScaleFactor}
+          onChange={(e) => setDeviceScaleFactor(e.target.value)}
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+        >
+          <option value="1">1x Resolution</option>
+          <option value="2">2x Resolution (Higher Quality)</option>
+        </select>
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Higher resolution screenshots take longer to process
+        </div>
         <button
           type="submit"
           disabled={isLoading || !!jobId || !url.trim()}

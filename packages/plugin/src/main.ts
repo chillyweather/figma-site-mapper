@@ -1,14 +1,16 @@
 import { renderSitemap } from "./figmaRendering/renderSitemap";
-import { createScreenshotPages } from "./figmaRendering/utils/createScreenshotPages";
-import { flattenTree } from "./figmaRendering/utils/flattenTree";
 
 const BACKEND_URL = 'http://localhost:3006';
+let screenshotWidth = 1440; // Default screenshot width
 
-figma.showUI(__html__, { width: 320, height: 240, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor } = msg;
+    
+    // Store the screenshot width for later use
+    screenshotWidth = width || 1440;
 
     try {
       const response = await fetch(`${BACKEND_URL}/crawl`, {
@@ -16,7 +18,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1 }),
       });
 
       const result = await response.json();
@@ -48,23 +50,19 @@ figma.ui.onmessage = async (msg) => {
         );
 
         const manifestResponse = await fetch(result.result.manifestUrl);
-        
+
         if (!manifestResponse.ok) {
           console.error("Failed to fetch manifest:", manifestResponse.status, manifestResponse.statusText);
           figma.notify("Error: Could not fetch manifest from backend.", { error: true });
           return;
         }
-        
+
         const manifestData = await manifestResponse.json();
 
         console.log("Successfully fetched manifest: ", manifestData);
 
-        console.log("Creating screeshot pages...")
-        const pages = flattenTree(manifestData.tree)
-        await createScreenshotPages(pages)
-
         figma.notify("Crawl complete and manifest fetched!");
-        await renderSitemap(manifestData);
+        await renderSitemap(manifestData, screenshotWidth);
       }
 
       figma.ui.postMessage({
@@ -72,6 +70,7 @@ figma.ui.onmessage = async (msg) => {
         jobId,
         status: result.status,
         progress: result.progress,
+        detailedProgress: result.detailedProgress,
         manifestUrl: result.result?.manifestUrl,
       });
     } catch (error) {

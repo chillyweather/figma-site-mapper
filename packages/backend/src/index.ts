@@ -33,6 +33,44 @@ server.get('/', async (request, reply) => {
   return { hello: 'world' }
 })
 
+server.post('/progress/:jobId', async (request, reply) => {
+  const { jobId } = request.params as { jobId: string }
+  const { stage, currentPage, totalPages, currentUrl, progress } = request.body as {
+    stage: string
+    currentPage?: number
+    totalPages?: number
+    currentUrl?: string
+    progress: number
+  }
+
+
+
+  try {
+    const job = await crawlQueue.getJob(jobId);
+    if (!job) {
+      return reply.status(404).send({ error: "Job not found" });
+    }
+
+    // Store progress data in job data
+    await job.updateData({
+      ...job.data,
+      progress: {
+        stage,
+        currentPage,
+        totalPages,
+        currentUrl,
+        progress,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    return { message: "Progress updated" };
+  } catch (error) {
+    server.log.error(`Error updating progress: ${error}`);
+    return reply.status(500).send({ error: "Internal server error" });
+  }
+})
+
 server.get("/status/:jobId", async (request, reply) => {
   const { jobId } = request.params as { jobId: string }
   const manifestPath = path.join(__dirname, "..", "screenshots", "manifest.json");
@@ -64,6 +102,13 @@ server.get("/status/:jobId", async (request, reply) => {
     
     let status: string;
     let result = null;
+    let detailedProgress = null;
+    
+    // Get detailed progress from job data
+    const jobData = job.data as any;
+    if (jobData.progress) {
+      detailedProgress = jobData.progress;
+    }
     
     switch (state) {
       case 'completed':
@@ -85,8 +130,9 @@ server.get("/status/:jobId", async (request, reply) => {
     return {
       jobId,
       status,
-      progress: typeof progress === 'number' ? progress : 0,
-      result
+      progress: detailedProgress || (typeof progress === 'number' ? progress : 0),
+      result,
+      detailedProgress
     };
   } catch (error) {
     server.log.error(`Error getting job status: ${error}`);
@@ -96,14 +142,14 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl } = request.body as { url: string, publicUrl: string };
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor } = request.body as { url: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor?: number };
 
   if (!url || !publicUrl) {
     reply.status(400).send({ error: "URL and publicUrl is required" })
     return
   }
 
-  const job = await crawlQueue.add("crawl", { url, publicUrl });
+  const job = await crawlQueue.add("crawl", { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1 });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }
 })
