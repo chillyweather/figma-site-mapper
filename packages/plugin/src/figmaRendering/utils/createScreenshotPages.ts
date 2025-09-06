@@ -51,6 +51,58 @@ export async function createScreenshotPages(
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
 
+  // Load font for navigation frame - use Inter only
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  const fontName = { family: "Inter", style: "Regular" };
+
+  // Create navigation frame function
+  function createNavigationFrame(pageTitle: string): FrameNode {
+    const navFrame = figma.createFrame();
+    navFrame.name = "Navigation";
+    navFrame.layoutMode = "HORIZONTAL";
+    navFrame.primaryAxisAlignItems = "MIN";
+    navFrame.counterAxisAlignItems = "CENTER";
+    navFrame.paddingTop = 16;
+    navFrame.paddingBottom = 16;
+    navFrame.paddingLeft = 16;
+    navFrame.paddingRight = 16;
+    navFrame.itemSpacing = 8;
+    navFrame.fills = [{ type: "SOLID", color: { r: 0.95, g: 0.95, b: 0.95 } }];
+    navFrame.strokes = [{ type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8 } }];
+    navFrame.strokeWeight = 1;
+    navFrame.cornerRadius = 8;
+
+    // Create "← Back to Index" text
+    const backText = figma.createText();
+    backText.fontName = fontName;
+    backText.fontSize = 14;
+    backText.characters = "← Back to Index";
+    // Link will be added later when we know the index page ID
+
+    // Create separator
+    const separator = figma.createText();
+    separator.fontName = fontName;
+    separator.fontSize = 14;
+    separator.characters = "|";
+
+    // Create current page title
+    const titleText = figma.createText();
+    titleText.fontName = fontName;
+    titleText.fontSize = 14;
+    titleText.characters = pageTitle;
+
+    navFrame.appendChild(backText);
+    navFrame.appendChild(separator);
+    navFrame.appendChild(titleText);
+
+    // Auto-resize
+    navFrame.layoutAlign = "STRETCH";
+    navFrame.primaryAxisSizingMode = "AUTO";
+    navFrame.counterAxisSizingMode = "AUTO";
+
+    return navFrame;
+  }
+
   for (const page of pages) {
     const newPage = figma.createPage();
     newPage.name = page.title.substring(0, 50);
@@ -65,12 +117,23 @@ export async function createScreenshotPages(
       screenshotsFrame.layoutMode = "VERTICAL";
       screenshotsFrame.primaryAxisAlignItems = "MIN";
       screenshotsFrame.counterAxisAlignItems = "MIN";
-       screenshotsFrame.itemSpacing = 0; // No overlap, so no negative spacing needed
+      screenshotsFrame.itemSpacing = 0; // No overlap, so no negative spacing needed
       screenshotsFrame.paddingTop = 0;
       screenshotsFrame.paddingBottom = 0;
       screenshotsFrame.paddingLeft = 0;
       screenshotsFrame.paddingRight = 0;
       screenshotsFrame.fills = [];
+
+      // Create navigation frame for this page
+      const navFrame = createNavigationFrame(page.title);
+      screenshotsFrame.appendChild(navFrame);
+
+      // Add 24px margin between navigation and screenshots
+      const spacerFrame = figma.createFrame();
+      spacerFrame.name = "Spacer";
+      spacerFrame.resize(screenshotWidth, 24);
+      spacerFrame.fills = [];
+      screenshotsFrame.appendChild(spacerFrame);
 
       // Handle multiple screenshot slices
       for (let i = 0; i < screenshots.length; i++) {
@@ -128,8 +191,27 @@ export async function createScreenshotPages(
   }
 
   figma.currentPage = originalPage;
+
   console.log(`Created ${pageIdMap.size} screenshot pages`);
 
   return pageIdMap;
+}
 
+// Function to update navigation links with index page ID
+export function updateNavigationLinks(indexPageId: string) {
+  // Find all pages that contain navigation frames
+  for (const page of figma.root.children) {
+    if (page.name === "Index") continue;
+    
+    const navFrame = page.findOne(node => node.name === "Navigation") as FrameNode;
+    if (navFrame) {
+      const backText = navFrame.findOne(node => 
+        node.type === "TEXT" && node.characters.includes("← Back to Index")
+      ) as TextNode;
+      
+      if (backText) {
+        backText.hyperlink = { type: "NODE", value: indexPageId };
+      }
+    }
+  }
 }
