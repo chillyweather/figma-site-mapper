@@ -4,11 +4,11 @@ import { runCrawler } from "./crawler.js";
 
 
 const processor = async (job: Job) => {
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay } = job.data;
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay } = job.data;
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
 
   try {
-    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0)
+    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000)
     console.log(`✅ Finished job ${job.id}`)
   } catch (error) {
     console.error(`❌ Job ${job.id} failed:`, error)

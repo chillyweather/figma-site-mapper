@@ -7,6 +7,7 @@ const App: React.FC = () => {
   const [screenshotWidth, setScreenshotWidth] = useState('1440');
   const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
   const [delay, setDelay] = useState('0');
+  const [requestDelay, setRequestDelay] = useState('1000');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -32,10 +33,14 @@ const App: React.FC = () => {
     const delayValue = delay.trim() === '' ? 0 : parseInt(delay);
     const delayParam = isNaN(delayValue) || delayValue < 0 ? 0 : delayValue;
 
+    // Parse request delay: default to 1000ms if invalid or empty
+    const requestDelayValue = requestDelay.trim() === '' ? 1000 : parseInt(requestDelay);
+    const requestDelayParam = isNaN(requestDelayValue) || requestDelayValue < 0 ? 1000 : requestDelayValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam } }, '*');
   };
 
   const handleClose = () => {
@@ -172,6 +177,20 @@ const App: React.FC = () => {
         />
         <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
           Additional delay after page load (0-60 seconds)
+        </div>
+        <input
+          type="number"
+          value={requestDelay}
+          onChange={(e) => setRequestDelay(e.target.value)}
+          placeholder="Delay between requests in ms (1000)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="0"
+          max="10000"
+          step="100"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Delay between requests to avoid rate limiting (0-10000ms)
         </div>
         <button
           type="submit"

@@ -1,29 +1,60 @@
 {
-  "requestsFinished": 39,
-  "requestsFailed": 0,
-  "requestsRetries": 0,
+  "requestsFinished": 33,
+  "requestsFailed": 3,
+  "requestsRetries": 20,
   "requestsFailedPerMinute": 0,
-  "requestsFinishedPerMinute": 15,
-  "requestMinDurationMillis": 2798,
-  "requestMaxDurationMillis": 9931,
-  "requestTotalFailedDurationMillis": 0,
-  "requestTotalFinishedDurationMillis": 156763,
-  "crawlerStartedAt": "2025-09-06T12:27:56.905Z",
-  "crawlerFinishedAt": "2025-09-06T12:30:34.271Z",
-  "statsPersistedAt": "2025-09-06T12:30:34.271Z",
-  "crawlerRuntimeMillis": 157492,
-  "crawlerLastStartTimestamp": 1757161676779,
+  "requestsFinishedPerMinute": 7,
+  "requestMinDurationMillis": 3277,
+  "requestMaxDurationMillis": 16074,
+  "requestTotalFailedDurationMillis": 3933,
+  "requestTotalFinishedDurationMillis": 174816,
+  "crawlerStartedAt": "2025-09-06T13:06:06.053Z",
+  "crawlerFinishedAt": "2025-09-06T13:10:33.469Z",
+  "statsPersistedAt": "2025-09-06T13:10:33.469Z",
+  "crawlerRuntimeMillis": 267478,
+  "crawlerLastStartTimestamp": 1757163965991,
   "requestRetryHistogram": [
-    39
+    16,
+    8,
+    4,
+    2,
+    3,
+    null,
+    null,
+    null,
+    null,
+    null,
+    3
   ],
   "statsId": 0,
-  "requestAvgFailedDurationMillis": null,
-  "requestAvgFinishedDurationMillis": 4020,
-  "requestTotalDurationMillis": 156763,
-  "requestsTotal": 39,
+  "requestAvgFailedDurationMillis": 1311,
+  "requestAvgFinishedDurationMillis": 5297,
+  "requestTotalDurationMillis": 178749,
+  "requestsTotal": 36,
   "requestsWithStatusCode": {
-    "200": 39
+    "200": 33,
+    "429": 67
   },
-  "errors": {},
-  "retryErrors": {}
+  "errors": {
+    "/Users/dmitridmitriev/personal/workspace/figma-sitemapper/node_modules/.pnpm/@crawlee+browser@3.14.1_playwright@1.54.2/node_modules/@crawlee/src/internals/browser-crawler.ts:584:30": {
+      "missing error code": {
+        "Error": {
+          "Detected a session error, rotating session... ": {
+            "count": 3
+          }
+        }
+      }
+    }
+  },
+  "retryErrors": {
+    "/Users/dmitridmitriev/personal/workspace/figma-sitemapper/node_modules/.pnpm/@crawlee+browser@3.14.1_playwright@1.54.2/node_modules/@crawlee/src/internals/browser-crawler.ts:584:30": {
+      "missing error code": {
+        "Error": {
+          "Detected a session error, rotating session... ": {
+            "count": 64
+          }
+        }
+      }
+    }
+  }
 }

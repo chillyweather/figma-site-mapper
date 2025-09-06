@@ -144,8 +144,16 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000) {
     console.log('🚀 Starting the crawler...');
+    // List of realistic user agents to rotate
+    const userAgents = [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+    ];
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     const canonicalStartUrl = new URL(startUrl).toString();
     const crawledPages = [];
     let currentPage = 0;
@@ -172,6 +180,8 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
         }
     };
+    // Calculate max requests per minute based on request delay
+    const maxRequestsPerMinute = requestDelay > 0 ? Math.floor(60000 / (requestDelay + 500)) : 30; // 500ms buffer for processing
     const crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
@@ -179,15 +189,38 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 // Add additional browser arguments for better compatibility
                 headless: true,
                 slowMo: 100 // Small delay to allow pages to stabilize
-            }
+            },
+            // Set custom user agent to appear more like real browser traffic
+            userAgent: randomUserAgent
         },
         // Wait for network idle before considering page loaded
         navigationTimeoutSecs: 30,
-        requestHandlerTimeoutSecs: 60,
+        requestHandlerTimeoutSecs: 45,
         maxConcurrency: 1, // Process one page at a time for better reliability
+        // Rate limiting configuration
+        maxRequestsPerMinute: maxRequestsPerMinute, // Dynamic based on request delay
+        retryOnBlocked: true,
+        maxRequestRetries: 3,
+        // Use session pool to rotate identities
+        useSessionPool: true,
+        persistCookiesPerSession: true,
         async requestHandler({ request, page, log, enqueueLinks }) {
             currentPage++;
             await updateProgress('crawling', currentPage, totalPages, request.url);
+            // Set extra headers to appear more like real browser traffic
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"macOS"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Upgrade-Insecure-Requests': '1'
+            });
             // Wait for page to fully load and render dynamic content
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
                 log.info('Network idle timeout, continuing anyway');
@@ -283,6 +316,17 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         failedRequestHandler({ request, log }) {
             log.error(`Request ${request.url} failed.`);
         },
+        // Add pre-navigation hooks for random delays and better request spacing
+        preNavigationHooks: [
+            async ({ request, log }) => {
+                // Use configured request delay with some randomization to avoid rate limiting
+                const baseDelay = requestDelay;
+                const randomVariation = Math.floor(Math.random() * 500) - 250; // ±250ms variation
+                const totalDelay = Math.max(0, baseDelay + randomVariation);
+                log.info(`Adding ${totalDelay}ms delay before navigating to ${request.url}`);
+                await new Promise(resolve => setTimeout(resolve, totalDelay));
+            }
+        ],
         maxRequestsPerCrawl: maxRequestsPerCrawl || undefined,
     });
     // Get total pages count before starting
