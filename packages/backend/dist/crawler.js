@@ -144,8 +144,16 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000) {
     console.log('🚀 Starting the crawler...');
+    // List of realistic user agents to rotate
+    const userAgents = [
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+    ];
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     const canonicalStartUrl = new URL(startUrl).toString();
     const crawledPages = [];
     let currentPage = 0;
@@ -172,15 +180,78 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
         }
     };
+    // Calculate max requests per minute based on request delay
+    const maxRequestsPerMinute = requestDelay > 0 ? Math.floor(60000 / (requestDelay + 500)) : 30; // 500ms buffer for processing
     const crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
-                args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : []
-            }
+                args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : [],
+                // Add additional browser arguments for better compatibility
+                headless: true,
+                slowMo: 100 // Small delay to allow pages to stabilize
+            },
+            // Set custom user agent to appear more like real browser traffic
+            userAgent: randomUserAgent
         },
+        // Wait for network idle before considering page loaded
+        navigationTimeoutSecs: 30,
+        requestHandlerTimeoutSecs: 45,
+        maxConcurrency: 1, // Process one page at a time for better reliability
+        // Rate limiting configuration
+        maxRequestsPerMinute: maxRequestsPerMinute, // Dynamic based on request delay
+        retryOnBlocked: true,
+        maxRequestRetries: 3,
+        // Use session pool to rotate identities
+        useSessionPool: true,
+        persistCookiesPerSession: true,
         async requestHandler({ request, page, log, enqueueLinks }) {
             currentPage++;
             await updateProgress('crawling', currentPage, totalPages, request.url);
+            // Set extra headers to appear more like real browser traffic
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"macOS"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Upgrade-Insecure-Requests': '1'
+            });
+            // Wait for page to fully load and render dynamic content
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+                log.info('Network idle timeout, continuing anyway');
+            });
+            // Additional wait for dynamic content (configurable delay)
+            if (delay > 0) {
+                log.info(`Waiting ${delay}ms for dynamic content to load`);
+                await page.waitForTimeout(delay);
+            }
+            // Scroll through page to trigger lazy loading
+            try {
+                await page.evaluate(async () => {
+                    const scrollHeight = document.documentElement.scrollHeight;
+                    const viewportHeight = window.innerHeight;
+                    let currentPosition = 0;
+                    while (currentPosition < scrollHeight) {
+                        currentPosition += viewportHeight;
+                        window.scrollTo(0, currentPosition);
+                        await new Promise(resolve => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
+                    }
+                    // Scroll back to top
+                    window.scrollTo(0, 0);
+                });
+                // Wait for any newly loaded content
+                const scrollWaitTime = delay > 0 ? Math.min(2000, delay / 2) : 1000;
+                await page.waitForTimeout(scrollWaitTime);
+                log.info(`Completed scrolling through ${request.url} to trigger lazy loading`);
+            }
+            catch (error) {
+                log.info(`Scrolling failed or not needed for ${request.url}`);
+            }
             const title = await page.title();
             log.info(`Crawled ${request.url} - Title: ${title}`);
             await updateProgress('screenshot', currentPage, totalPages, request.url);
@@ -194,13 +265,68 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 title: title,
                 screenshot: screenshotSlices,
             });
-            await enqueueLinks({
-                strategy: "same-hostname"
-            });
+            // Log discovered links for debugging
+            try {
+                const links = await page.evaluate(() => {
+                    const anchors = document.querySelectorAll('a[href]');
+                    return Array.from(anchors).map(a => ({
+                        href: a.getAttribute('href'),
+                        text: a.textContent?.trim().substring(0, 50)
+                    })).slice(0, 10); // Log first 10 links
+                });
+                log.info(`Found ${links.length} links on ${request.url}: ${links.map(l => l.href).join(', ')}`);
+            }
+            catch (error) {
+                log.info(`Could not extract links for debugging from ${request.url}`);
+            }
+            // Enhanced link discovery with multiple strategies
+            try {
+                // Wait a bit more for any lazy-loaded links
+                await page.waitForTimeout(1000);
+                // Enqueue links with same hostname strategy
+                await enqueueLinks({
+                    strategy: "same-hostname",
+                    transformRequestFunction: (request) => {
+                        // Filter out common non-content URLs
+                        const url = new URL(request.url);
+                        const blockedPatterns = [
+                            /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar)$/i,
+                            /\/api\//i,
+                            /\/assets\//i,
+                            /\/images\//i,
+                            /\/css\//i,
+                            /\/js\//i,
+                            /\#.*$/,
+                            /\?.*$/
+                        ];
+                        const shouldBlock = blockedPatterns.some(pattern => pattern.test(url.pathname));
+                        if (shouldBlock) {
+                            log.info(`Skipping URL due to blocked pattern: ${request.url}`);
+                            return false;
+                        }
+                        return request;
+                    }
+                });
+                log.info(`Successfully enqueued links from ${request.url}`);
+            }
+            catch (error) {
+                log.error(`Failed to enqueue links from ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+            }
         },
         failedRequestHandler({ request, log }) {
             log.error(`Request ${request.url} failed.`);
         },
+        // Add pre-navigation hooks for random delays and better request spacing
+        preNavigationHooks: [
+            async ({ request, log }) => {
+                // Use configured request delay with some randomization to avoid rate limiting
+                const baseDelay = requestDelay;
+                const randomVariation = Math.floor(Math.random() * 500) - 250; // ±250ms variation
+                const totalDelay = Math.max(0, baseDelay + randomVariation);
+                log.info(`Adding ${totalDelay}ms delay before navigating to ${request.url}`);
+                await new Promise(resolve => setTimeout(resolve, totalDelay));
+            }
+        ],
         maxRequestsPerCrawl: maxRequestsPerCrawl || undefined,
     });
     // Get total pages count before starting

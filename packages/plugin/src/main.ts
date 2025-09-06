@@ -4,7 +4,7 @@ const BACKEND_URL = 'http://localhost:3006';
 let screenshotWidth = 1440; // Default screenshot width
 let hasRenderedSitemap = false; // Prevent duplicate rendering
 
-figma.showUI(__html__, { width: 320, height: 480, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 600, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
@@ -45,32 +45,32 @@ figma.ui.onmessage = async (msg) => {
       const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
       const result = await response.json();
 
-        if (result.status === "completed" && result.result?.manifestUrl && !hasRenderedSitemap) {
-          hasRenderedSitemap = true; // Prevent duplicate rendering
-          console.log("🎉 Job completed, rendering sitemap (first time)");
+      if (result.status === "completed" && result.result?.manifestUrl && !hasRenderedSitemap) {
+        hasRenderedSitemap = true; // Prevent duplicate rendering
+        console.log("🎉 Job completed, rendering sitemap (first time)");
 
-          console.log(
-            "Job complete! Fetching manifest from:",
-            result.result.manifestUrl
-          );
+        console.log(
+          "Job complete! Fetching manifest from:",
+          result.result.manifestUrl
+        );
 
-          const manifestResponse = await fetch(result.result.manifestUrl);
+        const manifestResponse = await fetch(result.result.manifestUrl);
 
-          if (!manifestResponse.ok) {
-            console.error("Failed to fetch manifest:", manifestResponse.status, manifestResponse.statusText);
-            figma.notify("Error: Could not fetch manifest from backend.", { error: true });
-            return;
-          }
-
-          const manifestData = await manifestResponse.json();
-
-          console.log("Successfully fetched manifest: ", manifestData);
-
-          figma.notify("Crawl complete and manifest fetched!");
-          await renderSitemap(manifestData, screenshotWidth);
-        } else if (result.status === "completed" && hasRenderedSitemap) {
-          console.log("⚠️  Skipping duplicate sitemap rendering");
+        if (!manifestResponse.ok) {
+          console.error("Failed to fetch manifest:", manifestResponse.status, manifestResponse.statusText);
+          figma.notify("Error: Could not fetch manifest from backend.", { error: true });
+          return;
         }
+
+        const manifestData = await manifestResponse.json();
+
+        console.log("Successfully fetched manifest: ", manifestData);
+
+        figma.notify("Crawl complete and manifest fetched!");
+        await renderSitemap(manifestData, screenshotWidth);
+      } else if (result.status === "completed" && hasRenderedSitemap) {
+        console.log("⚠️  Skipping duplicate sitemap rendering");
+      }
 
       figma.ui.postMessage({
         type: "status-update",
