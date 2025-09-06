@@ -175,12 +175,46 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     const crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
-                args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : []
+                args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : [],
+                // Add additional browser arguments for better compatibility
+                headless: true,
+                slowMo: 100 // Small delay to allow pages to stabilize
             }
         },
+        // Wait for network idle before considering page loaded
+        navigationTimeoutSecs: 30,
+        requestHandlerTimeoutSecs: 60,
+        maxConcurrency: 1, // Process one page at a time for better reliability
         async requestHandler({ request, page, log, enqueueLinks }) {
             currentPage++;
             await updateProgress('crawling', currentPage, totalPages, request.url);
+            // Wait for page to fully load and render dynamic content
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+                log.info('Network idle timeout, continuing anyway');
+            });
+            // Additional wait for dynamic content
+            await page.waitForTimeout(2000);
+            // Scroll through page to trigger lazy loading
+            try {
+                await page.evaluate(async () => {
+                    const scrollHeight = document.documentElement.scrollHeight;
+                    const viewportHeight = window.innerHeight;
+                    let currentPosition = 0;
+                    while (currentPosition < scrollHeight) {
+                        currentPosition += viewportHeight;
+                        window.scrollTo(0, currentPosition);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    // Scroll back to top
+                    window.scrollTo(0, 0);
+                });
+                // Wait for any newly loaded content
+                await page.waitForTimeout(2000);
+                log.info(`Completed scrolling through ${request.url} to trigger lazy loading`);
+            }
+            catch (error) {
+                log.info(`Scrolling failed or not needed for ${request.url}`);
+            }
             const title = await page.title();
             log.info(`Crawled ${request.url} - Title: ${title}`);
             await updateProgress('screenshot', currentPage, totalPages, request.url);
@@ -194,9 +228,53 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 title: title,
                 screenshot: screenshotSlices,
             });
-            await enqueueLinks({
-                strategy: "same-hostname"
-            });
+            // Log discovered links for debugging
+            try {
+                const links = await page.evaluate(() => {
+                    const anchors = document.querySelectorAll('a[href]');
+                    return Array.from(anchors).map(a => ({
+                        href: a.getAttribute('href'),
+                        text: a.textContent?.trim().substring(0, 50)
+                    })).slice(0, 10); // Log first 10 links
+                });
+                log.info(`Found ${links.length} links on ${request.url}: ${links.map(l => l.href).join(', ')}`);
+            }
+            catch (error) {
+                log.info(`Could not extract links for debugging from ${request.url}`);
+            }
+            // Enhanced link discovery with multiple strategies
+            try {
+                // Wait a bit more for any lazy-loaded links
+                await page.waitForTimeout(1000);
+                // Enqueue links with same hostname strategy
+                await enqueueLinks({
+                    strategy: "same-hostname",
+                    transformRequestFunction: (request) => {
+                        // Filter out common non-content URLs
+                        const url = new URL(request.url);
+                        const blockedPatterns = [
+                            /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar)$/i,
+                            /\/api\//i,
+                            /\/assets\//i,
+                            /\/images\//i,
+                            /\/css\//i,
+                            /\/js\//i,
+                            /\#.*$/,
+                            /\?.*$/
+                        ];
+                        const shouldBlock = blockedPatterns.some(pattern => pattern.test(url.pathname));
+                        if (shouldBlock) {
+                            log.info(`Skipping URL due to blocked pattern: ${request.url}`);
+                            return false;
+                        }
+                        return request;
+                    }
+                });
+                log.info(`Successfully enqueued links from ${request.url}`);
+            }
+            catch (error) {
+                log.error(`Failed to enqueue links from ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+            }
         },
         failedRequestHandler({ request, log }) {
             log.error(`Request ${request.url} failed.`);
