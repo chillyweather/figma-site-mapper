@@ -142,14 +142,14 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor } = request.body as { url: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor?: number };
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay } = request.body as { url: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor?: number, delay?: number };
 
   if (!url || !publicUrl) {
     reply.status(400).send({ error: "URL and publicUrl is required" })
     return
   }
 
-  const job = await crawlQueue.add("crawl", { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1 });
+  const job = await crawlQueue.add("crawl", { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0 });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }
 })

@@ -6,6 +6,7 @@ const App: React.FC = () => {
   const [maxRequests, setMaxRequests] = useState('10');
   const [screenshotWidth, setScreenshotWidth] = useState('1440');
   const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
+  const [delay, setDelay] = useState('0');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -27,10 +28,14 @@ const App: React.FC = () => {
     const deviceScaleFactorValue = deviceScaleFactor.trim() === '' ? 1 : parseInt(deviceScaleFactor);
     const deviceScaleFactorParam = isNaN(deviceScaleFactorValue) || deviceScaleFactorValue < 1 || deviceScaleFactorValue > 2 ? 1 : deviceScaleFactorValue;
 
+    // Parse delay: default to 0 if invalid or empty
+    const delayValue = delay.trim() === '' ? 0 : parseInt(delay);
+    const delayParam = isNaN(delayValue) || delayValue < 0 ? 0 : delayValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam } }, '*');
   };
 
   const handleClose = () => {
@@ -154,6 +159,19 @@ const App: React.FC = () => {
         </select>
         <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
           Higher resolution screenshots take longer to process
+        </div>
+        <input
+          type="number"
+          value={delay}
+          onChange={(e) => setDelay(e.target.value)}
+          placeholder="Delay in seconds (0)"
+          disabled={isLoading || !!jobId}
+          style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '8px' }}
+          min="0"
+          max="60"
+        />
+        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          Additional delay after page load (0-60 seconds)
         </div>
         <button
           type="submit"

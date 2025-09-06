@@ -144,7 +144,7 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0) {
     console.log('🚀 Starting the crawler...');
     const canonicalStartUrl = new URL(startUrl).toString();
     const crawledPages = [];
@@ -192,8 +192,11 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
                 log.info('Network idle timeout, continuing anyway');
             });
-            // Additional wait for dynamic content
-            await page.waitForTimeout(2000);
+            // Additional wait for dynamic content (configurable delay)
+            if (delay > 0) {
+                log.info(`Waiting ${delay}ms for dynamic content to load`);
+                await page.waitForTimeout(delay);
+            }
             // Scroll through page to trigger lazy loading
             try {
                 await page.evaluate(async () => {
@@ -203,13 +206,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     while (currentPosition < scrollHeight) {
                         currentPosition += viewportHeight;
                         window.scrollTo(0, currentPosition);
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
                     }
                     // Scroll back to top
                     window.scrollTo(0, 0);
                 });
                 // Wait for any newly loaded content
-                await page.waitForTimeout(2000);
+                const scrollWaitTime = delay > 0 ? Math.min(2000, delay / 2) : 1000;
+                await page.waitForTimeout(scrollWaitTime);
                 log.info(`Completed scrolling through ${request.url} to trigger lazy loading`);
             }
             catch (error) {

@@ -186,7 +186,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string) {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0) {
   console.log('🚀 Starting the crawler...')
 
   const canonicalStartUrl = new URL(startUrl).toString();
@@ -239,8 +239,11 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         log.info('Network idle timeout, continuing anyway');
       });
       
-      // Additional wait for dynamic content
-      await page.waitForTimeout(2000);
+      // Additional wait for dynamic content (configurable delay)
+      if (delay > 0) {
+        log.info(`Waiting ${delay}ms for dynamic content to load`);
+        await page.waitForTimeout(delay);
+      }
       
       // Scroll through page to trigger lazy loading
       try {
@@ -252,7 +255,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
           while (currentPosition < scrollHeight) {
             currentPosition += viewportHeight;
             window.scrollTo(0, currentPosition);
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
           }
           
           // Scroll back to top
@@ -260,7 +263,8 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         });
         
         // Wait for any newly loaded content
-        await page.waitForTimeout(2000);
+        const scrollWaitTime = delay > 0 ? Math.min(2000, delay / 2) : 1000;
+        await page.waitForTimeout(scrollWaitTime);
         log.info(`Completed scrolling through ${request.url} to trigger lazy loading`);
       } catch (error) {
         log.info(`Scrolling failed or not needed for ${request.url}`);
