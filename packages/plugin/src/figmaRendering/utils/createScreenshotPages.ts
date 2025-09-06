@@ -64,7 +64,7 @@ export async function createScreenshotPages(
       screenshotsFrame.layoutMode = "VERTICAL";
       screenshotsFrame.primaryAxisAlignItems = "MIN";
       screenshotsFrame.counterAxisAlignItems = "MIN";
-      screenshotsFrame.itemSpacing = -100; // Negative spacing to compensate for overlap
+       screenshotsFrame.itemSpacing = 0; // No overlap, so no negative spacing needed
       screenshotsFrame.paddingTop = 0;
       screenshotsFrame.paddingBottom = 0;
       screenshotsFrame.paddingLeft = 0;

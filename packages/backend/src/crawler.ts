@@ -19,11 +19,11 @@ function getSafeFilename(url: string): string {
 }
 
 async function sliceScreenshot(
-  imageBuffer: Buffer, 
-  url: string, 
+  imageBuffer: Buffer,
+  url: string,
   publicUrl: string,
   maxHeight: number = 4096,
-  overlap: number = 100
+  overlap: number = 0
 ): Promise<string[]> {
   try {
     const image = sharp(imageBuffer);

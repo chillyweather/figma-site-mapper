@@ -9,7 +9,7 @@ if (!fs.existsSync(screenshotDir)) {
 function getSafeFilename(url) {
     return url.replace(/[^a-zA-Z0-9]/g, '_');
 }
-async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, overlap = 100) {
+async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, overlap = 0) {
     try {
         const image = sharp(imageBuffer);
         const metadata = await image.metadata();
