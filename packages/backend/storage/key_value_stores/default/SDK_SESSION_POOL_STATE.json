@@ -1,9 +1,9 @@
 {
-  "usableSessionsCount": 11,
+  "usableSessionsCount": 6,
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_jhS9ipbFaK",
+      "id": "session_zyfLSKEXLq",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:05.638Z",
-      "createdAt": "2025-09-06T09:38:05.638Z",
+      "expiresAt": "2025-09-06T10:33:31.763Z",
+      "createdAt": "2025-09-06T09:43:31.763Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_xOJBsmt497",
+      "id": "session_V5WJlgBUYC",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -33,121 +33,47 @@
         "prefixSecurity": "silent",
         "cookies": [
           {
-            "key": "vercel_session_id",
-            "value": "NzA0ODA0MTI3LDE4NTIwOTAwMzUsMjgzNTMwMzc2MywxNjAwMjEyMTA1LDI1MjkwMjE4NzY=",
-            "expires": "2025-09-06T10:28:08.172Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": true,
-            "creation": "2025-09-06T09:38:08.174Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "visitor-id",
-            "value": "0ucvPz40eo1Si-3EzF5Ld",
-            "expires": "2025-09-07T09:38:07.307Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": true,
-            "creation": "2025-09-06T09:38:08.174Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "__ssid",
-            "value": "1af4ab6c0ac505326fe298882634ddb",
-            "expires": "2026-10-11T09:38:08.414Z",
-            "domain": "vercel.com",
+            "key": "intercom-id-kod1r788",
+            "value": "285cbf6f-4fc5-4059-b7de-9b0aafb8ab3a",
+            "expires": "2026-06-03T10:16:57.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-06T09:38:10.556Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
+            "creation": "2025-09-06T09:43:37.025Z",
+            "lastAccessed": "2025-09-06T09:43:37.904Z"
           },
           {
-            "key": "ko_id",
-            "value": "784da6ac-4e81-4ef6-8826-3e27d80aae59",
-            "expires": "2026-09-06T09:38:19.000Z",
-            "domain": "vercel.com",
+            "key": "intercom-session-kod1r788",
+            "expires": "2025-09-13T09:43:37.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-06T09:38:10.556Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
+            "creation": "2025-09-06T09:43:37.026Z",
+            "lastAccessed": "2025-09-06T09:43:37.905Z"
           },
           {
-            "key": "ko_sid",
-            "value": "{%22id%22:%221757151488641%22%2C%22lastTouched%22:1757151499230}",
-            "expires": "2025-09-07T09:38:19.000Z",
-            "domain": "vercel.com",
+            "key": "intercom-device-id-kod1r788",
+            "value": "218058be-88ff-419d-8a7c-a9df709ffd2c",
+            "expires": "2026-06-03T10:16:57.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-06T09:38:10.556Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "_hp2_id.3648353952",
-            "value": "%7B%22userId%22%3A%221646848702777290%22%2C%22pageviewId%22%3A%228427278339750343%22%2C%22sessionId%22%3A%22735986250728769%22%2C%22identity%22%3Anull%2C%22trackerVersion%22%3A%224.0%22%7D",
-            "expires": "2026-10-05T19:38:19.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-09-06T09:38:13.105Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "signals-sdk-user-id",
-            "value": "f239b248-5025-439e-b9af-48c269cfba72",
-            "expires": "2026-09-06T09:38:19.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-06T09:38:13.105Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "signals-sdk-session-id",
-            "value": "a6da0e5e-a4b6-4fb6-9409-b8fbf2f54b63",
-            "expires": "2025-09-06T10:08:19.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-06T09:38:13.105Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "_hp2_props.3648353952",
-            "value": "%7B%22isLoggedIn%22%3Afalse%2C%22isVercelian%22%3Afalse%2C%22isVercelianEncoded%22%3A%22false%22%7D",
-            "expires": "2026-10-05T19:38:19.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-09-06T09:38:13.105Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
-          },
-          {
-            "key": "_hp2_ses_props.3648353952",
-            "value": "%7B%22ts%22%3A1757151491225%2C%22d%22%3A%22vercel.com%22%2C%22h%22%3A%22%2Fframeworks%2Fnextjs%22%7D",
-            "expires": "2025-09-06T10:08:19.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-09-06T09:38:13.105Z",
-            "lastAccessed": "2025-09-06T09:38:19.255Z"
+            "creation": "2025-09-06T09:43:37.026Z",
+            "lastAccessed": "2025-09-06T09:43:37.905Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:05.639Z",
-      "createdAt": "2025-09-06T09:38:05.639Z",
-      "usageCount": 10,
+      "expiresAt": "2025-09-06T10:33:31.764Z",
+      "createdAt": "2025-09-06T09:43:31.764Z",
+      "usageCount": 5,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_fyteE9YjzT",
+      "id": "session_8hRmHDVvCT",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -160,14 +86,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:10.042Z",
-      "createdAt": "2025-09-06T09:38:10.042Z",
+      "expiresAt": "2025-09-06T10:33:34.807Z",
+      "createdAt": "2025-09-06T09:43:34.807Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_kUlGraH9QO",
+      "id": "session_ImXPSyeOiD",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -180,14 +106,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:10.043Z",
-      "createdAt": "2025-09-06T09:38:10.043Z",
+      "expiresAt": "2025-09-06T10:33:34.808Z",
+      "createdAt": "2025-09-06T09:43:34.808Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_7cIDZqkPdw",
+      "id": "session_wNGStalZW4",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -200,14 +126,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:12.278Z",
-      "createdAt": "2025-09-06T09:38:12.278Z",
+      "expiresAt": "2025-09-06T10:33:36.218Z",
+      "createdAt": "2025-09-06T09:43:36.218Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_cLmklT7pej",
+      "id": "session_VQrKxnFQGY",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -220,108 +146,8 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:13.008Z",
-      "createdAt": "2025-09-06T09:38:13.008Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_vXpbrMn4Es",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:14.958Z",
-      "createdAt": "2025-09-06T09:38:14.958Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_dQfQ54zCoC",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:15.028Z",
-      "createdAt": "2025-09-06T09:38:15.028Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_JzVpCPdfbD",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:16.047Z",
-      "createdAt": "2025-09-06T09:38:16.047Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_qyWPhRlg6Y",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:17.826Z",
-      "createdAt": "2025-09-06T09:38:17.826Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_DqqQjShr10",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-06T10:28:18.807Z",
-      "createdAt": "2025-09-06T09:38:18.807Z",
+      "expiresAt": "2025-09-06T10:33:36.812Z",
+      "createdAt": "2025-09-06T09:43:36.812Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0

@@ -47,6 +47,7 @@ export async function createScreenshotPages(
   pages: TreeNode[],
   screenshotWidth: number = 1440
 ): Promise<Map<string, string>> {
+  console.log(`Creating screenshot pages for ${pages.length} pages`);
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
 
@@ -127,6 +128,7 @@ export async function createScreenshotPages(
   }
 
   figma.currentPage = originalPage;
+  console.log(`Created ${pageIdMap.size} screenshot pages`);
 
   return pageIdMap;
 
