@@ -1,47 +1,29 @@
 {
-  "requestsFinished": 36,
+  "requestsFinished": 5,
   "requestsFailed": 0,
-  "requestsRetries": 24,
+  "requestsRetries": 0,
   "requestsFailedPerMinute": 0,
-  "requestsFinishedPerMinute": 8,
-  "requestMinDurationMillis": 3443,
-  "requestMaxDurationMillis": 15377,
+  "requestsFinishedPerMinute": 12,
+  "requestMinDurationMillis": 4403,
+  "requestMaxDurationMillis": 5947,
   "requestTotalFailedDurationMillis": 0,
-  "requestTotalFinishedDurationMillis": 187832,
-  "crawlerStartedAt": "2025-09-06T13:47:44.435Z",
-  "crawlerFinishedAt": "2025-09-06T13:52:28.963Z",
-  "statsPersistedAt": "2025-09-06T13:52:28.963Z",
-  "crawlerRuntimeMillis": 284561,
-  "crawlerLastStartTimestamp": 1757166464402,
+  "requestTotalFinishedDurationMillis": 25443,
+  "crawlerStartedAt": "2025-09-12T12:40:24.436Z",
+  "crawlerFinishedAt": "2025-09-12T12:40:50.171Z",
+  "statsPersistedAt": "2025-09-12T12:40:50.171Z",
+  "crawlerRuntimeMillis": 25776,
+  "crawlerLastStartTimestamp": 1757680824395,
   "requestRetryHistogram": [
-    12,
-    12,
-    null,
-    5,
-    1,
-    null,
-    5,
-    1
+    5
   ],
   "statsId": 0,
   "requestAvgFailedDurationMillis": null,
-  "requestAvgFinishedDurationMillis": 5218,
-  "requestTotalDurationMillis": 187832,
-  "requestsTotal": 36,
+  "requestAvgFinishedDurationMillis": 5089,
+  "requestTotalDurationMillis": 25443,
+  "requestsTotal": 5,
   "requestsWithStatusCode": {
-    "200": 36,
-    "429": 68
+    "200": 5
   },
   "errors": {},
-  "retryErrors": {
-    "/Users/dmitridmitriev/personal/workspace/figma-sitemapper/node_modules/.pnpm/@crawlee+browser@3.14.1_playwright@1.54.2/node_modules/@crawlee/src/internals/browser-crawler.ts:584:30": {
-      "missing error code": {
-        "Error": {
-          "Detected a session error, rotating session... ": {
-            "count": 68
-          }
-        }
-      }
-    }
-  }
+  "retryErrors": {}
 }

@@ -56,7 +56,7 @@ export async function createScreenshotPages(
   const fontName = { family: "Inter", style: "Regular" };
 
   // Create navigation frame function
-  function createNavigationFrame(pageTitle: string): FrameNode {
+  function createNavigationFrame(pageTitle: string, pageUrl?: string): FrameNode {
     const navFrame = figma.createFrame();
     navFrame.name = "Navigation";
     navFrame.layoutMode = "HORIZONTAL";
@@ -85,11 +85,16 @@ export async function createScreenshotPages(
     separator.fontSize = 14;
     separator.characters = "|";
 
-    // Create current page title
+    // Create current page title with link to source page
     const titleText = figma.createText();
     titleText.fontName = fontName;
     titleText.fontSize = 14;
     titleText.characters = pageTitle;
+    
+    // Add hyperlink to the source page if URL is provided
+    if (pageUrl) {
+      titleText.hyperlink = { type: "URL", value: pageUrl };
+    }
 
     navFrame.appendChild(backText);
     navFrame.appendChild(separator);
@@ -125,7 +130,7 @@ export async function createScreenshotPages(
       screenshotsFrame.fills = [];
 
       // Create navigation frame for this page
-      const navFrame = createNavigationFrame(page.title);
+      const navFrame = createNavigationFrame(page.title, page.url);
       screenshotsFrame.appendChild(navFrame);
 
       // Add 24px margin between navigation and screenshots
