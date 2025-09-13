@@ -142,7 +142,7 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize } = request.body as { 
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = request.body as { 
     url: string, 
     publicUrl: string, 
     maxRequestsPerCrawl?: number, 
@@ -151,7 +151,14 @@ server.post('/crawl', async (request, reply) => {
     requestDelay?: number,
     maxDepth?: number,
     defaultLanguageOnly?: boolean,
-    sampleSize?: number
+    sampleSize?: number,
+    auth?: {
+      method: 'credentials' | 'cookies';
+      loginUrl?: string;
+      username?: string;
+      password?: string;
+      cookies?: Array<{name: string; value: string}>;
+    }
   };
 
   if (!url || !publicUrl) {
@@ -168,7 +175,8 @@ server.post('/crawl', async (request, reply) => {
     requestDelay: requestDelay || 1000,
     maxDepth: maxDepth === undefined ? 2 : maxDepth, // 0 means no limit
     defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
-    sampleSize: sampleSize === undefined ? 3 : sampleSize // 0 means no limit
+    sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
+    auth
   });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }

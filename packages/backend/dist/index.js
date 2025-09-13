@@ -117,7 +117,7 @@ server.get("/status/:jobId", async (request, reply) => {
 });
 server.post('/crawl', async (request, reply) => {
     //add validation
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize } = request.body;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = request.body;
     if (!url || !publicUrl) {
         reply.status(400).send({ error: "URL and publicUrl is required" });
         return;
@@ -131,7 +131,8 @@ server.post('/crawl', async (request, reply) => {
         requestDelay: requestDelay || 1000,
         maxDepth: maxDepth === undefined ? 2 : maxDepth, // 0 means no limit
         defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
-        sampleSize: sampleSize === undefined ? 3 : sampleSize // 0 means no limit
+        sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
+        auth
     });
     return { message: "Crawl job successfully queued.", jobId: job.id };
 });

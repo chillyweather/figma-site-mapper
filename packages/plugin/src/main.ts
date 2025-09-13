@@ -8,7 +8,7 @@ figma.showUI(__html__, { width: 320, height: 1000, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = msg;
 
     // Store the screenshot width for later use
     screenshotWidth = width || 1440;
@@ -20,7 +20,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize: sampleSize === 0 ? undefined : sampleSize }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, auth }),
       });
 
       const result = await response.json();

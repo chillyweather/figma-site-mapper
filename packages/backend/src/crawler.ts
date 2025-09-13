@@ -282,7 +282,13 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3) {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3, auth?: {
+  method: 'credentials' | 'cookies';
+  loginUrl?: string;
+  username?: string;
+  password?: string;
+  cookies?: Array<{name: string; value: string}>;
+}) {
   console.log('🚀 Starting the crawler...')
 
   // List of realistic user agents to rotate
@@ -301,6 +307,27 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   const crawledPages: PageData[] = [];
   let currentPage = 0;
   let totalPages = 0;
+  
+  // Handle authentication if provided
+  let authSuccess = false;
+  if (auth) {
+    console.log(`🔐 Attempting authentication via ${auth.method}`);
+    try {
+      if (auth.method === 'cookies' && auth.cookies) {
+        // Cookie-based authentication
+        console.log(`🍪 Setting ${auth.cookies.length} cookies for authentication`);
+        // Cookies will be set in the browser context before navigation
+        authSuccess = true;
+      } else if (auth.method === 'credentials' && auth.loginUrl && auth.username && auth.password) {
+        // Credential-based authentication - will be handled in pre-navigation hooks
+        console.log(`🔑 Will attempt login at ${auth.loginUrl} for user ${auth.username}`);
+        authSuccess = true;
+      }
+    } catch (error) {
+      console.error(`❌ Authentication setup failed:`, error);
+      authSuccess = false;
+    }
+  }
   
   // Track URLs by section for sampling
   const sectionUrlMap = new Map<string, string[]>();
@@ -384,6 +411,25 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
     useSessionPool: true,
     persistCookiesPerSession: true,
     async requestHandler({ request, page, log, enqueueLinks }) {
+      // Handle cookie authentication on first request
+      if (auth?.method === 'cookies' && auth.cookies && !authSuccess) {
+        try {
+          log.info(`🍪 Setting cookies for authentication`);
+          for (const cookie of auth.cookies) {
+            await page.context().addCookies([{
+              name: cookie.name,
+              value: cookie.value,
+              url: canonicalStartUrl,
+              domain: new URL(canonicalStartUrl).hostname
+            }]);
+          }
+          authSuccess = true;
+          log.info(`✅ Cookies set successfully`);
+        } catch (error) {
+          log.error(`❌ Failed to set cookies: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      
       // Check if we should crawl this URL based on language and depth filters
       const currentDepth = calculateUrlDepth(request.url);
       
@@ -601,7 +647,54 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
     
     // Add pre-navigation hooks for random delays and better request spacing
     preNavigationHooks: [
-      async ({ request, log }) => {
+      async ({ request, page, log }) => {
+        // Handle credential-based authentication
+        if (auth?.method === 'credentials' && auth.loginUrl && auth.username && auth.password) {
+          const loginUrlNormalized = new URL(auth.loginUrl).toString();
+          const currentUrlNormalized = new URL(request.url).toString();
+          
+          // Only attempt login when navigating to the login page
+          if (currentUrlNormalized === loginUrlNormalized && !authSuccess) {
+            log.info(`🔑 Attempting login at ${auth.loginUrl}`);
+            try {
+              // Navigate to login page
+              await page.goto(auth.loginUrl, { waitUntil: 'networkidle' });
+              
+              // Find and fill login form
+              const usernameSelector = await page.locator('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], #username, #email').first();
+              const passwordSelector = await page.locator('input[type="password"], input[name*="pass"], #password').first();
+              const submitSelector = await page.locator('button[type="submit"], input[type="submit"], button:has-text("login"), button:has-text("sign in")').first();
+              
+              if (usernameSelector && passwordSelector) {
+                await usernameSelector.fill(auth.username);
+                await passwordSelector.fill(auth.password);
+                
+                if (submitSelector) {
+                  await submitSelector.click();
+                  
+                  // Wait for navigation after login
+                  await page.waitForLoadState('networkidle', { timeout: 10000 });
+                  
+                  // Check if login was successful by looking for common success indicators
+                  const successIndicators = await page.locator('a[href*="logout"], button:has-text("logout"), .user-menu, .profile, [data-testid*="user"]').count();
+                  if (successIndicators > 0) {
+                    log.info(`✅ Login successful`);
+                    authSuccess = true;
+                  } else {
+                    log.info(`⚠️ Login may have failed - no success indicators found`);
+                  }
+                } else {
+                  log.info(`⚠️ Could not find submit button for login form`);
+                }
+              } else {
+                log.info(`⚠️ Could not find username/password fields for login`);
+              }
+            } catch (error) {
+              log.error(`❌ Login failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+        }
+        
         // Use configured request delay with some randomization to avoid rate limiting
         const baseDelay = requestDelay;
         const randomVariation = Math.floor(Math.random() * 500) - 250; // ±250ms variation
