@@ -445,6 +445,25 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         await page.waitForTimeout(delay);
       }
       
+      // FIX: Handle potential sticky headers or fixed positioning issues
+      try {
+        await page.evaluate(() => {
+          // Hide potential sticky/fixed elements that might overlap navigation
+          const stickyElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"], .sticky, .fixed');
+          stickyElements.forEach((el, index) => {
+            if (index > 0) { // Keep first sticky element (likely main nav)
+              (el as HTMLElement).style.display = 'none';
+            }
+          });
+          
+          // Remove any transform that might affect positioning
+          document.documentElement.style.transform = 'none';
+          document.body.style.transform = 'none';
+        });
+      } catch (error) {
+        log.info(`Could not handle sticky elements for ${request.url}`);
+      }
+      
       // Scroll through page to trigger lazy loading
       try {
         await page.evaluate(async () => {
@@ -458,8 +477,10 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
             await new Promise(resolve => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
           }
           
-          // Scroll back to top
+          // Scroll back to top - ENSURE we're at the very top
           window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
         });
         
         // Wait for any newly loaded content
@@ -474,6 +495,40 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
       log.info(`Crawled ${request.url} - Title: ${title}`);
 
       await updateProgress('screenshot', currentPage, totalPages, request.url);
+      
+      // CRITICAL FIX: Ensure page is scrolled to very top before screenshot
+      // This fixes navigation bar positioning issues
+      try {
+        await page.evaluate(() => {
+          // Multiple methods to ensure we're at the very top
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          if (document.scrollingElement) {
+            document.scrollingElement.scrollTop = 0;
+          }
+        });
+        
+        // Wait for any potential scroll animations to complete
+        await page.waitForTimeout(300);
+        
+        // Double-check we're at the top
+        const scrollPosition = await page.evaluate(() => ({
+          window: window.scrollY,
+          document: document.documentElement.scrollTop,
+          body: document.body.scrollTop
+        }));
+        
+        if (scrollPosition.window > 0 || scrollPosition.document > 0 || scrollPosition.body > 0) {
+          log.info(`⚠️ Page still scrolled after reset: ${JSON.stringify(scrollPosition)}`);
+        } else {
+          log.info(`✅ Page confirmed at top position for screenshot: ${request.url}`);
+        }
+        
+      } catch (error) {
+        log.info(`⚠️ Could not ensure top position for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
       const fullPageBuffer = await page.screenshot({ fullPage: true });
 
       // Slice the screenshot into manageable pieces
