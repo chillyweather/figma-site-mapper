@@ -2,6 +2,72 @@ import { PlaywrightCrawler } from "crawlee";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
+// Language detection patterns
+const LANGUAGE_PATTERNS = [
+    /^\/(en|fr|de|es|it|pt|ru|ja|ko|zh)(\/|$)/i, // /en/, /fr/, etc.
+    /[?&]lang=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?lang=en
+    /[?&]language=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?language=en
+    /[?&]locale=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?locale=en
+    /[?&]l=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?l=en
+];
+const COMMON_LANGUAGE_CODES = new Set(['en', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ja', 'ko', 'zh']);
+function detectLanguageFromUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const search = urlObj.search;
+        // Check path patterns
+        for (const pattern of LANGUAGE_PATTERNS) {
+            const pathnameMatch = pathname.match(pattern);
+            if (pathnameMatch && pathnameMatch[1]) {
+                return pathnameMatch[1].toLowerCase();
+            }
+            const searchMatch = search.match(pattern);
+            if (searchMatch && searchMatch[1]) {
+                return searchMatch[1].toLowerCase();
+            }
+        }
+        // Check subdomain patterns (en.example.com)
+        const hostname = urlObj.hostname;
+        const parts = hostname.split('.');
+        if (parts.length >= 3) {
+            const subdomain = parts[0]?.toLowerCase();
+            if (subdomain && COMMON_LANGUAGE_CODES.has(subdomain)) {
+                return subdomain;
+            }
+        }
+        return null;
+    }
+    catch {
+        return null;
+    }
+}
+function getDefaultLanguage(startUrl) {
+    // Try to detect language from start URL
+    const detected = detectLanguageFromUrl(startUrl);
+    if (detected)
+        return detected;
+    // Default to 'en' if no language detected
+    return 'en';
+}
+function shouldCrawlUrl(url, options) {
+    // Check language filtering
+    if (options.defaultLanguageOnly) {
+        const defaultLanguage = getDefaultLanguage(options.startUrl);
+        const urlLanguage = detectLanguageFromUrl(url);
+        // If URL has language code, it must match default language
+        if (urlLanguage && urlLanguage !== defaultLanguage) {
+            return false;
+        }
+    }
+    // Check depth filtering
+    if (options.maxDepth !== undefined && options.currentDepth !== undefined) {
+        if (options.currentDepth > options.maxDepth) {
+            return false;
+        }
+    }
+    return true;
+}
 const screenshotDir = path.join(process.cwd(), "screenshots");
 if (!fs.existsSync(screenshotDir)) {
     fs.mkdirSync(screenshotDir, { recursive: true });
@@ -144,7 +210,7 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3) {
     console.log('🚀 Starting the crawler...');
     // List of realistic user agents to rotate
     const userAgents = [
@@ -155,9 +221,42 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     ];
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     const canonicalStartUrl = new URL(startUrl).toString();
+    const defaultLanguage = getDefaultLanguage(canonicalStartUrl);
     const crawledPages = [];
     let currentPage = 0;
     let totalPages = 0;
+    // Track URLs by section for sampling
+    const sectionUrlMap = new Map();
+    const crawledUrls = new Set();
+    // Calculate URL depth
+    function calculateUrlDepth(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathSegments = urlObj.pathname.split('/').filter(segment => segment.length > 0);
+            return pathSegments.length;
+        }
+        catch {
+            return 0;
+        }
+    }
+    // Get section key for sampling (e.g., /blog/, /products/)
+    function getSectionKey(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathSegments = urlObj.pathname.split('/').filter(segment => segment.length > 0);
+            if (pathSegments.length === 0)
+                return 'root';
+            // Use first path segment as section key, but ignore language codes
+            const firstSegment = pathSegments[0];
+            if (firstSegment && COMMON_LANGUAGE_CODES.has(firstSegment)) {
+                return pathSegments[1] || 'root';
+            }
+            return firstSegment || 'root';
+        }
+        catch {
+            return 'root';
+        }
+    }
     // Function to update job progress
     const updateProgress = async (stage, currentPage, totalPages, currentUrl) => {
         if (jobId) {
@@ -205,7 +304,33 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         useSessionPool: true,
         persistCookiesPerSession: true,
         async requestHandler({ request, page, log, enqueueLinks }) {
+            // Check if we should crawl this URL based on language and depth filters
+            const currentDepth = calculateUrlDepth(request.url);
+            if (!shouldCrawlUrl(request.url, {
+                startUrl: canonicalStartUrl,
+                defaultLanguageOnly,
+                maxDepth,
+                currentDepth
+            })) {
+                log.info(`Skipping ${request.url} due to language/depth filters`);
+                return;
+            }
+            // Check section sampling - only crawl up to sampleSize pages per section
+            const sectionKey = getSectionKey(request.url);
+            const existingSectionUrls = sectionUrlMap.get(sectionKey) || [];
+            if (existingSectionUrls.length >= sampleSize) {
+                log.info(`Skipping ${request.url} - section ${sectionKey} already has ${existingSectionUrls.length} pages (max: ${sampleSize})`);
+                return;
+            }
+            // Check if we've already crawled this URL
+            if (crawledUrls.has(request.url)) {
+                log.info(`Skipping ${request.url} - already crawled`);
+                return;
+            }
             currentPage++;
+            crawledUrls.add(request.url);
+            existingSectionUrls.push(request.url);
+            sectionUrlMap.set(sectionKey, existingSectionUrls);
             await updateProgress('crawling', currentPage, totalPages, request.url);
             // Set extra headers to appear more like real browser traffic
             await page.setExtraHTTPHeaders({

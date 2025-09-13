@@ -142,14 +142,34 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay } = request.body as { url: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor?: number, delay?: number, requestDelay?: number };
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize } = request.body as { 
+    url: string, 
+    publicUrl: string, 
+    maxRequestsPerCrawl?: number, 
+    deviceScaleFactor?: number, 
+    delay?: number, 
+    requestDelay?: number,
+    maxDepth?: number,
+    defaultLanguageOnly?: boolean,
+    sampleSize?: number
+  };
 
   if (!url || !publicUrl) {
     reply.status(400).send({ error: "URL and publicUrl is required" })
     return
   }
 
-  const job = await crawlQueue.add("crawl", { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000 });
+  const job = await crawlQueue.add("crawl", { 
+    url, 
+    publicUrl, 
+    maxRequestsPerCrawl, 
+    deviceScaleFactor: deviceScaleFactor || 1, 
+    delay: delay || 0, 
+    requestDelay: requestDelay || 1000,
+    maxDepth: maxDepth || 3,
+    defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
+    sampleSize: sampleSize || 3
+  });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }
 })

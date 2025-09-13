@@ -4,11 +4,11 @@ const BACKEND_URL = 'http://localhost:3006';
 let screenshotWidth = 1440; // Default screenshot width
 let hasRenderedSitemap = false; // Prevent duplicate rendering
 
-figma.showUI(__html__, { width: 320, height: 600, themeColors: true });
+figma.showUI(__html__, { width: 320, height: 1000, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize } = msg;
 
     // Store the screenshot width for later use
     screenshotWidth = width || 1440;
@@ -20,7 +20,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1 }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth || 2, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize: sampleSize || 3 }),
       });
 
       const result = await response.json();

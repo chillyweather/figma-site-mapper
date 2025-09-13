@@ -8,6 +8,9 @@ const App: React.FC = () => {
   const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
   const [delay, setDelay] = useState('0');
   const [requestDelay, setRequestDelay] = useState('1000');
+  const [maxDepth, setMaxDepth] = useState('2');
+  const [defaultLanguageOnly, setDefaultLanguageOnly] = useState(true);
+  const [sampleSize, setSampleSize] = useState('3');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -37,10 +40,18 @@ const App: React.FC = () => {
     const requestDelayValue = requestDelay.trim() === '' ? 1000 : parseInt(requestDelay);
     const requestDelayParam = isNaN(requestDelayValue) || requestDelayValue < 0 ? 1000 : requestDelayValue;
 
+    // Parse max depth: default to 2 if invalid or empty
+    const maxDepthValue = maxDepth.trim() === '' ? 2 : parseInt(maxDepth);
+    const maxDepthParam = isNaN(maxDepthValue) || maxDepthValue < 1 || maxDepthValue > 10 ? 2 : maxDepthValue;
+
+    // Parse sample size: default to 3 if invalid or empty
+    const sampleSizeValue = sampleSize.trim() === '' ? 3 : parseInt(sampleSize);
+    const sampleSizeParam = isNaN(sampleSizeValue) || sampleSizeValue < 1 || sampleSizeValue > 20 ? 3 : sampleSizeValue;
+
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam } }, '*');
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam, maxDepth: maxDepthParam, defaultLanguageOnly, sampleSize: sampleSizeParam } }, '*');
   };
 
   const handleClose = () => {
@@ -192,6 +203,57 @@ const App: React.FC = () => {
         <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
           Delay between requests to avoid rate limiting (0-10000ms)
         </div>
+        
+        <div style={{ marginBottom: '12px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+          <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>
+            Crawl Limiting Settings
+          </div>
+          
+          <div style={{ marginBottom: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={defaultLanguageOnly}
+                onChange={(e) => setDefaultLanguageOnly(e.target.checked)}
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: '8px' }}
+              />
+              Crawl only default language pages
+            </label>
+            <div style={{ fontSize: '10px', color: '#666', marginTop: '2px', marginLeft: '20px' }}>
+              Detects language from URL patterns like /en/, /fr/, ?lang=de, etc.
+            </div>
+          </div>
+          
+          <input
+            type="number"
+            value={maxDepth}
+            onChange={(e) => setMaxDepth(e.target.value)}
+            placeholder="Max crawl depth (2)"
+            disabled={isLoading || !!jobId}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '4px' }}
+            min="1"
+            max="10"
+          />
+          <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+            How many levels deep to crawl (1-10, default: 2)
+          </div>
+          
+          <input
+            type="number"
+            value={sampleSize}
+            onChange={(e) => setSampleSize(e.target.value)}
+            placeholder="Pages per section (3)"
+            disabled={isLoading || !!jobId}
+            style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '4px' }}
+            min="1"
+            max="20"
+          />
+          <div style={{ fontSize: '10px', color: '#666' }}>
+            Max pages to crawl per section (e.g., blog posts, products)
+          </div>
+        </div>
+        
         <button
           type="submit"
           disabled={isLoading || !!jobId || !url.trim()}
