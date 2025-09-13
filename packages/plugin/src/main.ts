@@ -20,7 +20,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth || 2, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize: sampleSize || 3 }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize: sampleSize === 0 ? undefined : sampleSize }),
       });
 
       const result = await response.json();

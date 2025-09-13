@@ -40,13 +40,13 @@ const App: React.FC = () => {
     const requestDelayValue = requestDelay.trim() === '' ? 1000 : parseInt(requestDelay);
     const requestDelayParam = isNaN(requestDelayValue) || requestDelayValue < 0 ? 1000 : requestDelayValue;
 
-    // Parse max depth: default to 2 if invalid or empty
-    const maxDepthValue = maxDepth.trim() === '' ? 2 : parseInt(maxDepth);
-    const maxDepthParam = isNaN(maxDepthValue) || maxDepthValue < 1 || maxDepthValue > 10 ? 2 : maxDepthValue;
+    // Parse max depth: 0 or empty means no limit
+    const maxDepthValue = maxDepth.trim() === '' ? 0 : parseInt(maxDepth);
+    const maxDepthParam = isNaN(maxDepthValue) || maxDepthValue < 0 || maxDepthValue > 10 ? 0 : maxDepthValue;
 
-    // Parse sample size: default to 3 if invalid or empty
-    const sampleSizeValue = sampleSize.trim() === '' ? 3 : parseInt(sampleSize);
-    const sampleSizeParam = isNaN(sampleSizeValue) || sampleSizeValue < 1 || sampleSizeValue > 20 ? 3 : sampleSizeValue;
+    // Parse sample size: 0 or empty means no limit
+    const sampleSizeValue = sampleSize.trim() === '' ? 0 : parseInt(sampleSize);
+    const sampleSizeParam = isNaN(sampleSizeValue) || sampleSizeValue < 0 || sampleSizeValue > 20 ? 0 : sampleSizeValue;
 
     setIsLoading(true);
     setStatus('Starting crawl...');
@@ -236,7 +236,7 @@ const App: React.FC = () => {
             max="10"
           />
           <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
-            How many levels deep to crawl (1-10, default: 2)
+            How many levels deep to crawl (0 or empty = no limit, 1-10)
           </div>
           
           <input
@@ -250,7 +250,7 @@ const App: React.FC = () => {
             max="20"
           />
           <div style={{ fontSize: '10px', color: '#666' }}>
-            Max pages to crawl per section (e.g., blog posts, products)
+            Max pages to crawl per section (0 or empty = no limit, 1-20)
           </div>
         </div>
         

@@ -9,7 +9,7 @@ const processor = async (job: Job) => {
   console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, sampleSize=${sampleSize}`);
 
   try {
-    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth, defaultLanguageOnly, sampleSize)
+    await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize === 0 ? undefined : sampleSize)
     console.log(`✅ Finished job ${job.id}`)
   } catch (error) {
     console.error(`❌ Job ${job.id} failed:`, error)

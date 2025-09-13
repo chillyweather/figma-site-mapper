@@ -60,8 +60,8 @@ function shouldCrawlUrl(url, options) {
             return false;
         }
     }
-    // Check depth filtering
-    if (options.maxDepth !== undefined && options.currentDepth !== undefined) {
+    // Check depth filtering (0 or undefined means no limit)
+    if (options.maxDepth !== undefined && options.maxDepth > 0 && options.currentDepth !== undefined) {
         if (options.currentDepth > options.maxDepth) {
             return false;
         }
@@ -315,10 +315,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 log.info(`Skipping ${request.url} due to language/depth filters`);
                 return;
             }
-            // Check section sampling - only crawl up to sampleSize pages per section
+            // Check section sampling - only crawl up to sampleSize pages per section (0 means no limit)
             const sectionKey = getSectionKey(request.url);
             const existingSectionUrls = sectionUrlMap.get(sectionKey) || [];
-            if (existingSectionUrls.length >= sampleSize) {
+            if (sampleSize > 0 && existingSectionUrls.length >= sampleSize) {
                 log.info(`Skipping ${request.url} - section ${sectionKey} already has ${existingSectionUrls.length} pages (max: ${sampleSize})`);
                 return;
             }
