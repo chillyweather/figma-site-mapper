@@ -289,7 +289,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   password?: string;
   cookies?: Array<{name: string; value: string}>;
 }) {
-  console.log('🚀 Starting the crawler...')
+  console.log('🚀 Starting the crawler with URL:', startUrl);
 
   // List of realistic user agents to rotate
   const userAgents = [
@@ -307,6 +307,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   const crawledPages: PageData[] = [];
   let currentPage = 0;
   let totalPages = 0;
+  let isTerminating = false; // Flag to prevent multiple termination attempts
   
   // Handle authentication if provided
   let authSuccess = false;
@@ -362,11 +363,18 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
     }
   }
 
+  // Track if we've already warned about progress updates to reduce spam
+  let progressUpdateWarned = false;
+  
   // Function to update job progress
   const updateProgress = async (stage: string, currentPage?: number, totalPages?: number, currentUrl?: string) => {
     if (jobId) {
       try {
         const progress = totalPages && currentPage ? Math.round((currentPage / totalPages) * 100) : 0;
+        // Add timeout to prevent long hangs
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+        
         await fetch(`${publicUrl}/progress/${jobId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -376,10 +384,17 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
             totalPages,
             currentUrl,
             progress
-          })
+          }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
       } catch (error) {
-        console.warn(`Failed to update progress for job ${jobId}:`, error);
+        // Only log once per job to reduce spam
+        if (!progressUpdateWarned) {
+          console.warn(`Progress updates disabled for job ${jobId} (backend server not available)`);
+          progressUpdateWarned = true;
+        }
       }
     }
   };
@@ -387,7 +402,9 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   // Calculate max requests per minute based on request delay
   const maxRequestsPerMinute = requestDelay > 0 ? Math.floor(60000 / (requestDelay + 500)) : 30; // 500ms buffer for processing
 
-  const crawler = new PlaywrightCrawler({
+  let crawler: PlaywrightCrawler; // Declare crawler variable for access in request handler
+
+  crawler = new PlaywrightCrawler({
     launchContext: {
       launchOptions: {
         args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : [],
@@ -411,6 +428,12 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
     useSessionPool: true,
     persistCookiesPerSession: true,
     async requestHandler({ request, page, log, enqueueLinks }) {
+      // Early termination check - skip processing if we're terminating
+      if (isTerminating) {
+        log.info(`Skipping ${request.url} - crawler is terminating`);
+        return;
+      }
+      
       // Handle cookie authentication on first request
       if (auth?.method === 'cookies' && auth.cookies && !authSuccess) {
         try {
@@ -455,6 +478,28 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
       // Check if we've already crawled this URL
       if (crawledUrls.has(request.url)) {
         log.info(`Skipping ${request.url} - already crawled`);
+        return;
+      }
+      
+      // Check if we've reached the max requests limit (0 means no limit)
+      if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl) {
+        log.info(`Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`);
+        
+        // Terminate the crawler gracefully when limit is reached
+        if (currentPage >= maxRequestsPerCrawl && !isTerminating) {
+          isTerminating = true;
+          log.info(`🛑 Terminating crawler: reached max requests limit of ${maxRequestsPerCrawl}`);
+          // Stop processing new requests - the crawler will finish current requests and then terminate
+          setTimeout(async () => {
+            try {
+              await crawler.teardown();
+              log.info('✅ Crawler terminated successfully');
+            } catch (error) {
+              log.error(`❌ Error terminating crawler: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }, 100); // Small delay to allow current request to complete
+        }
+        
         return;
       }
       
@@ -703,8 +748,6 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         await new Promise(resolve => setTimeout(resolve, totalDelay));
       }
     ],
-
-    maxRequestsPerCrawl: maxRequestsPerCrawl || undefined,
   });
 
   // Get total pages count before starting

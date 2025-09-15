@@ -21,7 +21,7 @@ interface PluginSettings {
 
 // Default settings
 const DEFAULT_SETTINGS: PluginSettings = {
-  url: 'https://crawlee.dev',
+  url: '',
   maxRequests: '10',
   screenshotWidth: '1440',
   deviceScaleFactor: '1',
@@ -482,7 +482,7 @@ const MainView: React.FC<MainViewProps> = ({
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'main' | 'settings'>('main');
-  const [url, setUrl] = useState('https://crawlee.dev');
+  const [url, setUrl] = useState('');
   const [maxRequests, setMaxRequests] = useState('10');
   const [screenshotWidth, setScreenshotWidth] = useState('1440');
   const [deviceScaleFactor, setDeviceScaleFactor] = useState('1');
@@ -503,7 +503,7 @@ const App: React.FC = () => {
   const [cookies, setCookies] = useState('');
   const [authStatus, setAuthStatus] = useState<'idle' | 'authenticating' | 'success' | 'failed'>('idle');
   const intervalRef = useRef<number | null>(null);
-  const settingsSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const settingsSaveTimeoutRef = useRef<number | null>(null);
 
   // Load settings from clientStorage on component mount
   useEffect(() => {
@@ -677,6 +677,8 @@ const App: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     if (!url.trim()) return;
+
+    console.log('🚀 Starting crawl with URL:', url.trim());
 
     // Parse max requests: empty, 0, or >= 999 means infinity (no limit)
     const maxRequestsValue = maxRequests.trim() === '' ? 0 : parseInt(maxRequests);

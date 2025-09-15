@@ -10,6 +10,8 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
     const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = msg;
 
+    console.log('📡 Main.ts received crawl request for URL:', url);
+
     // Store the screenshot width for later use
     screenshotWidth = width || 1440;
     hasRenderedSitemap = false; // Reset flag for new crawl
@@ -20,7 +22,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth: maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, auth }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, auth }),
       });
 
       const result = await response.json();

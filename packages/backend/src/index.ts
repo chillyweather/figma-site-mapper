@@ -173,7 +173,7 @@ server.post('/crawl', async (request, reply) => {
     deviceScaleFactor: deviceScaleFactor || 1, 
     delay: delay || 0, 
     requestDelay: requestDelay || 1000,
-    maxDepth: maxDepth === undefined ? 2 : maxDepth, // 0 means no limit
+    maxDepth: maxDepth === undefined ? 0 : maxDepth, // 0 means no limit, undefined defaults to no limit
     defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
     sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
     auth

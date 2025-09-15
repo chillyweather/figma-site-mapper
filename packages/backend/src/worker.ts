@@ -7,6 +7,7 @@ const processor = async (job: Job) => {
   const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = job.data;
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
   console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, sampleSize=${sampleSize}`);
+  console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
   if (auth) {
     console.log(`🔐 Authentication: ${auth.method}`);
   }
