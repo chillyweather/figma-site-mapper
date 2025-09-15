@@ -1,6 +1,45 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 
+// Define the settings structure
+interface PluginSettings {
+  url: string;
+  maxRequests: string;
+  screenshotWidth: string;
+  deviceScaleFactor: string;
+  delay: string;
+  requestDelay: string;
+  maxDepth: string;
+  defaultLanguageOnly: boolean;
+  sampleSize: string;
+  authMethod: 'none' | 'credentials' | 'cookies';
+  loginUrl: string;
+  username: string;
+  password: string;
+  cookies: string;
+}
+
+// Default settings
+const DEFAULT_SETTINGS: PluginSettings = {
+  url: 'https://crawlee.dev',
+  maxRequests: '10',
+  screenshotWidth: '1440',
+  deviceScaleFactor: '1',
+  delay: '0',
+  requestDelay: '1000',
+  maxDepth: '2',
+  defaultLanguageOnly: true,
+  sampleSize: '3',
+  authMethod: 'none',
+  loginUrl: '',
+  username: '',
+  password: '',
+  cookies: ''
+};
+
+// Settings key for clientStorage
+const SETTINGS_KEY = 'figma-sitemapper-settings';
+
 // Custom input component that maintains focus
 const FocusedInput: React.FC<{
   type?: string;
@@ -464,6 +503,175 @@ const App: React.FC = () => {
   const [cookies, setCookies] = useState('');
   const [authStatus, setAuthStatus] = useState<'idle' | 'authenticating' | 'success' | 'failed'>('idle');
   const intervalRef = useRef<number | null>(null);
+  const settingsSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load settings from clientStorage on component mount
+  useEffect(() => {
+    // Request settings from main plugin code
+    parent.postMessage({ pluginMessage: { type: 'load-settings' } }, '*');
+    
+    // Listen for messages from main plugin code
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'settings-loaded') {
+        if (msg.settings) {
+          // Apply loaded settings
+          setUrl(msg.settings.url || DEFAULT_SETTINGS.url);
+          setMaxRequests(msg.settings.maxRequests || DEFAULT_SETTINGS.maxRequests);
+          setScreenshotWidth(msg.settings.screenshotWidth || DEFAULT_SETTINGS.screenshotWidth);
+          setDeviceScaleFactor(msg.settings.deviceScaleFactor || DEFAULT_SETTINGS.deviceScaleFactor);
+          setDelay(msg.settings.delay || DEFAULT_SETTINGS.delay);
+          setRequestDelay(msg.settings.requestDelay || DEFAULT_SETTINGS.requestDelay);
+          setMaxDepth(msg.settings.maxDepth || DEFAULT_SETTINGS.maxDepth);
+          setDefaultLanguageOnly(msg.settings.defaultLanguageOnly !== undefined ? msg.settings.defaultLanguageOnly : DEFAULT_SETTINGS.defaultLanguageOnly);
+          setSampleSize(msg.settings.sampleSize || DEFAULT_SETTINGS.sampleSize);
+          setAuthMethod(msg.settings.authMethod || DEFAULT_SETTINGS.authMethod);
+          setLoginUrl(msg.settings.loginUrl || DEFAULT_SETTINGS.loginUrl);
+          setUsername(msg.settings.username || DEFAULT_SETTINGS.username);
+          setPassword(msg.settings.password || DEFAULT_SETTINGS.password);
+          setCookies(msg.settings.cookies || DEFAULT_SETTINGS.cookies);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Save settings to clientStorage with debouncing
+  const saveSettings = useCallback((settings: PluginSettings) => {
+    // Clear previous timeout if it exists
+    if (settingsSaveTimeoutRef.current) {
+      clearTimeout(settingsSaveTimeoutRef.current);
+    }
+    
+    // Debounce settings save to avoid excessive writes
+    settingsSaveTimeoutRef.current = setTimeout(() => {
+      parent.postMessage({ pluginMessage: { type: 'save-settings', settings } }, '*');
+    }, 500);
+  }, []);
+
+  // Create settings object from current state
+  const getCurrentSettings = useCallback((): PluginSettings => ({
+    url,
+    maxRequests,
+    screenshotWidth,
+    deviceScaleFactor,
+    delay,
+    requestDelay,
+    maxDepth,
+    defaultLanguageOnly,
+    sampleSize,
+    authMethod,
+    loginUrl,
+    username,
+    password,
+    cookies
+  }), [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, authMethod, loginUrl, username, password, cookies]);
+
+  // Wrapper functions for state setters that also save settings
+  const setUrlAndSave = useCallback((value: string) => {
+    setUrl(value);
+    const newSettings = { ...getCurrentSettings(), url: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setMaxRequestsAndSave = useCallback((value: string) => {
+    setMaxRequests(value);
+    const newSettings = { ...getCurrentSettings(), maxRequests: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setScreenshotWidthAndSave = useCallback((value: string) => {
+    setScreenshotWidth(value);
+    const newSettings = { ...getCurrentSettings(), screenshotWidth: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setDeviceScaleFactorAndSave = useCallback((value: string) => {
+    setDeviceScaleFactor(value);
+    const newSettings = { ...getCurrentSettings(), deviceScaleFactor: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setDelayAndSave = useCallback((value: string) => {
+    setDelay(value);
+    const newSettings = { ...getCurrentSettings(), delay: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setRequestDelayAndSave = useCallback((value: string) => {
+    setRequestDelay(value);
+    const newSettings = { ...getCurrentSettings(), requestDelay: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setMaxDepthAndSave = useCallback((value: string) => {
+    setMaxDepth(value);
+    const newSettings = { ...getCurrentSettings(), maxDepth: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setDefaultLanguageOnlyAndSave = useCallback((value: boolean) => {
+    setDefaultLanguageOnly(value);
+    const newSettings = { ...getCurrentSettings(), defaultLanguageOnly: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setSampleSizeAndSave = useCallback((value: string) => {
+    setSampleSize(value);
+    const newSettings = { ...getCurrentSettings(), sampleSize: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setAuthMethodAndSave = useCallback((value: 'none' | 'credentials' | 'cookies') => {
+    setAuthMethod(value);
+    setAuthStatus('idle');
+    const newSettings = { ...getCurrentSettings(), authMethod: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setLoginUrlAndSave = useCallback((value: string) => {
+    setLoginUrl(value);
+    const newSettings = { ...getCurrentSettings(), loginUrl: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setUsernameAndSave = useCallback((value: string) => {
+    setUsername(value);
+    const newSettings = { ...getCurrentSettings(), username: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setPasswordAndSave = useCallback((value: string) => {
+    setPassword(value);
+    const newSettings = { ...getCurrentSettings(), password: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setCookiesAndSave = useCallback((value: string) => {
+    setCookies(value);
+    const newSettings = { ...getCurrentSettings(), cookies: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  // Load settings from clientStorage on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const savedSettings = await parent.postMessage({ pluginMessage: { type: 'load-settings' } }, '*');
+        // We'll handle the response in the message event listener
+      } catch (error) {
+        console.error('Failed to request settings load:', error);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -618,61 +826,60 @@ const App: React.FC = () => {
 
   // Stable input handlers to prevent focus loss
   const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setUrl(e.target.value);
-  }, []);
+    setUrlAndSave(e.target.value);
+  }, [setUrlAndSave]);
 
   const handleScreenshotWidthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setScreenshotWidth(e.target.value);
-  }, []);
+    setScreenshotWidthAndSave(e.target.value);
+  }, [setScreenshotWidthAndSave]);
 
   const handleDeviceScaleFactorChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDeviceScaleFactor(e.target.value);
-  }, []);
+    setDeviceScaleFactorAndSave(e.target.value);
+  }, [setDeviceScaleFactorAndSave]);
 
   const handleDelayChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDelay(e.target.value);
-  }, []);
+    setDelayAndSave(e.target.value);
+  }, [setDelayAndSave]);
 
   const handleRequestDelayChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setRequestDelay(e.target.value);
-  }, []);
+    setRequestDelayAndSave(e.target.value);
+  }, [setRequestDelayAndSave]);
 
   const handleMaxRequestsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setMaxRequests(e.target.value);
-  }, []);
+    setMaxRequestsAndSave(e.target.value);
+  }, [setMaxRequestsAndSave]);
 
   const handleMaxDepthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setMaxDepth(e.target.value);
-  }, []);
+    setMaxDepthAndSave(e.target.value);
+  }, [setMaxDepthAndSave]);
 
   const handleSampleSizeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSampleSize(e.target.value);
-  }, []);
+    setSampleSizeAndSave(e.target.value);
+  }, [setSampleSizeAndSave]);
 
   const handleDefaultLanguageOnlyChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDefaultLanguageOnly(e.target.checked);
-  }, []);
+    setDefaultLanguageOnlyAndSave(e.target.checked);
+  }, [setDefaultLanguageOnlyAndSave]);
 
   const handleAuthMethodChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setAuthMethod(e.target.value as 'none' | 'credentials' | 'cookies');
-    setAuthStatus('idle');
-  }, []);
+    setAuthMethodAndSave(e.target.value as 'none' | 'credentials' | 'cookies');
+  }, [setAuthMethodAndSave]);
 
   const handleLoginUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setLoginUrl(e.target.value);
-  }, []);
+    setLoginUrlAndSave(e.target.value);
+  }, [setLoginUrlAndSave]);
 
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setUsername(e.target.value);
-  }, []);
+    setUsernameAndSave(e.target.value);
+  }, [setUsernameAndSave]);
 
   const handlePasswordChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
-  }, []);
+    setPasswordAndSave(e.target.value);
+  }, [setPasswordAndSave]);
 
   const handleCookiesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCookies(e.target.value);
-  }, []);
+    setCookiesAndSave(e.target.value);
+  }, [setCookiesAndSave]);
 
   // Stable view switching callbacks
   const switchToMain = useCallback(() => setCurrentView('main'), []);

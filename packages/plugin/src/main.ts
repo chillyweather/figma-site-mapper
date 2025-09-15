@@ -37,6 +37,30 @@ figma.ui.onmessage = async (msg) => {
     }
   }
 
+  if (msg.type === "save-settings") {
+    try {
+      await figma.clientStorage.setAsync("settings", msg.settings);
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+    }
+  }
+
+  if (msg.type === "load-settings") {
+    try {
+      const settings = await figma.clientStorage.getAsync("settings");
+      figma.ui.postMessage({
+        type: "settings-loaded",
+        settings: settings || null,
+      });
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      figma.ui.postMessage({
+        type: "settings-loaded",
+        settings: null,
+      });
+    }
+  }
+
   if (msg.type === "get-status") {
     const { jobId } = msg;
 
