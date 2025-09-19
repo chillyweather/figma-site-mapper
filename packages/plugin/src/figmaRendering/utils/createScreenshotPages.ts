@@ -55,28 +55,27 @@ export async function createScreenshotPages(
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   const fontName = { family: "Inter", style: "Regular" };
 
-  // Create navigation frame function
+  // Create navigation frame function (for absolute positioning)
   function createNavigationFrame(pageTitle: string, pageUrl?: string): FrameNode {
     const navFrame = figma.createFrame();
     navFrame.name = "Navigation";
-    navFrame.layoutMode = "HORIZONTAL";
-    navFrame.primaryAxisAlignItems = "MIN";
-    navFrame.counterAxisAlignItems = "CENTER";
-    navFrame.paddingTop = 16;
-    navFrame.paddingBottom = 16;
-    navFrame.paddingLeft = 16;
-    navFrame.paddingRight = 16;
-    navFrame.itemSpacing = 8;
+    navFrame.layoutMode = "NONE"; // No autolayout for absolute positioning
     navFrame.fills = [{ type: "SOLID", color: { r: 0.95, g: 0.95, b: 0.95 } }];
     navFrame.strokes = [{ type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8 } }];
     navFrame.strokeWeight = 1;
     navFrame.cornerRadius = 8;
+    navFrame.paddingTop = 16;
+    navFrame.paddingBottom = 16;
+    navFrame.paddingLeft = 16;
+    navFrame.paddingRight = 16;
 
     // Create "← Back to Index" text
     const backText = figma.createText();
     backText.fontName = fontName;
     backText.fontSize = 14;
     backText.characters = "← Back to Index";
+    backText.x = 16;
+    backText.y = 16;
     // Link will be added later when we know the index page ID
 
     // Create separator
@@ -84,12 +83,16 @@ export async function createScreenshotPages(
     separator.fontName = fontName;
     separator.fontSize = 14;
     separator.characters = "|";
+    separator.x = backText.x + backText.width + 8;
+    separator.y = 16;
 
     // Create current page title with link to source page
     const titleText = figma.createText();
     titleText.fontName = fontName;
     titleText.fontSize = 14;
     titleText.characters = pageTitle;
+    titleText.x = separator.x + separator.width + 8;
+    titleText.y = 16;
     
     // Add hyperlink to the source page if URL is provided
     if (pageUrl) {
@@ -100,10 +103,9 @@ export async function createScreenshotPages(
     navFrame.appendChild(separator);
     navFrame.appendChild(titleText);
 
-    // Auto-resize
-    navFrame.layoutAlign = "STRETCH";
-    navFrame.primaryAxisSizingMode = "AUTO";
-    navFrame.counterAxisSizingMode = "AUTO";
+    // Calculate total width needed and resize
+    const totalWidth = titleText.x + titleText.width + 16; // Add right padding
+    navFrame.resize(totalWidth, 48); // Fixed height for navigation
 
     return navFrame;
   }
@@ -116,7 +118,7 @@ export async function createScreenshotPages(
     try {
       const screenshots = page.screenshot;
 
-      // Create a vertical autolayout frame for all screenshots
+      // Create a vertical autolayout frame for screenshots only (no navigation)
       const screenshotsFrame = figma.createFrame();
       screenshotsFrame.name = `${page.title} Screenshots`;
       screenshotsFrame.layoutMode = "VERTICAL";
@@ -128,17 +130,6 @@ export async function createScreenshotPages(
       screenshotsFrame.paddingLeft = 0;
       screenshotsFrame.paddingRight = 0;
       screenshotsFrame.fills = [];
-
-      // Create navigation frame for this page
-      const navFrame = createNavigationFrame(page.title, page.url);
-      screenshotsFrame.appendChild(navFrame);
-
-      // Add 24px margin between navigation and screenshots
-      const spacerFrame = figma.createFrame();
-      spacerFrame.name = "Spacer";
-      spacerFrame.resize(screenshotWidth, 24);
-      spacerFrame.fills = [];
-      screenshotsFrame.appendChild(spacerFrame);
 
       // Handle multiple screenshot slices
       for (let i = 0; i < screenshots.length; i++) {
@@ -188,6 +179,113 @@ export async function createScreenshotPages(
       screenshotsFrame.counterAxisSizingMode = "AUTO";
 
       newPage.appendChild(screenshotsFrame);
+
+      // Create absolute positioning overlay container for navigation and interactive elements
+      const overlayContainer = figma.createFrame();
+      overlayContainer.name = "Page Overlay";
+      overlayContainer.x = 0;
+      overlayContainer.y = 0;
+      overlayContainer.fills = []; // Transparent background
+      overlayContainer.strokes = []; // No border
+      overlayContainer.layoutMode = "NONE"; // CRITICAL: No autolayout for absolute positioning
+      overlayContainer.clipsContent = false; // Allow children to extend beyond bounds
+
+      // Calculate the total height needed for the overlay (screenshots only, nav is above)
+      let totalHeight = 0;
+      for (let i = 0; i < screenshots.length; i++) {
+        const screenshotUrl = screenshots[i];
+        let imageBytes: Uint8Array;
+        let imageUrl = screenshotUrl;
+
+        try {
+          imageBytes = await fetchImageAsUint8Array(screenshotUrl);
+        } catch (sliceError) {
+          console.log(`Failed to fetch slice ${i + 1} for height calculation, trying thumbnail...`);
+          try {
+            imageBytes = await fetchImageAsUint8Array(page.thumbnail);
+            imageUrl = page.thumbnail;
+          } catch (thumbError) {
+            console.log(`Failed to fetch thumbnail too, skipping height calculation`);
+            continue;
+          }
+        }
+
+        try {
+          const dimensions = await getImageDimensions(imageBytes);
+          const aspectRatio = dimensions.width / dimensions.height;
+          const calculatedHeight = screenshotWidth / aspectRatio;
+          totalHeight += calculatedHeight;
+        } catch (error) {
+          console.log(`Failed to get dimensions for ${imageUrl}, using fallback height`);
+          totalHeight += 1024; // fallback height
+        }
+      }
+
+      overlayContainer.resize(screenshotWidth, totalHeight);
+
+      // Define navigation height constant
+      const navHeight = 48; // Fixed height for navigation frame
+
+      // Add navigation frame to overlay (absolutely positioned above screenshots)
+      const navFrame = createNavigationFrame(page.title, page.url);
+      navFrame.x = 0;
+      navFrame.y = -60; // Position navigation above screenshots
+      navFrame.resize(screenshotWidth, navHeight);
+      overlayContainer.appendChild(navFrame);
+
+      // Add red frames around interactive elements - with absolute positioning and scaling
+      if (page.interactiveElements && page.interactiveElements.length > 0) {
+        console.log(`Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`);
+        
+        // Get the original screenshot dimensions to calculate scaling factor
+        let originalWidth = screenshotWidth; // fallback
+        let scaleFactor = 1;
+        
+        if (screenshots.length > 0) {
+          try {
+            const firstScreenshotBytes = await fetchImageAsUint8Array(screenshots[0]);
+            const dimensions = await getImageDimensions(firstScreenshotBytes);
+            originalWidth = dimensions.width;
+            scaleFactor = screenshotWidth / originalWidth;
+            console.log(`Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`);
+          } catch (error) {
+            console.log(`Could not calculate scaling factor, using 1:1 scaling:`, error);
+          }
+        }
+        
+        // Add red frames for each interactive element with scaled coordinates
+        for (const element of page.interactiveElements) {
+          const highlightRect = figma.createRectangle();
+          highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
+          
+          // Scale coordinates and dimensions to match screenshot scaling
+          const scaledX = element.x * scaleFactor;
+          const scaledY = element.y * scaleFactor; // Position relative to screenshots (no nav offset needed)
+          const scaledWidth = element.width * scaleFactor;
+          const scaledHeight = element.height * scaleFactor;
+          
+          // Set absolute position - coordinates are scaled to match screenshot
+          highlightRect.x = scaledX;
+          highlightRect.y = scaledY;
+          highlightRect.resize(scaledWidth, scaledHeight);
+          
+          // Style the highlight - red 1px stroke, no fill, 50% opacity
+          highlightRect.fills = [];
+          highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }]; // Red color
+          highlightRect.strokeWeight = 1;
+          highlightRect.opacity = 0.5;
+          
+          overlayContainer.appendChild(highlightRect);
+          
+          console.log(`Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`);
+        }
+        
+        console.log(`Added interactive element highlights with scaled positioning for ${page.url}`);
+      }
+
+      // Add the overlay container to the page
+      newPage.appendChild(overlayContainer);
+      console.log(`Added absolute positioning overlay for ${page.url}`);
 
     } catch (error) {
       console.error(`Failed to place images for ${page.url}:`, error);
