@@ -3,10 +3,21 @@ import sharp from "sharp";
 import fs from "fs";
 import path from "path"
 
+interface InteractiveElement {
+  type: 'link' | 'button';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  href?: string;
+  text?: string;
+}
+
 interface PageData {
   url: string;
   title: string;
   screenshot: string[];
+  interactiveElements?: InteractiveElement[];
 }
 
 // Language detection patterns
@@ -620,6 +631,58 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         log.info(`⚠️ Could not ensure top position for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
       }
       
+      // Find interactive elements (links and buttons) with their bounding boxes
+      log.info(`Finding interactive elements on ${request.url}`);
+      const interactiveElements = await page.evaluate(() => {
+        const elements: Array<{
+          type: 'link' | 'button';
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          href?: string;
+          text?: string;
+        }> = [];
+
+        // Find all links with hrefs
+        const links = document.querySelectorAll('a[href]');
+        links.forEach((link) => {
+          const rect = link.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) { // Only visible elements
+            elements.push({
+              type: 'link',
+              x: rect.left + window.scrollX,
+              y: rect.top + window.scrollY,
+              width: rect.width,
+              height: rect.height,
+              href: link.getAttribute('href') || undefined,
+              text: link.textContent?.trim().substring(0, 100) || undefined
+            });
+          }
+        });
+
+        // Find all buttons
+        const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
+        buttons.forEach((button) => {
+          const rect = button.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) { // Only visible elements
+            elements.push({
+              type: 'button',
+              x: rect.left + window.scrollX,
+              y: rect.top + window.scrollY,
+              width: rect.width,
+              height: rect.height,
+              href: undefined,
+              text: button.textContent?.trim().substring(0, 100) || (button as HTMLInputElement).value?.substring(0, 100) || undefined
+            });
+          }
+        });
+
+        return elements;
+      });
+
+      log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+
       const fullPageBuffer = await page.screenshot({ fullPage: true });
 
       // Slice the screenshot into manageable pieces
@@ -631,6 +694,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         url: request.url,
         title: title,
         screenshot: screenshotSlices,
+        interactiveElements: interactiveElements,
       })
       
       // Log discovered links for debugging

@@ -1,0 +1,23 @@
+{
+  "startUrl": "https://example.com/",
+  "crawlDate": "2025-09-19T09:10:11.604Z",
+  "tree": {
+    "url": "https://example.com/",
+    "title": "Example Domain",
+    "screenshot": [
+      "http://localhost:3000/screenshots/https___example_com_.png"
+    ],
+    "interactiveElements": [
+      {
+        "type": "link",
+        "x": 340,
+        "y": 244.875,
+        "width": 136.984375,
+        "height": 18,
+        "href": "https://www.iana.org/domains/example",
+        "text": "More information..."
+      }
+    ],
+    "children": []
+  }
+}
