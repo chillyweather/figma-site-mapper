@@ -1,4 +1,4 @@
-import { TreeNode } from "../../types";
+import { TreeNode, InteractiveElement } from "../../types";
 
 
 
@@ -54,6 +54,124 @@ export async function createScreenshotPages(
   // Load font for navigation frame - use Inter only
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   const fontName = { family: "Inter", style: "Regular" };
+
+  // Create link reference list function
+  async function createLinkReferenceList(
+    container: FrameNode, 
+    totalLinks: number, 
+    elements: InteractiveElement[]
+  ): Promise<void> {
+    // Create reference frame
+    const refFrame = figma.createFrame();
+    refFrame.name = "Link References";
+    refFrame.layoutMode = "VERTICAL";
+    refFrame.primaryAxisAlignItems = "MIN";
+    refFrame.counterAxisAlignItems = "MIN";
+    refFrame.itemSpacing = 8;
+    refFrame.paddingTop = 16;
+    refFrame.paddingBottom = 16;
+    refFrame.paddingLeft = 16;
+    refFrame.paddingRight = 16;
+    refFrame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
+    refFrame.strokes = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
+    refFrame.strokeWeight = 1;
+    refFrame.cornerRadius = 8;
+
+    // Position reference list at bottom of overlay
+    refFrame.x = 20; // 20px margin from left
+    refFrame.y = container.height - 200; // 200px from bottom (adjustable)
+
+    // Load fonts before creating text
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+
+    // Create title
+    const titleText = figma.createText();
+    titleText.fontName = { family: "Inter", style: "Bold" };
+    titleText.fontSize = 14;
+    titleText.characters = "Link Destinations:";
+    titleText.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
+    refFrame.appendChild(titleText);
+
+    // Create reference entries for each link
+    let linkNum = 1;
+    for (const element of elements) {
+      if (element.href && element.href !== '#') {
+        const entryFrame = figma.createFrame();
+        entryFrame.name = `Link ${linkNum} Reference`;
+        entryFrame.layoutMode = "HORIZONTAL";
+        entryFrame.primaryAxisAlignItems = "MIN";
+        entryFrame.counterAxisAlignItems = "CENTER";
+        entryFrame.itemSpacing = 8;
+        entryFrame.fills = [];
+
+        // Create badge container with absolute positioning for proper text centering
+        const badgeContainer = figma.createFrame();
+        badgeContainer.name = `Badge ${linkNum}`;
+        badgeContainer.resize(16, 16);
+        badgeContainer.fills = [];
+        badgeContainer.strokes = [];
+        badgeContainer.layoutMode = "NONE"; // Absolute positioning for centering
+        
+        // Create badge icon
+        const badgeIcon = figma.createEllipse();
+        badgeIcon.resize(16, 16);
+        badgeIcon.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+        badgeIcon.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+        badgeIcon.strokeWeight = 2;
+        badgeIcon.x = 0;
+        badgeIcon.y = 0;
+
+        // Create badge number text (font already loaded)
+        const badgeNumText = figma.createText();
+        badgeNumText.fontName = { family: "Inter", style: "Bold" };
+        badgeNumText.fontSize = 10;
+        badgeNumText.characters = linkNum.toString();
+        badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+        
+        // Center text in badge
+        badgeNumText.x = (16 - badgeNumText.width) / 2;
+        badgeNumText.y = (16 - badgeNumText.height) / 2;
+
+        // Add to badge container
+        badgeContainer.appendChild(badgeIcon);
+        badgeContainer.appendChild(badgeNumText);
+
+        // Create destination text
+        const destText = figma.createText();
+        destText.fontName = { family: "Inter", style: "Regular" };
+        destText.fontSize = 12;
+        
+        // Truncate long URLs for display
+        const displayUrl = element.href.length > 60 
+          ? element.href.substring(0, 57) + "..." 
+          : element.href;
+        
+        destText.characters = displayUrl;
+        destText.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
+
+        // Add elements to entry frame
+        entryFrame.appendChild(badgeContainer);
+        entryFrame.appendChild(destText);
+
+        // Auto-resize entry frame
+        entryFrame.layoutAlign = "STRETCH";
+        entryFrame.primaryAxisSizingMode = "AUTO";
+        entryFrame.counterAxisSizingMode = "AUTO";
+
+        refFrame.appendChild(entryFrame);
+        linkNum++;
+      }
+    }
+
+    // Auto-resize reference frame
+    refFrame.layoutAlign = "STRETCH";
+    refFrame.primaryAxisSizingMode = "AUTO";
+    refFrame.counterAxisSizingMode = "AUTO";
+
+    container.appendChild(refFrame);
+    console.log(`Created link reference list with ${totalLinks} entries`);
+  }
 
   // Create navigation frame function (for absolute positioning)
   function createNavigationFrame(pageTitle: string, pageUrl?: string): FrameNode {
@@ -253,8 +371,11 @@ export async function createScreenshotPages(
           }
         }
         
-        // Add red frames for each interactive element with scaled coordinates
+        // Add red frames and numbered badges for each interactive element
+        let linkCounter = 1; // Counter for numbering links
+        
         for (const element of page.interactiveElements) {
+          // Create main highlight rectangle
           const highlightRect = figma.createRectangle();
           highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
           
@@ -277,10 +398,52 @@ export async function createScreenshotPages(
           
           overlayContainer.appendChild(highlightRect);
           
+          // Add numbered badge for links with destinations
+          if (element.href && element.href !== '#') {
+            const badge = figma.createEllipse();
+            badge.name = `Link ${linkCounter}`;
+            
+            // Position badge in top-right corner of element
+            const badgeSize = 20;
+            badge.x = scaledX + scaledWidth - badgeSize - 4; // 4px margin from right edge
+            badge.y = scaledY - 4; // 4px margin from top edge
+            badge.resize(badgeSize, badgeSize);
+            
+            // Style badge - white fill, red border, bold number
+            badge.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+            badge.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+            badge.strokeWeight = 2;
+            
+            // Add number text to badge
+            const badgeText = figma.createText();
+            
+            // Load font before setting properties
+            await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+            badgeText.fontName = { family: "Inter", style: "Bold" };
+            badgeText.fontSize = 12;
+            badgeText.characters = linkCounter.toString();
+            badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+            
+            // Center text in badge
+            badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
+            badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
+            
+            overlayContainer.appendChild(badge);
+            overlayContainer.appendChild(badgeText);
+            
+            console.log(`Added link badge ${linkCounter} for ${element.href}`);
+            linkCounter++;
+          }
+          
           console.log(`Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`);
         }
         
         console.log(`Added interactive element highlights with scaled positioning for ${page.url}`);
+        
+        // Create reference list for link mappings if there are links
+        if (linkCounter > 1) {
+          await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements);
+        }
       }
 
       // Add the overlay container to the page
