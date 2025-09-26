@@ -420,37 +420,28 @@ interface MainViewProps {
   switchToSettings: () => void;
 }
 
-// Main view component (moved outside App to prevent re-creation)
-const MainView: React.FC<MainViewProps> = ({
+// Props for CrawlingTab component
+interface CrawlingTabProps {
+  url: string;
+  handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isLoading: boolean;
+  jobId: string | null;
+  handleSubmit: (e: React.FormEvent) => void;
+  status: string;
+  handleClose: () => void;
+}
+
+// Crawling tab component
+const CrawlingTab: React.FC<CrawlingTabProps> = ({
   url,
   handleUrlChange,
   isLoading,
   jobId,
   handleSubmit,
   status,
-  handleClose,
-  switchToSettings
+  handleClose
 }) => (
-  <div style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-      <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
-        Figma Site Mapper
-      </h3>
-      <button
-        onClick={switchToSettings}
-        style={{
-          background: 'none',
-          border: '1px solid #ccc',
-          padding: '4px 8px',
-          cursor: 'pointer',
-          fontSize: '12px',
-          borderRadius: '3px'
-        }}
-      >
-        <IconSettings size={16} />
-      </button>
-    </div>
-
+  <div>
     <div style={{ marginBottom: '16px' }}>
       <FocusedInput
         key="url-input"
@@ -483,6 +474,101 @@ const MainView: React.FC<MainViewProps> = ({
     </button>
   </div>
 );
+
+// Mapping tab component (empty for now)
+const MappingTab: React.FC = () => (
+  <div style={{ textAlign: 'center', color: '#666', padding: '32px 16px' }}>
+    <p>Mapping functionality coming soon...</p>
+  </div>
+);
+
+// Main view component with tabs
+const MainView: React.FC<MainViewProps> = ({
+  url,
+  handleUrlChange,
+  isLoading,
+  jobId,
+  handleSubmit,
+  status,
+  handleClose,
+  switchToSettings
+}) => {
+  const [activeTab, setActiveTab] = useState<'crawling' | 'mapping'>('crawling');
+
+  return (
+    <div style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
+          Figma Site Mapper
+        </h3>
+        <button
+          onClick={switchToSettings}
+          style={{
+            background: 'none',
+            border: '1px solid #ccc',
+            padding: '4px 8px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            borderRadius: '3px'
+          }}
+        >
+          <IconSettings size={16} />
+        </button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '1px solid #e0e0e0' }}>
+        <button
+          onClick={() => setActiveTab('crawling')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: activeTab === 'crawling' ? '600' : '400',
+            color: activeTab === 'crawling' ? '#000' : '#666',
+            borderBottom: activeTab === 'crawling' ? '2px solid #0066cc' : '2px solid transparent'
+          }}
+        >
+          Crawling
+        </button>
+        <button
+          onClick={() => setActiveTab('mapping')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: activeTab === 'mapping' ? '600' : '400',
+            color: activeTab === 'mapping' ? '#000' : '#666',
+            borderBottom: activeTab === 'mapping' ? '2px solid #0066cc' : '2px solid transparent'
+          }}
+        >
+          Mapping
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'crawling' && (
+        <CrawlingTab
+          url={url}
+          handleUrlChange={handleUrlChange}
+          isLoading={isLoading}
+          jobId={jobId}
+          handleSubmit={handleSubmit}
+          status={status}
+          handleClose={handleClose}
+        />
+      )}
+
+      {activeTab === 'mapping' && (
+        <MappingTab />
+      )}
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'main' | 'settings'>('main');
