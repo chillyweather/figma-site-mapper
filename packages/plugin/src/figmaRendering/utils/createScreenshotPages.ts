@@ -43,6 +43,40 @@ function isImageTooLarge(imageBytes: Uint8Array): boolean {
   return imageBytes.length > MAX_SIZE;
 }
 
+function parseHostname(url: string): string | null {
+  try {
+    // Remove protocol
+    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    // Get hostname part (before first slash, colon, or end)
+    const hostname = withoutProtocol.split(/[\/:\?#]/)[0];
+    return hostname.toLowerCase();
+  } catch (error) {
+    return null;
+  }
+}
+
+function isExternalLink(href: string, baseUrl: string): boolean {
+  try {
+    // Handle relative URLs - they are internal
+    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+      return false;
+    }
+    
+    const linkHostname = parseHostname(href);
+    const baseHostname = parseHostname(baseUrl);
+    
+    if (!linkHostname || !baseHostname) {
+      return false;
+    }
+    
+    // Compare hostnames - different hostname means external
+    return linkHostname !== baseHostname;
+  } catch (error) {
+    // If URL parsing fails, assume it's internal (relative link)
+    return false;
+  }
+}
+
 export async function createScreenshotPages(
   pages: TreeNode[],
   screenshotWidth: number = 1440
@@ -59,7 +93,8 @@ export async function createScreenshotPages(
   async function createLinkReferenceList(
     container: FrameNode, 
     totalLinks: number, 
-    elements: InteractiveElement[]
+    elements: InteractiveElement[],
+    pageUrl: string
   ): Promise<void> {
     // Create reference frame
     const refFrame = figma.createFrame();
@@ -77,9 +112,9 @@ export async function createScreenshotPages(
     refFrame.strokeWeight = 1;
     refFrame.cornerRadius = 8;
 
-    // Position reference list at bottom of overlay
+    // Position reference list 64px below the screenshots
     refFrame.x = 20; // 20px margin from left
-    refFrame.y = container.height - 200; // 200px from bottom (adjustable)
+    refFrame.y = container.height + 64; // 64px below the screenshots
 
     // Load fonts before creating text
     await figma.loadFontAsync({ family: "Inter", style: "Bold" });
@@ -108,30 +143,35 @@ export async function createScreenshotPages(
         // Create badge container with absolute positioning for proper text centering
         const badgeContainer = figma.createFrame();
         badgeContainer.name = `Badge ${linkNum}`;
-        badgeContainer.resize(16, 16);
+        badgeContainer.resize(18, 18);
         badgeContainer.fills = [];
         badgeContainer.strokes = [];
         badgeContainer.layoutMode = "NONE"; // Absolute positioning for centering
         
+        // Determine if link is external
+        const isExternal = isExternalLink(element.href, pageUrl);
+        const badgeColor = isExternal 
+          ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
+          : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
+
         // Create badge icon
         const badgeIcon = figma.createEllipse();
-        badgeIcon.resize(16, 16);
-        badgeIcon.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-        badgeIcon.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-        badgeIcon.strokeWeight = 2;
+        badgeIcon.resize(18, 18);
+        badgeIcon.fills = [{ type: "SOLID", color: badgeColor }]; // Colored fill
+        badgeIcon.strokes = []; // No stroke
         badgeIcon.x = 0;
         badgeIcon.y = 0;
 
         // Create badge number text (font already loaded)
         const badgeNumText = figma.createText();
         badgeNumText.fontName = { family: "Inter", style: "Bold" };
-        badgeNumText.fontSize = 10;
+        badgeNumText.fontSize = 9;
         badgeNumText.characters = linkNum.toString();
-        badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+        badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
         
         // Center text in badge
-        badgeNumText.x = (16 - badgeNumText.width) / 2;
-        badgeNumText.y = (16 - badgeNumText.height) / 2;
+        badgeNumText.x = (18 - badgeNumText.width) / 2;
+        badgeNumText.y = (18 - badgeNumText.height) / 2;
 
         // Add to badge container
         badgeContainer.appendChild(badgeIcon);
@@ -400,19 +440,24 @@ export async function createScreenshotPages(
           
           // Add numbered badge for links with destinations
           if (element.href && element.href !== '#') {
+            // Determine if link is external
+            const isExternal = isExternalLink(element.href, page.url);
+            const badgeColor = isExternal 
+              ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
+              : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
+
             const badge = figma.createEllipse();
             badge.name = `Link ${linkCounter}`;
             
             // Position badge in top-right corner of element
-            const badgeSize = 20;
+            const badgeSize = 18;
             badge.x = scaledX + scaledWidth - badgeSize - 4; // 4px margin from right edge
             badge.y = scaledY - 4; // 4px margin from top edge
             badge.resize(badgeSize, badgeSize);
             
-            // Style badge - white fill, red border, bold number
-            badge.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-            badge.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-            badge.strokeWeight = 2;
+            // Style badge - colored fill, no stroke
+            badge.fills = [{ type: "SOLID", color: badgeColor }];
+            badge.strokes = [];
             
             // Add number text to badge
             const badgeText = figma.createText();
@@ -420,9 +465,9 @@ export async function createScreenshotPages(
             // Load font before setting properties
             await figma.loadFontAsync({ family: "Inter", style: "Bold" });
             badgeText.fontName = { family: "Inter", style: "Bold" };
-            badgeText.fontSize = 12;
+            badgeText.fontSize = 9;
             badgeText.characters = linkCounter.toString();
-            badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+            badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
             
             // Center text in badge
             badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
@@ -442,7 +487,7 @@ export async function createScreenshotPages(
         
         // Create reference list for link mappings if there are links
         if (linkCounter > 1) {
-          await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements);
+          await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements, page.url);
         }
       }
 
