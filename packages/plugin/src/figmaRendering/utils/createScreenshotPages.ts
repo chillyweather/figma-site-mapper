@@ -14,7 +14,7 @@ async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
 async function getImageDimensions(imageBytes: Uint8Array): Promise<{ width: number; height: number }> {
   // Simple PNG/JPEG dimension parser
   const data = new Uint8Array(imageBytes);
-  
+
   // Check for PNG signature
   if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
     // PNG: width and height are at bytes 16-23
@@ -22,7 +22,7 @@ async function getImageDimensions(imageBytes: Uint8Array): Promise<{ width: numb
     const height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
     return { width, height };
   }
-  
+
   // Check for JPEG signature
   if (data[0] === 0xFF && data[1] === 0xD8) {
     // JPEG: scan for SOF0 marker (0xFF 0xC0)
@@ -34,7 +34,7 @@ async function getImageDimensions(imageBytes: Uint8Array): Promise<{ width: numb
       }
     }
   }
-  
+
   throw new Error("Unsupported image format or could not parse dimensions");
 }
 
@@ -61,14 +61,14 @@ function isExternalLink(href: string, baseUrl: string): boolean {
     if (!href.startsWith('http://') && !href.startsWith('https://')) {
       return false;
     }
-    
+
     const linkHostname = parseHostname(href);
     const baseHostname = parseHostname(baseUrl);
-    
+
     if (!linkHostname || !baseHostname) {
       return false;
     }
-    
+
     // Compare hostnames - different hostname means external
     return linkHostname !== baseHostname;
   } catch (error) {
@@ -91,8 +91,8 @@ export async function createScreenshotPages(
 
   // Create link reference list function
   async function createLinkReferenceList(
-    container: FrameNode, 
-    totalLinks: number, 
+    container: FrameNode,
+    totalLinks: number,
     elements: InteractiveElement[],
     pageUrl: string
   ): Promise<void> {
@@ -147,10 +147,10 @@ export async function createScreenshotPages(
         badgeContainer.fills = [];
         badgeContainer.strokes = [];
         badgeContainer.layoutMode = "NONE"; // Absolute positioning for centering
-        
+
         // Determine if link is external
         const isExternal = isExternalLink(element.href, pageUrl);
-        const badgeColor = isExternal 
+        const badgeColor = isExternal
           ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
           : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
 
@@ -168,25 +168,27 @@ export async function createScreenshotPages(
         badgeNumText.fontSize = 9;
         badgeNumText.characters = linkNum.toString();
         badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
-        
+
         // Center text in badge
         badgeNumText.x = (18 - badgeNumText.width) / 2;
         badgeNumText.y = (18 - badgeNumText.height) / 2;
 
         // Add to badge container
-        badgeContainer.appendChild(badgeIcon);
-        badgeContainer.appendChild(badgeNumText);
+        const badgeGroup = figma.group([badgeIcon, badgeNumText], figma.currentPage)
+        badgeContainer.appendChild(badgeGroup)
+        //badgeContainer.appendChild(badgeIcon);
+        //badgeContainer.appendChild(badgeNumText);
 
         // Create destination text
         const destText = figma.createText();
         destText.fontName = { family: "Inter", style: "Regular" };
         destText.fontSize = 12;
-        
+
         // Truncate long URLs for display
-        const displayUrl = element.href.length > 60 
-          ? element.href.substring(0, 57) + "..." 
+        const displayUrl = element.href.length > 60
+          ? element.href.substring(0, 57) + "..."
           : element.href;
-        
+
         destText.characters = displayUrl;
         destText.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
 
@@ -251,7 +253,7 @@ export async function createScreenshotPages(
     titleText.characters = pageTitle;
     titleText.x = separator.x + separator.width + 8;
     titleText.y = 16;
-    
+
     // Add hyperlink to the source page if URL is provided
     if (pageUrl) {
       titleText.hyperlink = { type: "URL", value: pageUrl };
@@ -394,11 +396,11 @@ export async function createScreenshotPages(
       // Add red frames around interactive elements - with absolute positioning and scaling
       if (page.interactiveElements && page.interactiveElements.length > 0) {
         console.log(`Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`);
-        
+
         // Get the original screenshot dimensions to calculate scaling factor
         let originalWidth = screenshotWidth; // fallback
         let scaleFactor = 1;
-        
+
         if (screenshots.length > 0) {
           try {
             const firstScreenshotBytes = await fetchImageAsUint8Array(screenshots[0]);
@@ -410,81 +412,120 @@ export async function createScreenshotPages(
             console.log(`Could not calculate scaling factor, using 1:1 scaling:`, error);
           }
         }
-        
+
         // Add red frames and numbered badges for each interactive element
         let linkCounter = 1; // Counter for numbering links
-        
+
         for (const element of page.interactiveElements) {
           // Create main highlight rectangle
           const highlightRect = figma.createRectangle();
           highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
-          
+
           // Scale coordinates and dimensions to match screenshot scaling
           const scaledX = element.x * scaleFactor;
           const scaledY = element.y * scaleFactor; // Position relative to screenshots (no nav offset needed)
           const scaledWidth = element.width * scaleFactor;
           const scaledHeight = element.height * scaleFactor;
-          
+
           // Set absolute position - coordinates are scaled to match screenshot
           highlightRect.x = scaledX;
           highlightRect.y = scaledY;
           highlightRect.resize(scaledWidth, scaledHeight);
-          
+
           // Style the highlight - red 1px stroke, no fill, 50% opacity
           highlightRect.fills = [];
           highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }]; // Red color
           highlightRect.strokeWeight = 1;
           highlightRect.opacity = 0.5;
-          
+
           overlayContainer.appendChild(highlightRect);
-          
+
           // Add numbered badge for links with destinations
           if (element.href && element.href !== '#') {
             // Determine if link is external
             const isExternal = isExternalLink(element.href, page.url);
-            const badgeColor = isExternal 
+            const badgeColor = isExternal
               ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
               : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
 
             const badge = figma.createEllipse();
             badge.name = `Link ${linkCounter}`;
-            
+
             // Position badge in top-right corner of element
             const badgeSize = 18;
             badge.x = scaledX + scaledWidth - badgeSize - 4; // 4px margin from right edge
             badge.y = scaledY - 4; // 4px margin from top edge
             badge.resize(badgeSize, badgeSize);
-            
+
             // Style badge - colored fill, no stroke
             badge.fills = [{ type: "SOLID", color: badgeColor }];
             badge.strokes = [];
-            
+
             // Add number text to badge
             const badgeText = figma.createText();
-            
+
             // Load font before setting properties
             await figma.loadFontAsync({ family: "Inter", style: "Bold" });
             badgeText.fontName = { family: "Inter", style: "Bold" };
             badgeText.fontSize = 9;
             badgeText.characters = linkCounter.toString();
+            // Validate and sanitize URL before setting hyperlink
+            try {
+              let validUrl = element.href;
+              
+              // For internal links (relative URLs), prepend the base site URL
+              if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
+                // Extract base URL from page.url (e.g., https://crawlee.dev from https://crawlee.dev/js)
+                const baseUrl = page.url.match(/^https?:\/\/[^\/]+/)?.[0];
+                if (baseUrl) {
+                  // Ensure the href starts with / for proper URL joining
+                  if (!validUrl.startsWith('/')) {
+                    validUrl = '/' + validUrl;
+                  }
+                  validUrl = baseUrl + validUrl;
+                } else {
+                  // Fallback if we can't extract base URL
+                  validUrl = 'https://' + validUrl;
+                }
+              }
+              
+              // Basic URL validation without using URL constructor
+              const urlPattern = /^https?:\/\/[^\s]+$/;
+              if (!urlPattern.test(validUrl)) {
+                throw new Error(`Invalid URL format: ${validUrl}`);
+              }
+              
+              const hyperlinkTarget: HyperlinkTarget = {
+                type: "URL",
+                value: validUrl
+              };
+              badgeText.setRangeHyperlink(0, badgeText.characters.length, hyperlinkTarget);
+              console.log(`Added hyperlink: ${validUrl}`);
+            } catch (urlError) {
+              console.log(`Skipping invalid hyperlink for: ${element.href}`, urlError);
+              // Don't add hyperlink if URL is invalid
+            }
             badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
-            
+
             // Center text in badge
             badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
             badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
-            
-            overlayContainer.appendChild(badge);
-            overlayContainer.appendChild(badgeText);
-            
+
+            const badgeGroup = figma.group([badge, badgeText], figma.currentPage)
+
+            overlayContainer.appendChild(badgeGroup)
+            //overlayContainer.appendChild(badge);
+            //overlayContainer.appendChild(badgeText);
+
             console.log(`Added link badge ${linkCounter} for ${element.href}`);
             linkCounter++;
           }
-          
+
           console.log(`Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`);
         }
-        
+
         console.log(`Added interactive element highlights with scaled positioning for ${page.url}`);
-        
+
         // Create reference list for link mappings if there are links
         if (linkCounter > 1) {
           await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements, page.url);
@@ -513,13 +554,13 @@ export function updateNavigationLinks(indexPageId: string) {
   // Find all pages that contain navigation frames
   for (const page of figma.root.children) {
     if (page.name === "Index") continue;
-    
+
     const navFrame = page.findOne(node => node.name === "Navigation") as FrameNode;
     if (navFrame) {
-      const backText = navFrame.findOne(node => 
+      const backText = navFrame.findOne(node =>
         node.type === "TEXT" && node.characters.includes("← Back to Index")
       ) as TextNode;
-      
+
       if (backText) {
         backText.hyperlink = { type: "NODE", value: indexPageId };
       }
