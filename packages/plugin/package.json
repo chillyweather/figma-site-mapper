@@ -19,6 +19,7 @@
     "vite-plugin-singlefile": "^0.13.5"
   },
   "dependencies": {
+    "@tabler/icons-react": "^3.35.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

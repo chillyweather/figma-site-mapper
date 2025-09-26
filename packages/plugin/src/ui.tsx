@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import { IconSettings, IconKey, IconCheck, IconX, IconRocket } from '@tabler/icons-react';
 
 // Define the settings structure
 interface PluginSettings {
@@ -386,18 +387,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       )}
       
       {authStatus === 'authenticating' && (
-        <div style={{ fontSize: '11px', color: '#856404', marginTop: '4px' }}>
-          🔑 Authenticating...
+        <div style={{ fontSize: '11px', color: '#856404', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <IconKey size={12} />
+          Authenticating...
         </div>
       )}
       {authStatus === 'success' && (
-        <div style={{ fontSize: '11px', color: '#155724', marginTop: '4px' }}>
-          ✅ Authentication successful
+        <div style={{ fontSize: '11px', color: '#155724', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <IconCheck size={12} />
+          Authentication successful
         </div>
       )}
       {authStatus === 'failed' && (
-        <div style={{ fontSize: '11px', color: '#721c24', marginTop: '4px' }}>
-          ❌ Authentication failed - will crawl public pages only
+        <div style={{ fontSize: '11px', color: '#721c24', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <IconX size={12} />
+          Authentication failed - will crawl public pages only
         </div>
       )}
     </div>
@@ -443,7 +447,7 @@ const MainView: React.FC<MainViewProps> = ({
           borderRadius: '3px'
         }}
       >
-        ⚙️ Settings
+        <IconSettings size={16} />
       </button>
     </div>
 
@@ -678,7 +682,7 @@ const App: React.FC = () => {
     e.stopPropagation();
     if (!url.trim()) return;
 
-    console.log('🚀 Starting crawl with URL:', url.trim());
+    console.log('Starting crawl with URL:', url.trim());
 
     // Parse max requests: empty, 0, or >= 999 means infinity (no limit)
     const maxRequestsValue = maxRequests.trim() === '' ? 0 : parseInt(maxRequests);
