@@ -3,7 +3,7 @@
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_lh6JNvfmGn",
+      "id": "session_tthxFFsMmL",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:04:54.560Z",
-      "createdAt": "2025-09-20T08:14:54.560Z",
+      "expiresAt": "2025-09-26T11:25:16.404Z",
+      "createdAt": "2025-09-26T10:35:16.404Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_HzWCjwgPj6",
+      "id": "session_dpMkAqkNDr",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -33,121 +33,47 @@
         "prefixSecurity": "silent",
         "cookies": [
           {
-            "key": "vercel_session_id",
-            "value": "MzU1MTAyNTU4NywzNTQ2ODI4NzIwLDIxMzA2ODM4MzIsMTYxODI0MzczMiwyNTMzNzMzNzUw",
-            "expires": "2025-09-20T09:04:57.816Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": true,
-            "creation": "2025-09-20T08:14:57.833Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "visitor-id",
-            "value": "T6PejM2I1BItQKGMQf_8p",
-            "expires": "2025-09-21T08:14:57.453Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": true,
-            "creation": "2025-09-20T08:14:57.834Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "__ssid",
-            "value": "85b1ff126946126065868048bf96079",
-            "expires": "2026-10-25T08:14:57.870Z",
-            "domain": "vercel.com",
+            "key": "intercom-id-kod1r788",
+            "value": "14ca7dd6-93c7-4da9-a44b-fe211b73d87c",
+            "expires": "2026-06-23T11:08:45.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.334Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
+            "creation": "2025-09-26T10:35:30.210Z",
+            "lastAccessed": "2025-09-26T10:35:45.080Z"
           },
           {
-            "key": "_hp2_props.3648353952",
-            "value": "%7B%22isLoggedIn%22%3Afalse%2C%22isVercelian%22%3Afalse%2C%22isVercelianEncoded%22%3A%22false%22%7D",
-            "expires": "2026-10-19T18:14:58.000Z",
-            "domain": "vercel.com",
+            "key": "intercom-session-kod1r788",
+            "expires": "2025-10-03T10:35:25.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
-            "secure": true,
             "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.334Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
+            "creation": "2025-09-26T10:35:30.210Z",
+            "lastAccessed": "2025-09-26T10:35:45.081Z"
           },
           {
-            "key": "_hp2_id.3648353952",
-            "value": "%7B%22userId%22%3A%226046313995369679%22%2C%22pageviewId%22%3A%223610758204766000%22%2C%22sessionId%22%3A%228091238260039382%22%2C%22identity%22%3Anull%2C%22trackerVersion%22%3A%224.0%22%7D",
-            "expires": "2026-10-19T18:15:17.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.334Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "signals-sdk-user-id",
-            "value": "d2c392d0-0277-433d-842f-b2f08552fe25",
-            "expires": "2026-09-20T08:14:58.000Z",
-            "domain": "vercel.com",
+            "key": "intercom-device-id-kod1r788",
+            "value": "36d3e1e9-508a-4104-b970-eba441c9d157",
+            "expires": "2026-06-23T11:08:45.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.335Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "signals-sdk-session-id",
-            "value": "1e9e015d-ce71-42f0-8859-507aa3e1cd14",
-            "expires": "2025-09-20T08:44:58.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.335Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "ko_id",
-            "value": "331e73d7-38ed-4034-9c5f-613c765b2a3b",
-            "expires": "2026-09-20T08:14:58.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.335Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "ko_sid",
-            "value": "{%22id%22:%221758356098191%22%2C%22lastTouched%22:1758356098192}",
-            "expires": "2025-09-21T08:14:58.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.335Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
-          },
-          {
-            "key": "_hp2_ses_props.3648353952",
-            "value": "%7B%22ts%22%3A1758356098098%2C%22d%22%3A%22vercel.com%22%2C%22h%22%3A%22%2F%22%7D",
-            "expires": "2025-09-20T08:45:17.000Z",
-            "domain": "vercel.com",
-            "path": "/",
-            "secure": true,
-            "hostOnly": false,
-            "creation": "2025-09-20T08:15:04.335Z",
-            "lastAccessed": "2025-09-20T08:15:30.596Z"
+            "creation": "2025-09-26T10:35:30.210Z",
+            "lastAccessed": "2025-09-26T10:35:45.081Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:04:54.562Z",
-      "createdAt": "2025-09-20T08:14:54.562Z",
+      "expiresAt": "2025-09-26T11:25:16.407Z",
+      "createdAt": "2025-09-26T10:35:16.407Z",
       "usageCount": 6,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_IaY20lG4UT",
+      "id": "session_4Y4LqBDsHr",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -160,14 +86,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:02.813Z",
-      "createdAt": "2025-09-20T08:15:02.813Z",
+      "expiresAt": "2025-09-26T11:25:23.274Z",
+      "createdAt": "2025-09-26T10:35:23.274Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_9GoTbC6YOq",
+      "id": "session_z0FO5aMXlA",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -180,14 +106,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:09.651Z",
-      "createdAt": "2025-09-20T08:15:09.651Z",
+      "expiresAt": "2025-09-26T11:25:28.156Z",
+      "createdAt": "2025-09-26T10:35:28.156Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_luz1Nln3ti",
+      "id": "session_9rzyyRKHd5",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -200,14 +126,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:16.042Z",
-      "createdAt": "2025-09-20T08:15:16.042Z",
+      "expiresAt": "2025-09-26T11:25:32.967Z",
+      "createdAt": "2025-09-26T10:35:32.967Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_iOOgbjgRKU",
+      "id": "session_gQdhauMjnT",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -220,14 +146,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:22.749Z",
-      "createdAt": "2025-09-20T08:15:22.749Z",
+      "expiresAt": "2025-09-26T11:25:37.544Z",
+      "createdAt": "2025-09-26T10:35:37.544Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_kf8dFK8Ldk",
+      "id": "session_zpNdCogy0v",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -240,14 +166,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:29.242Z",
-      "createdAt": "2025-09-20T08:15:29.242Z",
+      "expiresAt": "2025-09-26T11:25:43.457Z",
+      "createdAt": "2025-09-26T10:35:43.457Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_mtU4KACj0E",
+      "id": "session_ZhImsMt2O8",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -260,8 +186,8 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-20T09:05:30.963Z",
-      "createdAt": "2025-09-20T08:15:30.963Z",
+      "expiresAt": "2025-09-26T11:25:45.101Z",
+      "createdAt": "2025-09-26T10:35:45.101Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
