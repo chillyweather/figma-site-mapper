@@ -18,6 +18,7 @@ interface PageData {
   title: string;
   screenshot: string[];
   interactiveElements?: InteractiveElement[];
+  crawlOrder?: number; // Track the order in which pages were crawled
 }
 
 // Language detection patterns
@@ -254,11 +255,14 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   let root: PageData & { children: PageData[] } | null = null;
   const canonicalStartUrl = new URL(startUrl).toString();
 
+  // First pass: create nodes with numbered titles
   for (const page of pages) {
     const canonicalUrl = new URL(page.url).toString();
-    pageMap.set(canonicalUrl, { ...page, children: [] });
+    const numberedTitle = page.crawlOrder ? `${page.crawlOrder}_${page.title}` : page.title;
+    pageMap.set(canonicalUrl, { ...page, title: numberedTitle, children: [] });
   }
 
+  // Second pass: build parent-child relationships
   for (const page of pages) {
     const canonicalUrl = new URL(page.url).toString();
 
@@ -320,6 +324,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   let currentPage = 0;
   let totalPages = 0;
   let isTerminating = false; // Flag to prevent multiple termination attempts
+  let pageCounter = 1; // Counter to track crawl order for numbering
   
   // Handle authentication if provided
   let authSuccess = false;
@@ -869,6 +874,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         title: title,
         screenshot: screenshotSlices,
         interactiveElements: interactiveElements,
+        crawlOrder: pageCounter++,
       })
       
       // Log discovered links for debugging
