@@ -6,6 +6,102 @@ let hasRenderedSitemap = false; // Prevent duplicate rendering
 
 figma.showUI(__html__, { width: 320, height: 1000, themeColors: true });
 
+// Function to scan current page for badge-with-link elements
+async function scanForBadgeLinks(): Promise<Array<{id: string, text: string, url: string}>> {
+  const badgeLinks: Array<{id: string, text: string, url: string}> = [];
+  
+  try {
+    // Find all groups with name "badge-with-link"
+    const badgeGroups = figma.currentPage.findAll(node => 
+      node.type === 'GROUP' && node.name === 'badge-with-link'
+    );
+    
+    for (const group of badgeGroups) {
+      if (group.type === 'GROUP') {
+        // Look for text nodes within the group that have hyperlinks
+        const textNodes = group.findAll(node => node.type === 'TEXT');
+        
+        for (const node of textNodes) {
+          if (node.type === 'TEXT') {
+            const textNode = node;
+            // Check if the text node has hyperlink data
+            if (textNode.hyperlink) {
+              try {
+                // Extract hyperlink information
+                const hyperlink = textNode.hyperlink;
+                let url = '';
+                let text = textNode.characters || 'Link';
+                
+                // Handle different hyperlink types
+                if (typeof hyperlink === 'object' && hyperlink !== null) {
+                  if ('type' in hyperlink && hyperlink.type === 'URL') {
+                    url = (hyperlink as any).value || '';
+                  } else if ('value' in hyperlink) {
+                    url = (hyperlink as any).value || '';
+                  }
+                }
+                
+                if (url) {
+                  badgeLinks.push({
+                    id: textNode.id,
+                    text: text,
+                    url: url
+                  });
+                }
+              } catch (e) {
+                console.warn('Failed to extract hyperlink from text node:', e);
+                continue;
+              }
+            } else {
+              // If no hyperlink, still show the text content
+              const text = textNode.characters || 'Link';
+              if (text && text.trim()) {
+                badgeLinks.push({
+                  id: textNode.id,
+                  text: text,
+                  url: `#${text.toLowerCase().replace(/\s+/g, '-')}`
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`Found ${badgeLinks.length} badge-with-link elements`);
+    return badgeLinks;
+  } catch (error) {
+    console.error('Error scanning for badge links:', error);
+    return [];
+  }
+}
+
+// Function to send badge links to UI
+async function updateMappingTab() {
+  const badgeLinks = await scanForBadgeLinks();
+  figma.ui.postMessage({
+    type: 'badge-links-update',
+    badgeLinks: badgeLinks
+  });
+}
+
+// Set up page change detection
+figma.on('currentpagechange', () => {
+  console.log('Page changed, updating mapping tab');
+  updateMappingTab();
+});
+
+// Also detect when selection changes (user might navigate to different elements)
+figma.on('selectionchange', () => {
+  console.log('Selection changed, updating mapping tab');
+  updateMappingTab();
+});
+
+// Initial scan when plugin loads
+setTimeout(() => {
+  updateMappingTab();
+}, 1000);
+
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
     const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = msg;
