@@ -472,7 +472,7 @@ export async function createScreenshotPages(
             // Validate and sanitize URL before setting hyperlink
             try {
               let validUrl = element.href;
-              
+
               // For internal links (relative URLs), prepend the base site URL
               if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
                 // Extract base URL from page.url (e.g., https://crawlee.dev from https://crawlee.dev/js)
@@ -488,13 +488,13 @@ export async function createScreenshotPages(
                   validUrl = 'https://' + validUrl;
                 }
               }
-              
+
               // Basic URL validation without using URL constructor
               const urlPattern = /^https?:\/\/[^\s]+$/;
               if (!urlPattern.test(validUrl)) {
                 throw new Error(`Invalid URL format: ${validUrl}`);
               }
-              
+
               const hyperlinkTarget: HyperlinkTarget = {
                 type: "URL",
                 value: validUrl
@@ -512,6 +512,7 @@ export async function createScreenshotPages(
             badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
             const badgeGroup = figma.group([badge, badgeText], figma.currentPage)
+            badgeGroup.name = "badge-with-link"
 
             overlayContainer.appendChild(badgeGroup)
             //overlayContainer.appendChild(badge);

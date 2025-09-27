@@ -293,7 +293,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3, auth?: {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3, showBrowser: boolean = false, auth?: {
   method: 'credentials' | 'cookies';
   loginUrl?: string;
   username?: string;
@@ -301,7 +301,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   cookies?: Array<{name: string; value: string}>;
 }) {
   console.log('🚀 Starting the crawler with URL:', startUrl);
-  console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize });
+  console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser });
 
   // List of realistic user agents to rotate
   const userAgents = [
@@ -419,9 +419,19 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   crawler = new PlaywrightCrawler({
     launchContext: {
         launchOptions: {
-        args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : [],
+        args: [
+          ...(deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : []),
+          // Disable automation banner that causes positioning issues
+          '--disable-infobars',
+          '--disable-extensions-except=',
+          '--disable-extensions',
+          '--no-first-run',
+          '--disable-dev-shm-usage',
+          // Additional arguments for better compatibility
+          '--disable-blink-features=AutomationControlled'
+        ],
         // Add additional browser arguments for better compatibility
-        headless: false, // Run with visible browser for CAPTCHA handling
+        headless: !showBrowser, // Control browser visibility based on setting
         slowMo: 100, // Small delay to allow pages to stabilize
         devtools: false // Keep devtools closed to reduce resource usage
       },
@@ -776,6 +786,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
       }
       
       // Find interactive elements (links and buttons) with their bounding boxes
+      // IMPORTANT: This must happen AFTER final scroll positioning to ensure accurate coordinates
       log.info(`Finding interactive elements on ${request.url}`);
       const interactiveElements = await page.evaluate(() => {
         const elements: Array<{
@@ -792,6 +803,25 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         const links = document.querySelectorAll('a[href]');
         links.forEach((link) => {
           const rect = link.getBoundingClientRect();
+          const href = link.getAttribute('href') || '';
+          const id = link.getAttribute('id') || '';
+          
+          // Filter out unwanted links
+          const shouldSkip = 
+            // Skip docusaurus skip link
+            id === '__docusaurus_skipToContent_fallback' ||
+            // Skip empty or javascript links
+            !href || 
+            href === '#' || 
+            href.startsWith('javascript:') ||
+            // Skip very small elements (likely decorative)
+            rect.width < 10 || 
+            rect.height < 10;
+            
+          if (shouldSkip) {
+            return;
+          }
+          
           if (rect.width > 0 && rect.height > 0) { // Only visible elements
             elements.push({
               type: 'link',
@@ -799,7 +829,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
               y: rect.top + window.scrollY,
               width: rect.width,
               height: rect.height,
-              href: link.getAttribute('href') || undefined,
+              href: href || undefined,
               text: link.textContent?.trim().substring(0, 100) || undefined
             });
           }

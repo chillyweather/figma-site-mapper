@@ -8,7 +8,7 @@ figma.showUI(__html__, { width: 320, height: 1000, themeColors: true });
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = msg;
 
     console.log('📡 Main.ts received crawl request for URL:', url);
 
@@ -22,7 +22,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, auth }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, showBrowser, auth }),
       });
 
       const result = await response.json();

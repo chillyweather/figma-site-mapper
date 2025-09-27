@@ -13,6 +13,7 @@ interface PluginSettings {
   maxDepth: string;
   defaultLanguageOnly: boolean;
   sampleSize: string;
+  showBrowser: boolean;
   authMethod: 'none' | 'credentials' | 'cookies';
   loginUrl: string;
   username: string;
@@ -31,6 +32,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   maxDepth: '2',
   defaultLanguageOnly: true,
   sampleSize: '3',
+  showBrowser: false,
   authMethod: 'none',
   loginUrl: '',
   username: '',
@@ -125,6 +127,8 @@ interface SettingsViewProps {
   handleSampleSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   defaultLanguageOnly: boolean;
   handleDefaultLanguageOnlyChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  showBrowser: boolean;
+  handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   authMethod: 'none' | 'credentials' | 'cookies';
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   loginUrl: string;
@@ -159,6 +163,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   handleSampleSizeChange,
   defaultLanguageOnly,
   handleDefaultLanguageOnlyChange,
+  showBrowser,
+  handleShowBrowserChange,
   authMethod,
   handleAuthMethodChange,
   loginUrl,
@@ -317,6 +323,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </label>
       <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
         Detects language from URL patterns like /en/, /fr/, ?lang=de, etc.
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={showBrowser}
+          onChange={handleShowBrowserChange}
+          disabled={isLoading || !!jobId}
+          style={{ marginRight: '8px' }}
+        />
+        Show browser window during crawl
+      </label>
+      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+        Keep browser visible for manual intervention (CAPTCHA, login, etc.)
       </div>
     </div>
 
@@ -581,6 +600,7 @@ const App: React.FC = () => {
   const [maxDepth, setMaxDepth] = useState('2');
   const [defaultLanguageOnly, setDefaultLanguageOnly] = useState(true);
   const [sampleSize, setSampleSize] = useState('3');
+  const [showBrowser, setShowBrowser] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -617,6 +637,7 @@ const App: React.FC = () => {
           setMaxDepth(msg.settings.maxDepth || DEFAULT_SETTINGS.maxDepth);
           setDefaultLanguageOnly(msg.settings.defaultLanguageOnly !== undefined ? msg.settings.defaultLanguageOnly : DEFAULT_SETTINGS.defaultLanguageOnly);
           setSampleSize(msg.settings.sampleSize || DEFAULT_SETTINGS.sampleSize);
+          setShowBrowser(msg.settings.showBrowser !== undefined ? msg.settings.showBrowser : DEFAULT_SETTINGS.showBrowser);
           setAuthMethod(msg.settings.authMethod || DEFAULT_SETTINGS.authMethod);
           setLoginUrl(msg.settings.loginUrl || DEFAULT_SETTINGS.loginUrl);
           setUsername(msg.settings.username || DEFAULT_SETTINGS.username);
@@ -654,12 +675,13 @@ const App: React.FC = () => {
     maxDepth,
     defaultLanguageOnly,
     sampleSize,
+    showBrowser,
     authMethod,
     loginUrl,
     username,
     password,
     cookies
-  }), [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, authMethod, loginUrl, username, password, cookies]);
+  }), [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, authMethod, loginUrl, username, password, cookies]);
 
   // Wrapper functions for state setters that also save settings
   const setUrlAndSave = useCallback((value: string) => {
@@ -707,6 +729,12 @@ const App: React.FC = () => {
   const setDefaultLanguageOnlyAndSave = useCallback((value: boolean) => {
     setDefaultLanguageOnly(value);
     const newSettings = { ...getCurrentSettings(), defaultLanguageOnly: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setShowBrowserAndSave = useCallback((value: boolean) => {
+    setShowBrowser(value);
+    const newSettings = { ...getCurrentSettings(), showBrowser: value };
     saveSettings(newSettings);
   }, [getCurrentSettings, saveSettings]);
 
@@ -844,8 +872,8 @@ const App: React.FC = () => {
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam, maxDepth: maxDepthParam, defaultLanguageOnly, sampleSize: sampleSizeParam, auth: authData } }, '*');
-  }, [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, authMethod, loginUrl, username, password, cookies]);
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam, maxDepth: maxDepthParam, defaultLanguageOnly, sampleSize: sampleSizeParam, showBrowser, auth: authData } }, '*');
+  }, [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, authMethod, loginUrl, username, password, cookies]);
 
   const handleClose = useCallback(() => {
     parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
@@ -953,6 +981,10 @@ const App: React.FC = () => {
     setDefaultLanguageOnlyAndSave(e.target.checked);
   }, [setDefaultLanguageOnlyAndSave]);
 
+  const handleShowBrowserChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setShowBrowserAndSave(e.target.checked);
+  }, [setShowBrowserAndSave]);
+
   const handleAuthMethodChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setAuthMethodAndSave(e.target.value as 'none' | 'credentials' | 'cookies');
   }, [setAuthMethodAndSave]);
@@ -996,6 +1028,8 @@ const App: React.FC = () => {
       handleSampleSizeChange={handleSampleSizeChange}
       defaultLanguageOnly={defaultLanguageOnly}
       handleDefaultLanguageOnlyChange={handleDefaultLanguageOnlyChange}
+      showBrowser={showBrowser}
+      handleShowBrowserChange={handleShowBrowserChange}
       authMethod={authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
       loginUrl={loginUrl}

@@ -1,9 +1,9 @@
 {
-  "usableSessionsCount": 3,
+  "usableSessionsCount": 8,
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_6gfHnDScXz",
+      "id": "session_zgdl2LVUdV",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-27T09:20:14.824Z",
-      "createdAt": "2025-09-27T08:30:14.824Z",
+      "expiresAt": "2025-09-27T12:13:20.424Z",
+      "createdAt": "2025-09-27T11:23:20.424Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_C2G25wchq1",
+      "id": "session_Q8AxAbqhys",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -33,69 +33,47 @@
         "prefixSecurity": "silent",
         "cookies": [
           {
-            "key": "rack.session",
-            "value": "BAh7CUkiD3Nlc3Npb25faWQGOgZFVEkiRTJkYzc1OGMzZjViZjVlZjk5MDE1%0AZDA1MzUxODEzOWM5ZjEzOTNkODE4YWM4NDQwYzkwMjRiMjQ4ZjFiMTQzNTQG%0AOwBGSSIJY3NyZgY7AEZJIiU2NzllNzU0NTYzYTY1ZGJkM2VkMjI1YmYxN2Jm%0AZjhmYwY7AEZJIg10cmFja2luZwY7AEZ7B0kiFEhUVFBfVVNFUl9BR0VOVAY7%0AAFRJIi0xODhlYzQ5MzUzZTE1NWNkMGQ0MzdlODUyOTQyYjg0ZTMyNzE0NDFk%0ABjsARkkiGUhUVFBfQUNDRVBUX0xBTkdVQUdFBjsAVEkiLWQ0ZTdkMzNmNGVi%0ANzNiY2U4ZmY3MDdjODBiNjlhYzU3ZWU1YzlmYmMGOwBGSSIKZmxhc2gGOwBG%0AewA%3D%0A--60b67b882f086b47492e5601b6e7cbec54b7d77f",
-            "expires": "2025-09-27T09:21:02.627Z",
-            "domain": "the-internet.herokuapp.com",
-            "path": "/",
-            "httpOnly": true,
-            "hostOnly": true,
-            "creation": "2025-09-27T08:30:20.538Z",
-            "lastAccessed": "2025-09-27T08:31:02.628Z"
-          },
-          {
-            "key": "optimizelySegments",
-            "value": "%7B%7D",
-            "expires": "2026-11-01T08:30:19.465Z",
-            "domain": "the-internet.herokuapp.com",
+            "key": "intercom-id-kod1r788",
+            "value": "e257d3e1-6d49-4380-a1aa-e8b2debc0709",
+            "expires": "2026-06-24T11:56:50.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-27T08:30:20.539Z",
-            "lastAccessed": "2025-09-27T08:31:02.628Z"
+            "creation": "2025-09-27T11:23:34.705Z",
+            "lastAccessed": "2025-09-27T11:23:49.273Z"
           },
           {
-            "key": "optimizelyEndUserId",
-            "value": "oeu1758961819466r0.7534484600544304",
-            "expires": "2026-11-01T08:30:19.467Z",
-            "domain": "the-internet.herokuapp.com",
+            "key": "intercom-session-kod1r788",
+            "expires": "2025-10-04T11:23:30.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-27T08:30:20.539Z",
-            "lastAccessed": "2025-09-27T08:31:02.628Z"
+            "creation": "2025-09-27T11:23:34.705Z",
+            "lastAccessed": "2025-09-27T11:23:49.273Z"
           },
           {
-            "key": "optimizelyBuckets",
-            "value": "%7B%7D",
-            "expires": "2026-11-01T08:30:19.468Z",
-            "domain": "the-internet.herokuapp.com",
+            "key": "intercom-device-id-kod1r788",
+            "value": "4f832567-fb83-4e26-bfbd-bf81fd86553e",
+            "expires": "2026-06-24T11:56:50.000Z",
+            "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-09-27T08:30:20.539Z",
-            "lastAccessed": "2025-09-27T08:31:02.628Z"
-          },
-          {
-            "key": "optimizelyPendingLogEvents",
-            "value": "%5B%22n%3Dhttps%253A%252F%252Fthe-internet.herokuapp.com%252Flogin%26u%3Doeu1758961819466r0.7534484600544304%26wxhr%3Dtrue%26t%3D1758961862500%26f%3D298349752%2C318188263%22%5D",
-            "expires": "2025-09-27T08:31:17.000Z",
-            "domain": "the-internet.herokuapp.com",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-09-27T08:31:02.628Z",
-            "lastAccessed": "2025-09-27T08:31:02.628Z"
+            "creation": "2025-09-27T11:23:34.705Z",
+            "lastAccessed": "2025-09-27T11:23:49.273Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-27T09:20:14.826Z",
-      "createdAt": "2025-09-27T08:30:14.826Z",
-      "usageCount": 2,
+      "expiresAt": "2025-09-27T12:13:20.427Z",
+      "createdAt": "2025-09-27T11:23:20.427Z",
+      "usageCount": 6,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_ojxAruOe0v",
+      "id": "session_79lMwA9FAr",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -108,8 +86,108 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-27T09:21:01.238Z",
-      "createdAt": "2025-09-27T08:31:01.238Z",
+      "expiresAt": "2025-09-27T12:13:27.395Z",
+      "createdAt": "2025-09-27T11:23:27.395Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_zhkiczWhRg",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-09-27T12:13:32.509Z",
+      "createdAt": "2025-09-27T11:23:32.509Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_WRKFfhP7jO",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-09-27T12:13:37.436Z",
+      "createdAt": "2025-09-27T11:23:37.436Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_mxFaDDRZXA",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-09-27T12:13:41.926Z",
+      "createdAt": "2025-09-27T11:23:41.926Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_TCE0341xAT",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-09-27T12:13:47.872Z",
+      "createdAt": "2025-09-27T11:23:47.872Z",
+      "usageCount": 0,
+      "maxUsageCount": 50,
+      "errorScore": 0
+    },
+    {
+      "id": "session_3KLfzafRIa",
+      "cookieJar": {
+        "version": "tough-cookie@5.1.2",
+        "storeType": "MemoryCookieStore",
+        "rejectPublicSuffixes": true,
+        "enableLooseMode": false,
+        "allowSpecialUseDomain": true,
+        "prefixSecurity": "silent",
+        "cookies": []
+      },
+      "userData": {},
+      "maxErrorScore": 3,
+      "errorScoreDecrement": 0.5,
+      "expiresAt": "2025-09-27T12:13:49.293Z",
+      "createdAt": "2025-09-27T11:23:49.293Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0

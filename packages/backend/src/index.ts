@@ -142,7 +142,7 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, auth } = request.body as { 
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = request.body as { 
     url: string, 
     publicUrl: string, 
     maxRequestsPerCrawl?: number, 
@@ -152,6 +152,7 @@ server.post('/crawl', async (request, reply) => {
     maxDepth?: number,
     defaultLanguageOnly?: boolean,
     sampleSize?: number,
+    showBrowser?: boolean,
     auth?: {
       method: 'credentials' | 'cookies';
       loginUrl?: string;
@@ -176,6 +177,7 @@ server.post('/crawl', async (request, reply) => {
     maxDepth: maxDepth === undefined ? 0 : maxDepth, // 0 means no limit, undefined defaults to no limit
     defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
     sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
+    showBrowser: showBrowser !== false, // Default to false (headless)
     auth
   });
 
