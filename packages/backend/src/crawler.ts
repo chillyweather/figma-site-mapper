@@ -301,6 +301,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   cookies?: Array<{name: string; value: string}>;
 }) {
   console.log('🚀 Starting the crawler with URL:', startUrl);
+  console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize });
 
   // List of realistic user agents to rotate
   const userAgents = [
@@ -417,18 +418,19 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
 
   crawler = new PlaywrightCrawler({
     launchContext: {
-      launchOptions: {
+        launchOptions: {
         args: deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : [],
         // Add additional browser arguments for better compatibility
-        headless: true,
-        slowMo: 100 // Small delay to allow pages to stabilize
+        headless: false, // Run with visible browser for CAPTCHA handling
+        slowMo: 100, // Small delay to allow pages to stabilize
+        devtools: false // Keep devtools closed to reduce resource usage
       },
       // Set custom user agent to appear more like real browser traffic
       userAgent: randomUserAgent
     },
     // Wait for network idle before considering page loaded
     navigationTimeoutSecs: 30,
-    requestHandlerTimeoutSecs: 45,
+    requestHandlerTimeoutSecs: 300, // 5 minutes to allow for manual login/CAPTCHA
     maxConcurrency: 1, // Process one page at a time for better reliability
     
     // Rate limiting configuration
@@ -492,8 +494,13 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         return;
       }
       
+      // IMPORTANT: Don't terminate during login/authentication process
+      // Check if this looks like a login page before applying limits
+      const isLikelyLoginPage = request.url.includes('/login') || request.url.includes('/signin') || request.url.includes('/auth');
+      
       // Check if we've reached the max requests limit (0 means no limit)
-      if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl) {
+      log.info(`Current page: ${currentPage}, Max requests: ${maxRequestsPerCrawl}, Is login page: ${isLikelyLoginPage}`);
+      if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl && !isLikelyLoginPage) {
         log.info(`Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`);
         
         // Terminate the crawler gracefully when limit is reached
@@ -540,6 +547,143 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
         log.info('Network idle timeout, continuing anyway');
       });
+
+      // CAPTCHA detection and handling
+      const captchaIndicators = await page.evaluate(() => {
+        const captchaSelectors = [
+          '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
+          '[src*="shieldsquare"]', '[class*="shieldsquare"]',
+          'iframe[src*="recaptcha"]', '.g-recaptcha',
+          '[src*="hcaptcha"]', '.h-captcha',
+          '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]' // Cloudflare
+        ];
+        
+        // Check for CAPTCHA elements
+        const hasElements = captchaSelectors.some(selector => document.querySelector(selector));
+        
+        // Check for CAPTCHA-related text in body
+        const bodyText = document.body.textContent?.toLowerCase() || '';
+        const captchaTexts = ['verify you are human', 'prove you are not a robot', 'captcha', 'shieldsquare', 'security check'];
+        const hasText = captchaTexts.some(text => bodyText.includes(text));
+        
+        // Check for CAPTCHA-related titles
+        const titleText = document.title.toLowerCase();
+        const hasCaptchaTitle = captchaTexts.some(text => titleText.includes(text));
+        
+        return hasElements || hasText || hasCaptchaTitle;
+      });
+
+      if (captchaIndicators) {
+        log.info(`🚨 CAPTCHA detected on ${request.url}`);
+        log.info(`👤 Please solve CAPTCHA manually in the browser window. Waiting up to 2 minutes...`);
+        
+        try {
+          // Wait for page to change (CAPTCHA solved) or timeout
+          await Promise.race([
+            page.waitForNavigation({ timeout: 120000 }),
+            page.waitForFunction(() => {
+              const captchaElements = document.querySelectorAll([
+                '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
+                '[src*="shieldsquare"]', '[class*="shieldsquare"]',
+                'iframe[src*="recaptcha"]', '.g-recaptcha',
+                '[src*="hcaptcha"]', '.h-captcha',
+                '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]'
+              ].join(', '));
+              
+              // Also check if body text no longer contains CAPTCHA indicators
+              const bodyText = document.body.textContent?.toLowerCase() || '';
+              const captchaTexts = ['verify you are human', 'prove you are not a robot', 'security check'];
+              const stillHasText = captchaTexts.some(text => bodyText.includes(text));
+              
+              return captchaElements.length === 0 && !stillHasText;
+            }, { timeout: 120000 }),
+            page.waitForTimeout(120000) // 2 minute max wait
+          ]);
+          
+          log.info(`✅ CAPTCHA appears to be resolved, continuing with ${request.url}`);
+          await page.waitForTimeout(2000); // Let page stabilize after CAPTCHA resolution
+          
+        } catch (error) {
+          log.info(`⏰ CAPTCHA timeout on ${request.url}, skipping page`);
+          return;
+        }
+      }
+
+      // Login/Authentication detection and handling
+      const loginIndicators = await page.evaluate(() => {
+        // Check for login form elements
+        const hasPasswordField = document.querySelector('input[type="password"]');
+        const hasUsernameField = document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"], input[name="username"]');
+        
+        // Check for login buttons using proper text search
+        const buttons = document.querySelectorAll('button, input[type="submit"]');
+        const hasLoginButton = Array.from(buttons).some(btn => {
+          const text = btn.textContent?.toLowerCase() || btn.getAttribute('value')?.toLowerCase() || '';
+          return text.includes('login') || text.includes('sign in') || text.includes('log in') || text.includes('submit');
+        });
+        
+        // Check for login-related text
+        const bodyText = document.body.textContent?.toLowerCase() || '';
+        const titleText = document.title.toLowerCase();
+        const loginTexts = [
+          'login', 'sign in', 'log in', 'authenticate', 'enter password',
+          'please log in', 'access denied', 'unauthorized', 'authentication required',
+          'you must be logged in', 'please sign in'
+        ];
+        const hasLoginText = loginTexts.some(text => bodyText.includes(text) || titleText.includes(text));
+        
+        // Check for common login page patterns
+        const loginPaths = ['/login', '/signin', '/auth', '/authenticate'];
+        const hasLoginPath = loginPaths.some(path => window.location.pathname.includes(path));
+        
+        // Check for HTTP auth dialogs (these show as specific page content)
+        const hasHttpAuth = bodyText.includes('401') && (bodyText.includes('unauthorized') || bodyText.includes('authentication required'));
+        
+        // Debug logging
+        console.log('Login detection debug:', {
+          hasPasswordField: !!hasPasswordField,
+          hasUsernameField: !!hasUsernameField,
+          hasLoginButton,
+          hasLoginText,
+          hasLoginPath,
+          currentPath: window.location.pathname,
+          pageTitle: document.title,
+          bodyTextSnippet: bodyText.substring(0, 200)
+        });
+        
+        // More flexible login detection - any of these conditions
+        const isLoginPage = hasLoginPath || (hasPasswordField && hasUsernameField) || hasLoginText;
+        
+        return isLoginPage;
+      });
+
+      // Log the login detection result
+      log.info(`Login detection result for ${request.url}: ${loginIndicators}`);
+
+      if (loginIndicators) {
+        log.info(`🔐 Login page detected on ${request.url}`);
+        log.info(`👤 Please log in manually in the browser window. Browser will pause execution...`);
+        
+        // Add a visual indicator in the browser
+        await page.evaluate(() => {
+          const banner = document.createElement('div');
+          banner.innerHTML = '🔐 LOGIN DETECTED - Please log in manually then press F8 or click Resume button to continue';
+          banner.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
+            background: #ff6b6b; color: white; padding: 15px;
+            text-align: center; font-size: 18px; font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+          `;
+          document.body.insertBefore(banner, document.body.firstChild);
+        });
+        
+        // Use Playwright's built-in pause functionality
+        // This will open the Playwright Inspector and pause execution
+        log.info(`🛑 Pausing crawler execution - please log in manually and press F8 to continue`);
+        await page.pause();
+        
+        log.info(`✅ Login completed, continuing with crawl`);
+      }
       
       // Additional wait for dynamic content (configurable delay)
       if (delay > 0) {

@@ -11,6 +11,8 @@ A Figma plugin that automatically crawls websites and generates visual sitemaps 
 - **Configurable Crawling**: Control crawl depth, request limits, delays, and more
 - **Language Detection**: Filter pages by language to focus on specific locales
 - **Authentication Support**: Crawl protected sites with login credentials or cookies
+- **CAPTCHA Handling**: Interactive CAPTCHA solving with automatic detection
+- **Login Page Detection**: Smart detection and manual handling of password-protected pages
 - **Progress Tracking**: Real-time progress updates during the crawling process
 
 ## 🏗️ Architecture
@@ -154,6 +156,37 @@ The crawler supports two authentication methods:
 }
 ```
 
+## 🛡️ Advanced Features
+
+### CAPTCHA & Login Handling
+
+The crawler automatically handles common blocking scenarios:
+
+**CAPTCHA Support:**
+- Detects reCAPTCHA, hCaptcha, ShieldSquare, and Cloudflare challenges
+- Pauses crawling for manual CAPTCHA solving
+- Automatically continues when CAPTCHA is resolved
+- 2-minute timeout with graceful fallback
+
+**Login Page Detection:**
+- Smart detection via URL paths (`/login`, `/signin`, `/auth`)
+- Form-based detection (password + username fields)
+- Content-based detection (login-related text)
+- Interactive manual login with Playwright Inspector
+
+**How It Works:**
+1. Crawler detects CAPTCHA/login automatically
+2. Browser stays open with visual indicators
+3. User solves CAPTCHA or logs in manually
+4. Press F8 in Playwright Inspector to resume
+5. Crawler continues with authenticated session
+
+**Browser Configuration:**
+- Runs in non-headless mode for interaction
+- Extended timeouts (5 minutes) for manual intervention
+- Realistic browser headers and user agents
+- Session persistence across requests
+
 ## 🛠️ API Endpoints
 
 ### POST `/crawl`
@@ -220,12 +253,32 @@ node test-request-limit.js
 - Check for CORS issues or authentication requirements
 - Reduce crawl limits if hitting rate limits
 
+**CAPTCHA/Login Issues:**
+
+- Browser closes too quickly: Check `requestHandlerTimeoutSecs` in crawler config
+- Login not detected: Verify URL contains `/login`, `/signin`, or `/auth` path
+- CAPTCHA not detected: Check browser console for detection debug logs
+- Can't resume after login: Press F8 in Playwright Inspector window
+
 ### Debug Mode
 
 Enable verbose logging by setting environment variables:
 
 ```bash
 DEBUG=crawlee* pnpm dev:backend
+```
+
+### Testing Protected Sites
+
+**Recommended Test Sites:**
+- `https://the-internet.herokuapp.com/login` - Form-based login (credentials: `tomsmith` / `SuperSecretPassword!`)
+- `https://httpbin.org/basic-auth/user/pass` - HTTP Basic Auth
+- Any site with reCAPTCHA or similar challenges
+
+**Interactive Mode:**
+```bash
+# Enable interactive login/CAPTCHA handling
+INTERACTIVE_MODE=true pnpm dev:backend
 ```
 
 ## 🤝 Contributing

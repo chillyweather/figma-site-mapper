@@ -1,9 +1,9 @@
 {
-  "usableSessionsCount": 5,
+  "usableSessionsCount": 3,
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_6REWDZ1WSW",
+      "id": "session_6gfHnDScXz",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-26T16:39:06.863Z",
-      "createdAt": "2025-09-26T15:49:06.863Z",
+      "expiresAt": "2025-09-27T09:20:14.824Z",
+      "createdAt": "2025-09-27T08:30:14.824Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_HPC1ilZjXW",
+      "id": "session_C2G25wchq1",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -31,19 +31,71 @@
         "enableLooseMode": false,
         "allowSpecialUseDomain": true,
         "prefixSecurity": "silent",
-        "cookies": []
+        "cookies": [
+          {
+            "key": "rack.session",
+            "value": "BAh7CUkiD3Nlc3Npb25faWQGOgZFVEkiRTJkYzc1OGMzZjViZjVlZjk5MDE1%0AZDA1MzUxODEzOWM5ZjEzOTNkODE4YWM4NDQwYzkwMjRiMjQ4ZjFiMTQzNTQG%0AOwBGSSIJY3NyZgY7AEZJIiU2NzllNzU0NTYzYTY1ZGJkM2VkMjI1YmYxN2Jm%0AZjhmYwY7AEZJIg10cmFja2luZwY7AEZ7B0kiFEhUVFBfVVNFUl9BR0VOVAY7%0AAFRJIi0xODhlYzQ5MzUzZTE1NWNkMGQ0MzdlODUyOTQyYjg0ZTMyNzE0NDFk%0ABjsARkkiGUhUVFBfQUNDRVBUX0xBTkdVQUdFBjsAVEkiLWQ0ZTdkMzNmNGVi%0ANzNiY2U4ZmY3MDdjODBiNjlhYzU3ZWU1YzlmYmMGOwBGSSIKZmxhc2gGOwBG%0AewA%3D%0A--60b67b882f086b47492e5601b6e7cbec54b7d77f",
+            "expires": "2025-09-27T09:21:02.627Z",
+            "domain": "the-internet.herokuapp.com",
+            "path": "/",
+            "httpOnly": true,
+            "hostOnly": true,
+            "creation": "2025-09-27T08:30:20.538Z",
+            "lastAccessed": "2025-09-27T08:31:02.628Z"
+          },
+          {
+            "key": "optimizelySegments",
+            "value": "%7B%7D",
+            "expires": "2026-11-01T08:30:19.465Z",
+            "domain": "the-internet.herokuapp.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-09-27T08:30:20.539Z",
+            "lastAccessed": "2025-09-27T08:31:02.628Z"
+          },
+          {
+            "key": "optimizelyEndUserId",
+            "value": "oeu1758961819466r0.7534484600544304",
+            "expires": "2026-11-01T08:30:19.467Z",
+            "domain": "the-internet.herokuapp.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-09-27T08:30:20.539Z",
+            "lastAccessed": "2025-09-27T08:31:02.628Z"
+          },
+          {
+            "key": "optimizelyBuckets",
+            "value": "%7B%7D",
+            "expires": "2026-11-01T08:30:19.468Z",
+            "domain": "the-internet.herokuapp.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-09-27T08:30:20.539Z",
+            "lastAccessed": "2025-09-27T08:31:02.628Z"
+          },
+          {
+            "key": "optimizelyPendingLogEvents",
+            "value": "%5B%22n%3Dhttps%253A%252F%252Fthe-internet.herokuapp.com%252Flogin%26u%3Doeu1758961819466r0.7534484600544304%26wxhr%3Dtrue%26t%3D1758961862500%26f%3D298349752%2C318188263%22%5D",
+            "expires": "2025-09-27T08:31:17.000Z",
+            "domain": "the-internet.herokuapp.com",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-09-27T08:31:02.628Z",
+            "lastAccessed": "2025-09-27T08:31:02.628Z"
+          }
+        ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-26T16:39:06.865Z",
-      "createdAt": "2025-09-26T15:49:06.865Z",
-      "usageCount": 3,
+      "expiresAt": "2025-09-27T09:20:14.826Z",
+      "createdAt": "2025-09-27T08:30:14.826Z",
+      "usageCount": 2,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_fWE7M2gEJ3",
+      "id": "session_ojxAruOe0v",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -56,48 +108,8 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-26T16:39:13.587Z",
-      "createdAt": "2025-09-26T15:49:13.587Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_VyNakSFziK",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-26T16:39:18.325Z",
-      "createdAt": "2025-09-26T15:49:18.325Z",
-      "usageCount": 0,
-      "maxUsageCount": 50,
-      "errorScore": 0
-    },
-    {
-      "id": "session_afq4VeaTvN",
-      "cookieJar": {
-        "version": "tough-cookie@5.1.2",
-        "storeType": "MemoryCookieStore",
-        "rejectPublicSuffixes": true,
-        "enableLooseMode": false,
-        "allowSpecialUseDomain": true,
-        "prefixSecurity": "silent",
-        "cookies": []
-      },
-      "userData": {},
-      "maxErrorScore": 3,
-      "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-09-26T16:39:20.292Z",
-      "createdAt": "2025-09-26T15:49:20.292Z",
+      "expiresAt": "2025-09-27T09:21:01.238Z",
+      "createdAt": "2025-09-27T08:31:01.238Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
