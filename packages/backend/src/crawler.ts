@@ -251,8 +251,15 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
     return null;
   }
 
+  // For single-page crawls, just return the first page
+  if (pages.length === 1) {
+    const page = pages[0]!;
+    const numberedTitle = page.crawlOrder ? `${page.crawlOrder}_${page.title}` : page.title;
+    return { ...page, title: numberedTitle, children: [] } as PageData & { children: PageData[] };
+  }
+
   const pageMap = new Map<string, PageData & { children: PageData[] }>();
-  let root: PageData & { children: PageData[] } | null = null;
+  let root: PageData & { children: PageData [] } | null = null;
   const canonicalStartUrl = new URL(startUrl).toString();
 
   // First pass: create nodes with numbered titles

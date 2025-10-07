@@ -1201,9 +1201,17 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowFlow = useCallback(() => {
-    console.log('Show Flow clicked with checked links:', Array.from(checkedLinks));
-    // TODO: Implement flow visualization
-  }, [checkedLinks]);
+    const selectedLinkIds = Array.from(checkedLinks);
+    const selectedLinks = badgeLinks.filter(link => selectedLinkIds.includes(link.id));
+    console.log('Show Flow clicked with selected links:', selectedLinks);
+    
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'show-flow', 
+        selectedLinks: selectedLinks 
+      } 
+    }, '*');
+  }, [checkedLinks, badgeLinks]);
 
   // Stable view switching callbacks
   const switchToMain = useCallback(() => setCurrentView('main'), []);
