@@ -1081,6 +1081,7 @@ const App: React.FC = () => {
             intervalRef.current = null;
           }
           setStatus(`Crawl complete! Manifest at: ${msg.manifestUrl}`);
+          setJobId(null);
         }
       }
 
