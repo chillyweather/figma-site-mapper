@@ -4,7 +4,7 @@ const BACKEND_URL = 'http://localhost:3006';
 let screenshotWidth = 1440; // Default screenshot width
 let hasRenderedSitemap = false; // Prevent duplicate rendering
 
-figma.showUI(__html__, { width: 480, height: 1000, themeColors: true });
+figma.showUI(__html__, { width: 480, height: 1200, themeColors: true });
 
 // Helper function to parse hostname from URL
 function parseHostname(url: string): string | null {
@@ -62,7 +62,7 @@ function getPageBaseUrl(): string | null {
         }
       }
     }
-    
+
     // Fallback: try to extract from page name (format: "number_title")
     // Page names look like "1_Page Title" where the original URL would be in the navigation
     return null;
@@ -87,7 +87,7 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
         // Check badge color to filter internal vs external links
         // Orange badge = internal link, Cyan badge = external link
         const ellipseNodes = group.findAll(node => node.type === 'ELLIPSE');
-        
+
         let isInternalLink = false;
         for (const node of ellipseNodes) {
           if (node.type === 'ELLIPSE' && node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
@@ -103,7 +103,7 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
             }
           }
         }
-        
+
         // Skip external links (cyan badges)
         if (!isInternalLink) {
           continue;
@@ -301,7 +301,7 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === "show-flow") {
     const { selectedLinks } = msg;
     console.log('📊 Show flow requested for links:', selectedLinks);
-    
+
     try {
       await handleShowFlow(selectedLinks);
     } catch (error) {
@@ -334,67 +334,67 @@ async function handleShowFlow(selectedLinks: Array<{ id: string, text: string, u
   // Get the current page
   const currentPage = figma.currentPage;
   const currentPageName = currentPage.name;
-  
+
   // Extract the page number and title from current page name (format: "1_Page Title")
   const pageMatch = currentPageName.match(/^(\d+)_(.*)/);
   if (!pageMatch) {
     figma.notify("Could not parse current page name");
     return;
   }
-  
+
   const pageNumber = pageMatch[1];
   const pageTitle = pageMatch[2];
-  
+
   // Create flow page name with compass emoji
   const flowPageName = `${pageNumber}_🧭_${pageTitle}`;
-  
+
   // Check if flow page already exists
   let flowPage = figma.root.children.find(p => p.name === flowPageName) as PageNode | undefined;
-  
+
   if (!flowPage) {
     // Create new flow page
     flowPage = figma.createPage();
     flowPage.name = flowPageName;
-    
+
     // Find the index of the current page and insert the flow page right after it
     const currentPageIndex = figma.root.children.indexOf(currentPage);
     figma.root.insertChild(currentPageIndex + 1, flowPage);
-    
+
     console.log(`Created flow page: ${flowPageName}`);
   } else {
     console.log(`Flow page already exists: ${flowPageName}`);
   }
-  
+
   // Create the flow visualization (will switch to flow page internally)
   await createFlowVisualization(flowPage, selectedLink, currentPage);
-  
+
   figma.notify(`Flow visualization started for link ${selectedLink.text}`);
 }
 
 // Create flow visualization on the flow page
 async function createFlowVisualization(
-  flowPage: PageNode, 
+  flowPage: PageNode,
   selectedLink: { id: string, text: string, url: string },
   sourcePage: PageNode
 ) {
   console.log('Creating flow visualization for:', selectedLink);
-  
+
   // Make sure we're on the source page when looking for elements
   const previousPage = figma.currentPage;
   figma.currentPage = sourcePage;
-  
+
   // Step 1: Find the badge element on the source page
   const badgeElement = await figma.getNodeByIdAsync(selectedLink.id);
-  
+
   if (!badgeElement || badgeElement.type !== 'TEXT') {
     console.error(`Could not find badge element with ID: ${selectedLink.id}`);
     figma.notify("Could not find badge element");
     figma.currentPage = previousPage; // Restore previous page
     return;
   }
-  
+
   console.log('Found badge element:', badgeElement.name);
-  
+
   // Get the parent group (badge-with-link)
   const badgeGroup = badgeElement.parent;
   if (!badgeGroup || badgeGroup.type !== 'GROUP') {
@@ -403,13 +403,13 @@ async function createFlowVisualization(
     figma.currentPage = previousPage;
     return;
   }
-  
+
   console.log('Found badge group:', badgeGroup.name);
-  
+
   // Find the overlay container and screenshot to get context
   let overlayContainer: FrameNode | null = null;
   let screenshotImage: RectangleNode | null = null;
-  
+
   // Navigate up to find the Page Overlay frame
   let currentNode: BaseNode | null = badgeGroup.parent;
   while (currentNode) {
@@ -419,68 +419,68 @@ async function createFlowVisualization(
     }
     currentNode = currentNode.parent;
   }
-  
+
   if (!overlayContainer) {
     console.error('Could not find Page Overlay container');
     figma.notify("Could not find Page Overlay container");
     figma.currentPage = previousPage;
     return;
   }
-  
+
   console.log('Found overlay container');
-  
+
   // Find the screenshot frame (frame containing "Screenshots" in name)
-  const screenshotFrames = sourcePage.findAll(node => 
+  const screenshotFrames = sourcePage.findAll(node =>
     node.type === 'FRAME' && node.name.includes('Screenshots')
   ) as FrameNode[];
-  
+
   if (screenshotFrames.length === 0) {
     console.error('Could not find Screenshots frame');
     figma.notify("Could not find Screenshots frame");
     figma.currentPage = previousPage;
     return;
   }
-  
+
   const screenshotFrame = screenshotFrames[0];
   console.log('Found screenshot frame:', screenshotFrame.name);
-  
+
   // Get the first rectangle child (the actual screenshot image)
   const rectangles = screenshotFrame.findAll(node => node.type === 'RECTANGLE') as RectangleNode[];
-  
+
   if (rectangles.length === 0) {
     console.error('Could not find screenshot rectangles');
     figma.notify("Could not find screenshot image");
     figma.currentPage = previousPage;
     return;
   }
-  
+
   screenshotImage = rectangles[0];
   console.log('Found screenshot image');
-  
+
   // Step 2: Create context screenshot (80px around the badge element)
   const CONTEXT_PADDING = 80;
   const badgeBounds = badgeGroup.absoluteBoundingBox;
-  
+
   if (!badgeBounds) {
     console.error('Could not get badge bounds');
     figma.notify("Could not get badge bounds");
     figma.currentPage = previousPage;
     return;
   }
-  
+
   console.log('Badge bounds:', badgeBounds);
-  
+
   // Calculate context area
   const contextX = Math.max(0, badgeBounds.x - CONTEXT_PADDING);
   const contextY = Math.max(0, badgeBounds.y - CONTEXT_PADDING);
   const contextWidth = badgeBounds.width + (CONTEXT_PADDING * 2);
   const contextHeight = badgeBounds.height + (CONTEXT_PADDING * 2);
-  
+
   console.log('Creating context frame with dimensions:', contextWidth, contextHeight);
-  
+
   // Switch to flow page before creating elements
   figma.currentPage = flowPage;
-  
+
   // Create a frame for the context screenshot
   const contextFrame = figma.createFrame();
   contextFrame.name = `Context_${selectedLink.text}`;
@@ -489,68 +489,68 @@ async function createFlowVisualization(
   contextFrame.resize(contextWidth, contextHeight);
   contextFrame.clipsContent = true;
   contextFrame.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
-  
+
   // Clone the screenshot frame to get the full image
-  const screenshotFrameClone = screenshotImage.parent?.type === 'FRAME' 
-    ? (screenshotImage.parent as FrameNode).clone() 
+  const screenshotFrameClone = screenshotImage.parent?.type === 'FRAME'
+    ? (screenshotImage.parent as FrameNode).clone()
     : screenshotImage.clone();
-  
+
   // Position the cloned screenshot so the badge area is visible
   const screenshotBounds = screenshotImage.absoluteBoundingBox!;
   screenshotFrameClone.x = screenshotBounds.x - contextX;
   screenshotFrameClone.y = screenshotBounds.y - contextY;
-  
+
   contextFrame.appendChild(screenshotFrameClone);
-  
+
   // Clone the badge and overlay elements that are within the context area
   const badgeClone = badgeGroup.clone();
   badgeClone.x = badgeBounds.x - contextX;
   badgeClone.y = badgeBounds.y - contextY;
   contextFrame.appendChild(badgeClone);
-  
+
   flowPage.appendChild(contextFrame);
-  
+
   console.log('Context frame created');
-  
+
   // Step 3: Create arrow
   const arrow = figma.createVector();
   arrow.name = "Flow Arrow";
   arrow.x = contextFrame.x + contextFrame.width + 50;
   arrow.y = contextFrame.y + (contextFrame.height / 2) - 10;
-  
+
   // Create simple arrow shape (right-pointing)
   arrow.vectorPaths = [{
     windingRule: 'NONZERO',
     data: 'M 0 10 L 40 10 L 40 0 L 60 15 L 40 30 L 40 20 L 0 20 Z'
   }];
   arrow.fills = [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 0.8 } }];
-  
+
   flowPage.appendChild(arrow);
-  
+
   // Step 4: Fetch and render the target page
   const targetX = arrow.x + 120;
   const targetY = 100;
-  
+
   figma.notify(`Crawling target page: ${selectedLink.url}...`);
-  
+
   // Trigger a crawl for the target URL
   const BACKEND_URL = 'http://localhost:3006';
-  
+
   try {
     const response = await fetch(`${BACKEND_URL}/crawl`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
-        url: selectedLink.url, 
-        publicUrl: BACKEND_URL, 
+      body: JSON.stringify({
+        url: selectedLink.url,
+        publicUrl: BACKEND_URL,
         maxRequestsPerCrawl: 1, // Only crawl this one page
-        deviceScaleFactor: 1, 
-        delay: 0, 
-        requestDelay: 1000, 
+        deviceScaleFactor: 1,
+        delay: 0,
+        requestDelay: 1000,
         maxDepth: 0, // No depth - just this page
-        defaultLanguageOnly: false, 
+        defaultLanguageOnly: false,
         sampleSize: 1,
         showBrowser: false,
         detectInteractiveElements: true
@@ -559,45 +559,45 @@ async function createFlowVisualization(
 
     const result = await response.json();
     const jobId = result.jobId;
-    
+
     console.log(`Started crawl job ${jobId} for target page`);
-    
+
     // Poll for completion
     let attempts = 0;
     const maxAttempts = 60; // 3 minutes max
-    
+
     const pollInterval = setInterval(async () => {
       attempts++;
-      
+
       if (attempts > maxAttempts) {
         clearInterval(pollInterval);
         figma.notify("Target page crawl timed out", { error: true });
         return;
       }
-      
+
       try {
         const statusResponse = await fetch(`${BACKEND_URL}/status/${jobId}`);
         const statusResult = await statusResponse.json();
-        
+
         if (statusResult.status === 'completed' && statusResult.result?.manifestUrl) {
           clearInterval(pollInterval);
-          
+
           // Fetch manifest
           const manifestResponse = await fetch(statusResult.result.manifestUrl);
           const manifestData = await manifestResponse.json();
-          
+
           console.log('Target page crawl completed, rendering...');
-          
+
           // Render the target page on the flow page
           await renderTargetPage(flowPage, manifestData, targetX, targetY);
-          
+
           figma.notify("Flow visualization complete!");
         }
       } catch (error) {
         console.error('Error polling for target page status:', error);
       }
     }, 3000);
-    
+
   } catch (error) {
     console.error("Failed to crawl target page:", error);
     figma.notify("Error: Could not crawl target page.", { error: true });
@@ -613,7 +613,7 @@ function getImageDimensionsFromPNG(imageData: Uint8Array): { width: number; heig
     const height = (imageData[20] << 24) | (imageData[21] << 16) | (imageData[22] << 8) | imageData[23];
     return { width, height };
   }
-  
+
   // Fallback: return default dimensions
   console.warn('Could not parse image dimensions, using default');
   return { width: 1280, height: 1000 };
@@ -628,65 +628,65 @@ async function renderTargetPage(
 ) {
   console.log('Rendering target page at', x, y);
   console.log('Manifest data:', manifestData);
-  
+
   // Handle case where tree might be null (single page crawl)
   // In that case, check if we have pages array
   let pageData = manifestData.tree;
-  
+
   if (!pageData) {
     console.log('Tree is null, checking for pages array');
     // Tree might be null for single-page crawls, need to check backend
     figma.notify("No page data in manifest");
     return;
   }
-  
+
   if (!pageData.screenshot || !Array.isArray(pageData.screenshot) || pageData.screenshot.length === 0) {
     console.error('No screenshot data:', pageData);
     figma.notify("No screenshot data in manifest");
     return;
   }
-  
+
   const screenshotSlices = pageData.screenshot;
-  
+
   // Create container frame for the target page
   const targetFrame = figma.createFrame();
   targetFrame.name = `Target_${pageData.title || 'Page'}`;
   targetFrame.x = x;
   targetFrame.y = y;
   targetFrame.clipsContent = false;
-  
+
   let currentY = 0;
   let totalWidth = 1280; // Default width
-  
+
   // Render each screenshot slice (they are just URL strings)
   for (let i = 0; i < screenshotSlices.length; i++) {
     const screenshotUrl = screenshotSlices[i];
     console.log(`Fetching screenshot ${i} from:`, screenshotUrl);
-    
+
     const image = figma.createRectangle();
     image.name = `Screenshot_Slice_${i}`;
-    
+
     // Fetch the image
     try {
       const imageResponse = await fetch(screenshotUrl);
-      
+
       if (!imageResponse.ok) {
         throw new Error(`HTTP error! status: ${imageResponse.status}`);
       }
-      
+
       const imageBuffer = await imageResponse.arrayBuffer();
       console.log(`Fetched image buffer, size:`, imageBuffer.byteLength);
-      
+
       const imageData = new Uint8Array(imageBuffer);
-      
+
       // Get image dimensions
       console.log('Getting image dimensions...');
       const dimensions = getImageDimensionsFromPNG(imageData);
       console.log(`Image dimensions: ${dimensions.width}x${dimensions.height}`);
-      
+
       totalWidth = dimensions.width;
       const imageHeight = dimensions.height;
-      
+
       // Create image in Figma
       console.log('Creating Figma image...');
       const figmaImage = figma.createImage(imageData);
@@ -695,104 +695,135 @@ async function renderTargetPage(
         scaleMode: 'FILL',
         imageHash: figmaImage.hash
       }];
-      
+
       image.resize(totalWidth, imageHeight);
       image.fills = imageFills;
       image.x = 0;
       image.y = currentY;
-      
+
       targetFrame.appendChild(image);
       currentY += imageHeight;
-      
+
       console.log(`✅ Successfully loaded screenshot slice ${i}: ${totalWidth}x${imageHeight}`);
-      
+
     } catch (error) {
       console.error(`❌ Failed to load screenshot slice ${i}:`, error);
       figma.notify(`Error loading screenshot: ${error}`, { error: true });
     }
   }
-  
+
   // Resize container to fit content
   if (currentY > 0 && totalWidth > 0) {
     targetFrame.resize(totalWidth, currentY);
   }
-  
+
   // Add interactive element overlays if present
   if (pageData.interactiveElements && pageData.interactiveElements.length > 0) {
     await addInteractiveElementsOverlay(targetFrame, pageData);
   }
-  
+
   flowPage.appendChild(targetFrame);
 }
 
-// Add interactive elements overlay to target page
+// Add interactive elements overlay to target page (matching main crawl styling)
 async function addInteractiveElementsOverlay(targetFrame: FrameNode, pageData: any) {
-  // This is similar to createScreenshotPages logic
   // Create overlay for interactive elements
   const overlayContainer = figma.createFrame();
-  overlayContainer.name = 'Interactive Elements Overlay';
+  overlayContainer.name = 'Page Overlay';
   overlayContainer.resize(targetFrame.width, targetFrame.height);
   overlayContainer.x = 0;
   overlayContainer.y = 0;
   overlayContainer.fills = [];
   overlayContainer.clipsContent = false;
-  
+
   let linkCounter = 1;
-  
+
   for (const element of pageData.interactiveElements) {
-    const scaledX = element.x;
-    const scaledY = element.y;
-    const scaledWidth = element.width;
-    const scaledHeight = element.height;
-    
-    // Create highlight rectangle
+    // Create highlight rectangle - RED stroke, no fill, 50% opacity (matching main crawl)
     const highlightRect = figma.createRectangle();
-    highlightRect.name = `${element.type}_highlight`;
-    highlightRect.x = scaledX;
-    highlightRect.y = scaledY;
-    highlightRect.resize(scaledWidth, scaledHeight);
-    
-    const fillColor = element.type === 'link'
-      ? { r: 1, g: 0.6, b: 0 }
-      : { r: 0, g: 0.6, b: 1 };
-    
-    highlightRect.fills = [{ type: "SOLID", color: fillColor }];
-    highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-    highlightRect.strokeWeight = 2;
+    highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
+    highlightRect.x = element.x;
+    highlightRect.y = element.y;
+    highlightRect.resize(element.width, element.height);
+
+    // Style the highlight - red 1px stroke, no fill, 50% opacity
+    highlightRect.fills = [];
+    highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }]; // Red color
+    highlightRect.strokeWeight = 1;
     highlightRect.opacity = 0.5;
-    
+
     overlayContainer.appendChild(highlightRect);
-    
-    // Add numbered badge for links
+
+    // Add numbered badge for links with destinations
     if (element.href && element.href !== '#') {
+      // Determine if link is external
+      const isExternal = isExternalLink(element.href, pageData.url);
+      const badgeColor = isExternal
+        ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
+        : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
+
       const badge = figma.createEllipse();
       badge.name = `Link ${linkCounter}`;
-      
+
       const badgeSize = 18;
-      badge.x = scaledX + scaledWidth - badgeSize - 4;
-      badge.y = scaledY - 4;
+      badge.x = element.x + element.width - badgeSize - 4; // 4px margin from right edge
+      badge.y = element.y - 4; // 4px margin from top edge
       badge.resize(badgeSize, badgeSize);
-      
-      const badgeColor = { r: 0.9, g: 0.45, b: 0.1 }; // Orange for internal
+
+      // Style badge - colored fill, no stroke
       badge.fills = [{ type: "SOLID", color: badgeColor }];
       badge.strokes = [];
-      
+
+      // Add number text to badge
       const badgeText = figma.createText();
       await figma.loadFontAsync({ family: "Inter", style: "Bold" });
       badgeText.fontName = { family: "Inter", style: "Bold" };
       badgeText.fontSize = 9;
       badgeText.characters = linkCounter.toString();
-      badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-      
+
+      // Add hyperlink to badge text
+      try {
+        let validUrl = element.href;
+
+        // For internal links (relative URLs), prepend the base site URL
+        if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
+          // Extract base URL from page.url
+          const baseUrl = pageData.url.match(/^https?:\/\/[^\/]+/)?.[0];
+          if (baseUrl) {
+            if (!validUrl.startsWith('/')) {
+              validUrl = '/' + validUrl;
+            }
+            validUrl = baseUrl + validUrl;
+          } else {
+            validUrl = 'https://' + validUrl;
+          }
+        }
+
+        // Validate URL
+        const urlPattern = /^https?:\/\/[^\s]+$/;
+        if (urlPattern.test(validUrl)) {
+          const hyperlinkTarget: HyperlinkTarget = {
+            type: "URL",
+            value: validUrl
+          };
+          badgeText.setRangeHyperlink(0, badgeText.characters.length, hyperlinkTarget);
+        }
+      } catch (error) {
+        console.log(`Skipping hyperlink for: ${element.href}`);
+      }
+
+      badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
+
+      // Center text in badge
       badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
       badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
-      
+
       const badgeGroup = figma.group([badge, badgeText], overlayContainer);
       badgeGroup.name = "badge-with-link";
-      
+
       linkCounter++;
     }
   }
-  
+
   targetFrame.appendChild(overlayContainer);
 }
