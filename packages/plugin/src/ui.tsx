@@ -694,7 +694,7 @@ const MainView: React.FC<MainViewProps> = ({
             borderBottom: activeTab === 'mapping' ? '2px solid #0066cc' : '2px solid transparent'
           }}
         >
-          Mapping
+          Flows
         </button>
       </div>
 
