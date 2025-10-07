@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { IconSettings, IconKey, IconCheck, IconX, IconRocket } from '@tabler/icons-react';
+import './ui.css';
 
 // Define the settings structure
 interface PluginSettings {
@@ -47,16 +48,18 @@ const SETTINGS_KEY = 'figma-sitemapper-settings';
 
 // Custom input component that maintains focus
 const FocusedInput: React.FC<{
+  id?: string;
   type?: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
+  className?: string;
   style?: React.CSSProperties;
   min?: string;
   max?: string;
-}> = ({ type = 'text', value, onChange, placeholder, disabled, required, style, min, max }) => {
+}> = ({ id, type = 'text', value, onChange, placeholder, disabled, required, className, style, min, max }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Only focus if this input is already focused (maintains focus during re-renders)
@@ -68,6 +71,7 @@ const FocusedInput: React.FC<{
 
   return (
     <input
+      id={id}
       ref={inputRef}
       type={type}
       value={value}
@@ -75,6 +79,7 @@ const FocusedInput: React.FC<{
       placeholder={placeholder}
       disabled={disabled}
       required={required}
+      className={className}
       style={style}
       min={min}
       max={max}
@@ -84,12 +89,14 @@ const FocusedInput: React.FC<{
 
 // Custom textarea component that maintains focus
 const FocusedTextarea: React.FC<{
+  id?: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
   style?: React.CSSProperties;
-}> = ({ value, onChange, placeholder, disabled, style }) => {
+}> = ({ id, value, onChange, placeholder, disabled, className, style }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Only focus if this textarea is already focused (maintains focus during re-renders)
@@ -101,11 +108,13 @@ const FocusedTextarea: React.FC<{
 
   return (
     <textarea
+      id={id}
       ref={textareaRef}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
       disabled={disabled}
+      className={className}
       style={style}
     />
   );
@@ -186,9 +195,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   jobId,
   switchToMain
 }) => (
-  <div style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+  <div id="settings-view" style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
+    <div id="settings-header" style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
       <button
+        id="settings-back-button"
         onClick={switchToMain}
         style={{
           background: 'none',
@@ -201,16 +211,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       >
         ← Back
       </button>
-      <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
+      <h3 id="settings-title" style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
         Settings
       </h3>
     </div>
 
-    <div style={{ marginBottom: '16px' }}>
+    <div id="screenshot-settings-section" style={{ marginBottom: '16px' }}>
       <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
         Screenshot Settings
       </label>
       <FocusedInput
+        id="screenshot-width-input"
         key="screenshot-width-input"
         type="number"
         value={screenshotWidth}
@@ -225,6 +236,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         Screenshot width in pixels (320-3840px)
       </div>
       <select
+        id="device-scale-factor-select"
         value={deviceScaleFactor}
         onChange={handleDeviceScaleFactorChange}
         disabled={isLoading || !!jobId}
@@ -238,11 +250,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
     </div>
 
-    <div style={{ marginBottom: '16px' }}>
+    <div id="crawl-performance-section" style={{ marginBottom: '16px' }}>
       <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
         Crawl Performance
       </label>
       <FocusedInput
+        id="delay-input"
         key="delay-input"
         type="number"
         value={delay}
@@ -257,6 +270,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         Additional delay after page load (0-60 seconds)
       </div>
       <FocusedInput
+        id="request-delay-input"
         key="request-delay-input"
         type="number"
         value={requestDelay}
@@ -272,11 +286,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
     </div>
 
-    <div style={{ marginBottom: '16px' }}>
+    <div id="crawl-limits-section" style={{ marginBottom: '16px' }}>
       <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
         Crawl Limits
       </label>
       <FocusedInput
+        id="max-requests-input"
         key="max-requests-input"
         type="number"
         value={maxRequests}
@@ -319,6 +334,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
       <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer' }}>
         <input
+          id="default-language-only-checkbox"
           type="checkbox"
           checked={defaultLanguageOnly}
           onChange={handleDefaultLanguageOnlyChange}
@@ -332,6 +348,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
       <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer', marginTop: '8px' }}>
         <input
+          id="show-browser-checkbox"
           type="checkbox"
           checked={showBrowser}
           onChange={handleShowBrowserChange}
@@ -345,6 +362,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
       <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer', marginTop: '8px' }}>
         <input
+          id="detect-interactive-elements-checkbox"
           type="checkbox"
           checked={detectInteractiveElements}
           onChange={handleDetectInteractiveElementsChange}
@@ -358,11 +376,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
     </div>
 
-    <div style={{ marginBottom: '16px' }}>
+    <div id="authentication-section" style={{ marginBottom: '16px' }}>
       <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '500' }}>
         Authentication
       </label>
       <select
+        id="auth-method-select"
         value={authMethod}
         onChange={handleAuthMethodChange}
         disabled={isLoading || !!jobId}
@@ -374,8 +393,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </select>
 
       {authMethod === 'credentials' && (
-        <div style={{ marginBottom: '8px' }}>
+        <div id="auth-credentials-inputs" style={{ marginBottom: '8px' }}>
           <FocusedInput
+            id="login-url-input"
             key="login-url-input"
             type="url"
             value={loginUrl}
@@ -385,6 +405,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '6px' }}
           />
           <FocusedInput
+            id="username-input"
             key="username-input"
             type="text"
             value={username}
@@ -394,6 +415,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             style={{ width: '100%', padding: '8px', boxSizing: 'border-box', marginBottom: '6px' }}
           />
           <FocusedInput
+            id="password-input"
             key="password-input"
             type="password"
             value={password}
@@ -409,8 +431,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {authMethod === 'cookies' && (
-        <div style={{ marginBottom: '8px' }}>
+        <div id="auth-cookies-inputs" style={{ marginBottom: '8px' }}>
           <FocusedTextarea
+            id="cookies-textarea"
             key="cookies-textarea"
             value={cookies}
             onChange={handleCookiesChange}
@@ -491,9 +514,10 @@ const CrawlingTab: React.FC<CrawlingTabProps> = ({
   status,
   handleClose
 }) => (
-  <div>
-    <div style={{ marginBottom: '16px' }}>
+  <div id="crawling-tab">
+    <div id="crawl-form" style={{ marginBottom: '16px' }}>
       <FocusedInput
+        id="url-input"
         key="url-input"
         type="url"
         value={url}
@@ -505,6 +529,7 @@ const CrawlingTab: React.FC<CrawlingTabProps> = ({
       />
 
       <button
+        id="start-crawl-button"
         onClick={handleSubmit}
         disabled={isLoading || !!jobId || !url.trim()}
         style={{ width: '100%', padding: '8px 16px', marginBottom: '8px' }}
@@ -514,12 +539,12 @@ const CrawlingTab: React.FC<CrawlingTabProps> = ({
     </div>
 
     {status && (
-      <div style={{ padding: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '11px', marginBottom: '12px', wordBreak: 'break-all' }}>
+      <div id="crawl-status-display" style={{ padding: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '11px', marginBottom: '12px', wordBreak: 'break-all' }}>
         {status}
       </div>
     )}
 
-    <button onClick={handleClose} style={{ width: '100%', padding: '6px 16px', backgroundColor: 'transparent', border: '1px solid #ccc' }}>
+    <button id="close-plugin-button" onClick={handleClose} style={{ width: '100%', padding: '6px 16px', backgroundColor: 'transparent', border: '1px solid #ccc' }}>
       Close
     </button>
   </div>
@@ -532,18 +557,18 @@ const MappingTab: React.FC<MappingTabProps> = ({
   handleLinkCheck,
   handleShowFlow
 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 108px)' }}>
-    <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+  <div id="flows-tab" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 108px)' }}>
+    <div id="flows-content" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
       {badgeLinks.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#666', padding: '32px 16px' }}>
+        <div id="flows-empty-state" style={{ textAlign: 'center', color: '#666', padding: '32px 16px' }}>
           <p>No badge-with-link elements found on this page.</p>
           <p style={{ fontSize: '11px', marginTop: '8px' }}>
             Badge links are created when crawling websites with interactive elements.
           </p>
         </div>
       ) : (
-        <div>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: '600' }}>
+        <div id="flows-link-list">
+          <h4 id="flows-list-header" style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: '600' }}>
             Found {badgeLinks.length} link{badgeLinks.length !== 1 ? 's' : ''}
           </h4>
           {badgeLinks.map((link) => (
@@ -604,8 +629,9 @@ const MappingTab: React.FC<MappingTabProps> = ({
       )}
     </div>
 
-    <div style={{ padding: '16px', borderTop: '1px solid #e9ecef' }}>
+    <div id="flows-footer" style={{ padding: '16px', borderTop: '1px solid #e9ecef' }}>
       <button
+        id="show-flow-button"
         onClick={handleShowFlow}
         disabled={checkedLinks.size === 0}
         style={{
@@ -644,12 +670,13 @@ const MainView: React.FC<MainViewProps> = ({
   const [activeTab, setActiveTab] = useState<'crawling' | 'mapping'>('crawling');
 
   return (
-    <div style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
+    <div id="main-view" style={{ padding: '16px', fontFamily: 'Inter, sans-serif' }}>
+      <div id="main-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 id="main-title" style={{ margin: '0', fontSize: '14px', fontWeight: 600 }}>
           Figma Site Mapper
         </h3>
         <button
+          id="main-settings-button"
           onClick={switchToSettings}
           style={{
             background: 'none',
@@ -665,8 +692,9 @@ const MainView: React.FC<MainViewProps> = ({
       </div>
 
       {/* Tab Navigation */}
-      <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '1px solid #e0e0e0' }}>
+      <div id="tab-navigation" style={{ display: 'flex', marginBottom: '16px', borderBottom: '1px solid #e0e0e0' }}>
         <button
+          id="crawling-tab-button"
           onClick={() => setActiveTab('crawling')}
           style={{
             background: 'none',
@@ -682,6 +710,7 @@ const MainView: React.FC<MainViewProps> = ({
           Crawling
         </button>
         <button
+          id="flows-tab-button"
           onClick={() => setActiveTab('mapping')}
           style={{
             background: 'none',

@@ -6,7 +6,73 @@ let hasRenderedSitemap = false; // Prevent duplicate rendering
 
 figma.showUI(__html__, { width: 480, height: 1000, themeColors: true });
 
-// Function to scan current page for badge-with-link elements
+// Helper function to parse hostname from URL
+function parseHostname(url: string): string | null {
+  try {
+    // Remove protocol
+    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    // Get hostname part (before first slash, colon, or end)
+    const hostname = withoutProtocol.split(/[\/:\?#]/)[0];
+    return hostname.toLowerCase();
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper function to check if link is external
+function isExternalLink(href: string, baseUrl: string): boolean {
+  try {
+    // Handle relative URLs - they are internal
+    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+      return false;
+    }
+
+    const linkHostname = parseHostname(href);
+    const baseHostname = parseHostname(baseUrl);
+
+    if (!linkHostname || !baseHostname) {
+      return false;
+    }
+
+    // Compare hostnames - different hostname means external
+    return linkHostname !== baseHostname;
+  } catch (error) {
+    // If URL parsing fails, assume it's internal (relative link)
+    return false;
+  }
+}
+
+// Function to get the base URL from current page title (contains the crawled URL)
+function getPageBaseUrl(): string | null {
+  try {
+    // Look for the "Page Overlay" frame which has the page URL in its name or find navigation frame
+    const overlayFrame = figma.currentPage.findOne(node => node.name === 'Page Overlay') as FrameNode;
+    if (overlayFrame) {
+      // Find the navigation frame to get the URL
+      const navFrame = overlayFrame.findOne(node => node.name === 'Navigation') as FrameNode;
+      if (navFrame) {
+        // Find the text node with hyperlink that contains the page URL
+        const textNodes = navFrame.findAll(node => node.type === 'TEXT') as TextNode[];
+        for (const textNode of textNodes) {
+          if (textNode.hyperlink && typeof textNode.hyperlink === 'object' && 'type' in textNode.hyperlink) {
+            if (textNode.hyperlink.type === 'URL') {
+              return (textNode.hyperlink as any).value || null;
+            }
+          }
+        }
+      }
+    }
+    
+    // Fallback: try to extract from page name (format: "number_title")
+    // Page names look like "1_Page Title" where the original URL would be in the navigation
+    return null;
+  } catch (error) {
+    console.error('Error getting page base URL:', error);
+    return null;
+  }
+}
+
+// Function to scan current page for badge-with-link elements (only internal links)
 async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, url: string }>> {
   const badgeLinks: Array<{ id: string, text: string, url: string }> = [];
 
@@ -18,6 +84,31 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
 
     for (const group of badgeGroups) {
       if (group.type === 'GROUP') {
+        // Check badge color to filter internal vs external links
+        // Orange badge = internal link, Cyan badge = external link
+        const ellipseNodes = group.findAll(node => node.type === 'ELLIPSE');
+        
+        let isInternalLink = false;
+        for (const node of ellipseNodes) {
+          if (node.type === 'ELLIPSE' && node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+            const fill = node.fills[0];
+            if (fill.type === 'SOLID') {
+              const color = fill.color;
+              // Orange internal link badge: { r: 0.9, g: 0.45, b: 0.1 }
+              // Check if color is close to orange (allow for small floating point differences)
+              if (Math.abs(color.r - 0.9) < 0.1 && Math.abs(color.g - 0.45) < 0.1 && Math.abs(color.b - 0.1) < 0.1) {
+                isInternalLink = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Skip external links (cyan badges)
+        if (!isInternalLink) {
+          continue;
+        }
+
         // Look for text nodes within the group that have hyperlinks
         const textNodes = group.findAll(node => node.type === 'TEXT');
 
@@ -52,23 +143,13 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
                 console.warn('Failed to extract hyperlink from text node:', e);
                 continue;
               }
-            } else {
-              // If no hyperlink, still show the text content
-              const text = textNode.characters || 'Link';
-              if (text && text.trim()) {
-                badgeLinks.push({
-                  id: textNode.id,
-                  text: text,
-                  url: `#${text.toLowerCase().replace(/\s+/g, '-')}`
-                });
-              }
             }
           }
         }
       }
     }
 
-    console.log(`Found ${badgeLinks.length} badge-with-link elements`);
+    console.log(`Found ${badgeLinks.length} internal badge-with-link elements (filtered out external links by badge color)`);
     return badgeLinks;
   } catch (error) {
     console.error('Error scanning for badge links:', error);
