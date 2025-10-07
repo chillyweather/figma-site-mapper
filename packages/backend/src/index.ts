@@ -114,7 +114,8 @@ server.get("/status/:jobId", async (request, reply) => {
       case 'completed':
         status = 'completed';
         result = {
-          manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+          manifestUrl: `http://localhost:3006/screenshots/manifest.json`,
+          detectInteractiveElements: jobData.detectInteractiveElements !== false
         };
         break;
       case 'failed':
@@ -142,7 +143,7 @@ server.get("/status/:jobId", async (request, reply) => {
 
 server.post('/crawl', async (request, reply) => {
   //add validation
-  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = request.body as { 
+  const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, auth } = request.body as { 
     url: string, 
     publicUrl: string, 
     maxRequestsPerCrawl?: number, 
@@ -153,6 +154,7 @@ server.post('/crawl', async (request, reply) => {
     defaultLanguageOnly?: boolean,
     sampleSize?: number,
     showBrowser?: boolean,
+    detectInteractiveElements?: boolean,
     auth?: {
       method: 'credentials' | 'cookies';
       loginUrl?: string;
@@ -178,6 +180,7 @@ server.post('/crawl', async (request, reply) => {
     defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
     sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
     showBrowser: showBrowser !== false, // Default to false (headless)
+    detectInteractiveElements: detectInteractiveElements !== false, // Default to true
     auth
   });
 

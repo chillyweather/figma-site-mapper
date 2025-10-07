@@ -84,15 +84,16 @@ async function createIndexPage(tree: TreeNode, pageIdMap: Map<string, string>): 
   return indexPage.id;
 }
 
-export async function renderSitemap(manifestData: { tree: TreeNode }, screenshotWidth: number = 1440) {
+export async function renderSitemap(manifestData: { tree: TreeNode }, screenshotWidth: number = 1440, detectInteractiveElements: boolean = true) {
   console.log("Rendering sitemap for tree:", manifestData.tree);
+  console.log("Detect interactive elements:", detectInteractiveElements);
 
   // Flatten the tree to get all pages
   const pages = flattenTree(manifestData.tree);
   console.log(`Found ${pages.length} pages to render`);
 
   // Create screenshot pages for each page in the tree first
-  const pageIdMap = await createScreenshotPages(pages, screenshotWidth);
+  const pageIdMap = await createScreenshotPages(pages, screenshotWidth, detectInteractiveElements);
 
   // Create index page after screenshot pages, so we can link to them
   let indexPageId: string | undefined;

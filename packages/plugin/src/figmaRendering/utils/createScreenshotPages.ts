@@ -79,9 +79,11 @@ function isExternalLink(href: string, baseUrl: string): boolean {
 
 export async function createScreenshotPages(
   pages: TreeNode[],
-  screenshotWidth: number = 1440
+  screenshotWidth: number = 1440,
+  detectInteractiveElements: boolean = true
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
+  console.log(`Interactive elements detection: ${detectInteractiveElements ? 'enabled' : 'disabled'}`);
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
 
@@ -393,8 +395,8 @@ export async function createScreenshotPages(
       navFrame.resize(screenshotWidth, navHeight);
       overlayContainer.appendChild(navFrame);
 
-      // Add red frames around interactive elements - with absolute positioning and scaling
-      if (page.interactiveElements && page.interactiveElements.length > 0) {
+      // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)
+      if (detectInteractiveElements && page.interactiveElements && page.interactiveElements.length > 0) {
         console.log(`Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`);
 
         // Get the original screenshot dimensions to calculate scaling factor

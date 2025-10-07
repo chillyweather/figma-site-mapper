@@ -4,23 +4,23 @@ const BACKEND_URL = 'http://localhost:3006';
 let screenshotWidth = 1440; // Default screenshot width
 let hasRenderedSitemap = false; // Prevent duplicate rendering
 
-figma.showUI(__html__, { width: 320, height: 1000, themeColors: true });
+figma.showUI(__html__, { width: 480, height: 1000, themeColors: true });
 
 // Function to scan current page for badge-with-link elements
-async function scanForBadgeLinks(): Promise<Array<{id: string, text: string, url: string}>> {
-  const badgeLinks: Array<{id: string, text: string, url: string}> = [];
-  
+async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, url: string }>> {
+  const badgeLinks: Array<{ id: string, text: string, url: string }> = [];
+
   try {
     // Find all groups with name "badge-with-link"
-    const badgeGroups = figma.currentPage.findAll(node => 
+    const badgeGroups = figma.currentPage.findAll(node =>
       node.type === 'GROUP' && node.name === 'badge-with-link'
     );
-    
+
     for (const group of badgeGroups) {
       if (group.type === 'GROUP') {
         // Look for text nodes within the group that have hyperlinks
         const textNodes = group.findAll(node => node.type === 'TEXT');
-        
+
         for (const node of textNodes) {
           if (node.type === 'TEXT') {
             const textNode = node;
@@ -31,7 +31,7 @@ async function scanForBadgeLinks(): Promise<Array<{id: string, text: string, url
                 const hyperlink = textNode.hyperlink;
                 let url = '';
                 let text = textNode.characters || 'Link';
-                
+
                 // Handle different hyperlink types
                 if (typeof hyperlink === 'object' && hyperlink !== null) {
                   if ('type' in hyperlink && hyperlink.type === 'URL') {
@@ -40,7 +40,7 @@ async function scanForBadgeLinks(): Promise<Array<{id: string, text: string, url
                     url = (hyperlink as any).value || '';
                   }
                 }
-                
+
                 if (url) {
                   badgeLinks.push({
                     id: textNode.id,
@@ -67,7 +67,7 @@ async function scanForBadgeLinks(): Promise<Array<{id: string, text: string, url
         }
       }
     }
-    
+
     console.log(`Found ${badgeLinks.length} badge-with-link elements`);
     return badgeLinks;
   } catch (error) {
@@ -104,7 +104,7 @@ setTimeout(() => {
 
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "start-crawl") {
-    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = msg;
+    const { url, maxRequestsPerCrawl, screenshotWidth: width, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, auth } = msg;
 
     console.log('📡 Main.ts received crawl request for URL:', url);
 
@@ -118,7 +118,7 @@ figma.ui.onmessage = async (msg) => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, showBrowser, auth }),
+        body: JSON.stringify({ url, publicUrl: BACKEND_URL, maxRequestsPerCrawl, deviceScaleFactor: deviceScaleFactor || 1, delay: delay || 0, requestDelay: requestDelay || 1000, maxDepth, defaultLanguageOnly: defaultLanguageOnly !== false, sampleSize, showBrowser, detectInteractiveElements: detectInteractiveElements !== false, auth }),
       });
 
       const result = await response.json();
@@ -189,7 +189,8 @@ figma.ui.onmessage = async (msg) => {
         console.log("Successfully fetched manifest: ", manifestData);
 
         figma.notify("Crawl complete and manifest fetched!");
-        await renderSitemap(manifestData, screenshotWidth);
+        const detectInteractiveElements = result.result?.detectInteractiveElements !== false;
+        await renderSitemap(manifestData, screenshotWidth, detectInteractiveElements);
       } else if (result.status === "completed" && hasRenderedSitemap) {
         console.log("⚠️  Skipping duplicate sitemap rendering");
       }

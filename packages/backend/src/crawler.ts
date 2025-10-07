@@ -297,7 +297,7 @@ function buildTree(pages: PageData[], startUrl: string): PageData | null {
   return root;
 }
 
-export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3, showBrowser: boolean = false, auth?: {
+export async function runCrawler(startUrl: string, publicUrl: string, maxRequestsPerCrawl?: number, deviceScaleFactor: number = 1, jobId?: string, delay: number = 0, requestDelay: number = 1000, maxDepth?: number, defaultLanguageOnly: boolean = false, sampleSize: number = 3, showBrowser: boolean = false, detectInteractiveElements: boolean = true, auth?: {
   method: 'credentials' | 'cookies';
   loginUrl?: string;
   username?: string;
@@ -305,7 +305,7 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   cookies?: Array<{name: string; value: string}>;
 }) {
   console.log('🚀 Starting the crawler with URL:', startUrl);
-  console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser });
+  console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements });
 
   // List of realistic user agents to rotate
   const userAgents = [
@@ -624,81 +624,9 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         }
       }
 
-      // Login/Authentication detection and handling
-      const loginIndicators = await page.evaluate(() => {
-        // Check for login form elements
-        const hasPasswordField = document.querySelector('input[type="password"]');
-        const hasUsernameField = document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"], input[name="username"]');
-        
-        // Check for login buttons using proper text search
-        const buttons = document.querySelectorAll('button, input[type="submit"]');
-        const hasLoginButton = Array.from(buttons).some(btn => {
-          const text = btn.textContent?.toLowerCase() || btn.getAttribute('value')?.toLowerCase() || '';
-          return text.includes('login') || text.includes('sign in') || text.includes('log in') || text.includes('submit');
-        });
-        
-        // Check for login-related text
-        const bodyText = document.body.textContent?.toLowerCase() || '';
-        const titleText = document.title.toLowerCase();
-        const loginTexts = [
-          'login', 'sign in', 'log in', 'authenticate', 'enter password',
-          'please log in', 'access denied', 'unauthorized', 'authentication required',
-          'you must be logged in', 'please sign in'
-        ];
-        const hasLoginText = loginTexts.some(text => bodyText.includes(text) || titleText.includes(text));
-        
-        // Check for common login page patterns
-        const loginPaths = ['/login', '/signin', '/auth', '/authenticate'];
-        const hasLoginPath = loginPaths.some(path => window.location.pathname.includes(path));
-        
-        // Check for HTTP auth dialogs (these show as specific page content)
-        const hasHttpAuth = bodyText.includes('401') && (bodyText.includes('unauthorized') || bodyText.includes('authentication required'));
-        
-        // Debug logging
-        console.log('Login detection debug:', {
-          hasPasswordField: !!hasPasswordField,
-          hasUsernameField: !!hasUsernameField,
-          hasLoginButton,
-          hasLoginText,
-          hasLoginPath,
-          currentPath: window.location.pathname,
-          pageTitle: document.title,
-          bodyTextSnippet: bodyText.substring(0, 200)
-        });
-        
-        // More flexible login detection - any of these conditions
-        const isLoginPage = hasLoginPath || (hasPasswordField && hasUsernameField) || hasLoginText;
-        
-        return isLoginPage;
-      });
-
-      // Log the login detection result
-      log.info(`Login detection result for ${request.url}: ${loginIndicators}`);
-
-      if (loginIndicators) {
-        log.info(`🔐 Login page detected on ${request.url}`);
-        log.info(`👤 Please log in manually in the browser window. Browser will pause execution...`);
-        
-        // Add a visual indicator in the browser
-        await page.evaluate(() => {
-          const banner = document.createElement('div');
-          banner.innerHTML = '🔐 LOGIN DETECTED - Please log in manually then press F8 or click Resume button to continue';
-          banner.style.cssText = `
-            position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
-            background: #ff6b6b; color: white; padding: 15px;
-            text-align: center; font-size: 18px; font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-          `;
-          document.body.insertBefore(banner, document.body.firstChild);
-        });
-        
-        // Use Playwright's built-in pause functionality
-        // This will open the Playwright Inspector and pause execution
-        log.info(`🛑 Pausing crawler execution - please log in manually and press F8 to continue`);
-        await page.pause();
-        
-        log.info(`✅ Login completed, continuing with crawl`);
-      }
+      // Login/Authentication detection and handling - DISABLED FOR NOW
+      // TODO: Re-enable with stricter detection when needed
+      // const loginIndicators = false; // Disabled
       
       // Additional wait for dynamic content (configurable delay)
       if (delay > 0) {
@@ -790,10 +718,13 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
         log.info(`⚠️ Could not ensure top position for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
       }
       
-      // Find interactive elements (links and buttons) with their bounding boxes
+      // Find interactive elements (links and buttons) with their bounding boxes (if enabled)
       // IMPORTANT: This must happen AFTER final scroll positioning to ensure accurate coordinates
-      log.info(`Finding interactive elements on ${request.url}`);
-      const interactiveElements = await page.evaluate(() => {
+      let interactiveElements: InteractiveElement[] = [];
+      
+      if (detectInteractiveElements) {
+        log.info(`Finding interactive elements on ${request.url}`);
+        interactiveElements = await page.evaluate(() => {
         const elements: Array<{
           type: 'link' | 'button';
           x: number;
@@ -857,10 +788,13 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
           }
         });
 
-        return elements;
-      });
+          return elements;
+        });
 
-      log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+        log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+      } else {
+        log.info(`Skipping interactive elements detection (disabled)`);
+      }
 
       const fullPageBuffer = await page.screenshot({ fullPage: true });
 

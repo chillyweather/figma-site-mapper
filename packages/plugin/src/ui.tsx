@@ -14,6 +14,7 @@ interface PluginSettings {
   defaultLanguageOnly: boolean;
   sampleSize: string;
   showBrowser: boolean;
+  detectInteractiveElements: boolean;
   authMethod: 'none' | 'credentials' | 'cookies';
   loginUrl: string;
   username: string;
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   defaultLanguageOnly: true,
   sampleSize: '3',
   showBrowser: false,
+  detectInteractiveElements: true,
   authMethod: 'none',
   loginUrl: '',
   username: '',
@@ -129,6 +131,8 @@ interface SettingsViewProps {
   handleDefaultLanguageOnlyChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showBrowser: boolean;
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  detectInteractiveElements: boolean;
+  handleDetectInteractiveElementsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   authMethod: 'none' | 'credentials' | 'cookies';
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   loginUrl: string;
@@ -165,6 +169,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   handleDefaultLanguageOnlyChange,
   showBrowser,
   handleShowBrowserChange,
+  detectInteractiveElements,
+  handleDetectInteractiveElementsChange,
   authMethod,
   handleAuthMethodChange,
   loginUrl,
@@ -337,6 +343,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
         Keep browser visible for manual intervention (CAPTCHA, login, etc.)
       </div>
+      <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer', marginTop: '8px' }}>
+        <input
+          type="checkbox"
+          checked={detectInteractiveElements}
+          onChange={handleDetectInteractiveElementsChange}
+          disabled={isLoading || !!jobId}
+          style={{ marginRight: '8px' }}
+        />
+        Detect interactive elements
+      </label>
+      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+        Add numbered frames around links and buttons for user journey mapping
+      </div>
     </div>
 
     <div style={{ marginBottom: '16px' }}>
@@ -353,7 +372,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         <option value="credentials">Auto Login (Username/Password)</option>
         <option value="cookies">Import Cookies</option>
       </select>
-      
+
       {authMethod === 'credentials' && (
         <div style={{ marginBottom: '8px' }}>
           <FocusedInput
@@ -388,7 +407,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       )}
-      
+
       {authMethod === 'cookies' && (
         <div style={{ marginBottom: '8px' }}>
           <FocusedTextarea
@@ -404,7 +423,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       )}
-      
+
       {authStatus === 'authenticating' && (
         <div style={{ fontSize: '11px', color: '#856404', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <IconKey size={12} />
@@ -437,7 +456,7 @@ interface MainViewProps {
   status: string;
   handleClose: () => void;
   switchToSettings: () => void;
-  badgeLinks: Array<{id: string, text: string, url: string}>;
+  badgeLinks: Array<{ id: string, text: string, url: string }>;
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -456,7 +475,7 @@ interface CrawlingTabProps {
 
 // Props for MappingTab component
 interface MappingTabProps {
-  badgeLinks: Array<{id: string, text: string, url: string}>;
+  badgeLinks: Array<{ id: string, text: string, url: string }>;
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -513,7 +532,7 @@ const MappingTab: React.FC<MappingTabProps> = ({
   handleLinkCheck,
   handleShowFlow
 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 108px)' }}>
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
       {badgeLinks.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#666', padding: '32px 16px' }}>
@@ -528,9 +547,9 @@ const MappingTab: React.FC<MappingTabProps> = ({
             Found {badgeLinks.length} link{badgeLinks.length !== 1 ? 's' : ''}
           </h4>
           {badgeLinks.map((link) => (
-            <div key={link.id} style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div key={link.id} style={{
+              display: 'flex',
+              alignItems: 'center',
               marginBottom: '8px',
               padding: '8px',
               backgroundColor: '#f8f9fa',
@@ -544,8 +563,8 @@ const MappingTab: React.FC<MappingTabProps> = ({
                 style={{ marginRight: '8px' }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ 
-                  fontSize: '11px', 
+                <div style={{
+                  fontSize: '11px',
                   fontWeight: '500',
                   color: '#212529',
                   marginBottom: '2px',
@@ -555,12 +574,12 @@ const MappingTab: React.FC<MappingTabProps> = ({
                 }}>
                   {link.text}
                 </div>
-                <a 
+                <a
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ 
-                    fontSize: '10px', 
+                  style={{
+                    fontSize: '10px',
                     color: '#0066cc',
                     textDecoration: 'none',
                     whiteSpace: 'nowrap',
@@ -584,7 +603,7 @@ const MappingTab: React.FC<MappingTabProps> = ({
         </div>
       )}
     </div>
-    
+
     <div style={{ padding: '16px', borderTop: '1px solid #e9ecef' }}>
       <button
         onClick={handleShowFlow}
@@ -693,7 +712,7 @@ const MainView: React.FC<MainViewProps> = ({
       )}
 
       {activeTab === 'mapping' && (
-        <MappingTab 
+        <MappingTab
           badgeLinks={badgeLinks}
           checkedLinks={checkedLinks}
           handleLinkCheck={handleLinkCheck}
@@ -716,10 +735,11 @@ const App: React.FC = () => {
   const [defaultLanguageOnly, setDefaultLanguageOnly] = useState(true);
   const [sampleSize, setSampleSize] = useState('3');
   const [showBrowser, setShowBrowser] = useState(false);
+  const [detectInteractiveElements, setDetectInteractiveElements] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
-  
+
   // Authentication state
   const [authMethod, setAuthMethod] = useState<'none' | 'credentials' | 'cookies'>('none');
   const [loginUrl, setLoginUrl] = useState('');
@@ -727,7 +747,7 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [cookies, setCookies] = useState('');
   const [authStatus, setAuthStatus] = useState<'idle' | 'authenticating' | 'success' | 'failed'>('idle');
-  const [badgeLinks, setBadgeLinks] = useState<Array<{id: string, text: string, url: string}>>([]);
+  const [badgeLinks, setBadgeLinks] = useState<Array<{ id: string, text: string, url: string }>>([]);
   const [checkedLinks, setCheckedLinks] = useState<Set<string>>(new Set());
   const intervalRef = useRef<number | null>(null);
   const settingsSaveTimeoutRef = useRef<number | null>(null);
@@ -736,7 +756,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Request settings from main plugin code
     parent.postMessage({ pluginMessage: { type: 'load-settings' } }, '*');
-    
+
     // Listen for messages from main plugin code
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
@@ -755,6 +775,7 @@ const App: React.FC = () => {
           setDefaultLanguageOnly(msg.settings.defaultLanguageOnly !== undefined ? msg.settings.defaultLanguageOnly : DEFAULT_SETTINGS.defaultLanguageOnly);
           setSampleSize(msg.settings.sampleSize || DEFAULT_SETTINGS.sampleSize);
           setShowBrowser(msg.settings.showBrowser !== undefined ? msg.settings.showBrowser : DEFAULT_SETTINGS.showBrowser);
+          setDetectInteractiveElements(msg.settings.detectInteractiveElements !== undefined ? msg.settings.detectInteractiveElements : DEFAULT_SETTINGS.detectInteractiveElements);
           setAuthMethod(msg.settings.authMethod || DEFAULT_SETTINGS.authMethod);
           setLoginUrl(msg.settings.loginUrl || DEFAULT_SETTINGS.loginUrl);
           setUsername(msg.settings.username || DEFAULT_SETTINGS.username);
@@ -774,7 +795,7 @@ const App: React.FC = () => {
     if (settingsSaveTimeoutRef.current) {
       clearTimeout(settingsSaveTimeoutRef.current);
     }
-    
+
     // Debounce settings save to avoid excessive writes
     settingsSaveTimeoutRef.current = setTimeout(() => {
       parent.postMessage({ pluginMessage: { type: 'save-settings', settings } }, '*');
@@ -793,12 +814,13 @@ const App: React.FC = () => {
     defaultLanguageOnly,
     sampleSize,
     showBrowser,
+    detectInteractiveElements,
     authMethod,
     loginUrl,
     username,
     password,
     cookies
-  }), [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, authMethod, loginUrl, username, password, cookies]);
+  }), [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, authMethod, loginUrl, username, password, cookies]);
 
   // Wrapper functions for state setters that also save settings
   const setUrlAndSave = useCallback((value: string) => {
@@ -852,6 +874,12 @@ const App: React.FC = () => {
   const setShowBrowserAndSave = useCallback((value: boolean) => {
     setShowBrowser(value);
     const newSettings = { ...getCurrentSettings(), showBrowser: value };
+    saveSettings(newSettings);
+  }, [getCurrentSettings, saveSettings]);
+
+  const setDetectInteractiveElementsAndSave = useCallback((value: boolean) => {
+    setDetectInteractiveElements(value);
+    const newSettings = { ...getCurrentSettings(), detectInteractiveElements: value };
     saveSettings(newSettings);
   }, [getCurrentSettings, saveSettings]);
 
@@ -989,8 +1017,8 @@ const App: React.FC = () => {
     setIsLoading(true);
     setStatus('Starting crawl...');
 
-    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam, maxDepth: maxDepthParam, defaultLanguageOnly, sampleSize: sampleSizeParam, showBrowser, auth: authData } }, '*');
-  }, [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, authMethod, loginUrl, username, password, cookies]);
+    parent.postMessage({ pluginMessage: { type: 'start-crawl', url: url.trim(), maxRequestsPerCrawl, screenshotWidth: screenshotWidthParam, deviceScaleFactor: deviceScaleFactorParam, delay: delayParam, requestDelay: requestDelayParam, maxDepth: maxDepthParam, defaultLanguageOnly, sampleSize: sampleSizeParam, showBrowser, detectInteractiveElements, auth: authData } }, '*');
+  }, [url, maxRequests, screenshotWidth, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, authMethod, loginUrl, username, password, cookies]);
 
   const handleClose = useCallback(() => {
     parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
@@ -1025,26 +1053,26 @@ const App: React.FC = () => {
 
       if (msg.type === 'status-update') {
         let statusText = `Job ${msg.jobId}: ${msg.status}`;
-        
+
         if (msg.detailedProgress) {
           const { stage, currentPage, totalPages, currentUrl, progress } = msg.detailedProgress;
           statusText = `Job ${msg.jobId}: ${msg.status} - ${stage}`;
-          
+
           if (currentUrl) {
             statusText += ` - ${currentUrl}`;
           }
-          
+
           if (currentPage && totalPages) {
             statusText += ` (${currentPage}/${totalPages})`;
           }
-          
+
           if (typeof progress === 'number') {
             statusText += ` ${progress}%`;
           }
         } else if (msg.progress && typeof msg.progress === 'number') {
           statusText += ` (${msg.progress}%)`;
         }
-        
+
         setStatus(statusText);
 
         if (msg.status === 'completed') {
@@ -1105,6 +1133,10 @@ const App: React.FC = () => {
   const handleShowBrowserChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setShowBrowserAndSave(e.target.checked);
   }, [setShowBrowserAndSave]);
+
+  const handleDetectInteractiveElementsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDetectInteractiveElementsAndSave(e.target.checked);
+  }, [setDetectInteractiveElementsAndSave]);
 
   const handleAuthMethodChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setAuthMethodAndSave(e.target.value as 'none' | 'credentials' | 'cookies');
@@ -1168,6 +1200,8 @@ const App: React.FC = () => {
       handleDefaultLanguageOnlyChange={handleDefaultLanguageOnlyChange}
       showBrowser={showBrowser}
       handleShowBrowserChange={handleShowBrowserChange}
+      detectInteractiveElements={detectInteractiveElements}
+      handleDetectInteractiveElementsChange={handleDetectInteractiveElementsChange}
       authMethod={authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
       loginUrl={loginUrl}
