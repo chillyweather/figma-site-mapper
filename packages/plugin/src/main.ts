@@ -334,19 +334,27 @@ async function handleShowFlow(selectedLinks: Array<{ id: string, text: string, u
   // Get the current page
   const currentPage = figma.currentPage;
   const currentPageName = currentPage.name;
-
-  // Extract the page number and title from current page name (format: "1_Page Title")
-  const pageMatch = currentPageName.match(/^(\d+)_(.*)/);
+  
+  // Extract hierarchy and title from current page name
+  // Format can be: "3_Title" or "  3-14_Title" or "    3-14-15_Title"
+  const pageMatch = currentPageName.match(/^(\s*)([\d-]+)_(.*)/);
   if (!pageMatch) {
     figma.notify("Could not parse current page name");
     return;
   }
 
-  const pageNumber = pageMatch[1];
-  const pageTitle = pageMatch[2];
+  const currentIndent = pageMatch[1]; // Leading spaces
+  const currentHierarchy = pageMatch[2]; // e.g., "3" or "3-14"
+  const pageTitle = pageMatch[3];
+  
+  // Calculate new hierarchy and indent
+  const newHierarchy = `${currentHierarchy}-${selectedLink.text}`;
+  const currentLevel = currentHierarchy.split('-').length;
+  const newLevel = currentLevel + 1;
+  const newIndent = '  '.repeat(Math.max(0, newLevel - 1)); // 2 spaces per level, starting from level 2
 
-  // Create flow page name with compass emoji
-  const flowPageName = `${pageNumber}_🧭_${pageTitle}`;
+  // Create flow page name with hierarchy and target page title (we'll update after crawl)
+  const flowPageName = `${newIndent}${newHierarchy}_Loading...`;
 
   // Check if flow page already exists
   let flowPage = figma.root.children.find(p => p.name === flowPageName) as PageNode | undefined;
@@ -587,6 +595,15 @@ async function createFlowVisualization(
           const manifestData = await manifestResponse.json();
 
           console.log('Target page crawl completed, rendering...');
+          
+          // Update flow page name with target page title
+          if (manifestData.tree && manifestData.tree.title) {
+            const targetTitle = manifestData.tree.title;
+            // Remove the crawl order number if present (e.g., "1_Title" -> "Title")
+            const cleanTitle = targetTitle.replace(/^\d+_/, '');
+            flowPage.name = flowPage.name.replace('_Loading...', `_${cleanTitle}`);
+            console.log('Updated flow page name to:', flowPage.name);
+          }
 
           // Render the target page on the flow page
           await renderTargetPage(flowPage, manifestData, targetX, targetY);

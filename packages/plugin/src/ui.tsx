@@ -1211,6 +1211,9 @@ const App: React.FC = () => {
         selectedLinks: selectedLinks 
       } 
     }, '*');
+    
+    // Clear all selections after sending
+    setCheckedLinks(new Set());
   }, [checkedLinks, badgeLinks]);
 
   // Stable view switching callbacks
