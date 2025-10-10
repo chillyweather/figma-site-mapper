@@ -94,7 +94,7 @@ function extractLinksFromBadge(group: GroupNode): BadgeLink[] {
           links.push({ id: node.id, text, url });
         }
       } catch (e) {
-        console.log('⚠️ Failed to extract hyperlink:', e);
+        console.log("⚠️ Failed to extract hyperlink:", e);
       }
     }
   }
