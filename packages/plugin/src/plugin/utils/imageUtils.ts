@@ -25,6 +25,6 @@ export function getImageDimensionsFromPNG(imageData: Uint8Array): {
     return { width, height };
   }
 
-  console.warn("Could not parse image dimensions, using default");
+  console.log('⚠️ Could not parse image dimensions, using default');
   return { width: 1280, height: 1000 };
 }

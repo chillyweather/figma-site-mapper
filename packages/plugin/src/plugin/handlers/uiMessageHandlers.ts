@@ -180,6 +180,6 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
 
     default:
-      console.warn("Unknown message type:", msg.type);
+      console.log("Unknown message type:", msg.type);
   }
 }
