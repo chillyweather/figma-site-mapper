@@ -438,6 +438,7 @@ async function createFlowVisualization(
   if (overlayFrames.length > 0) {
     overlayContainer = overlayFrames[0];
     console.log('Found overlay container at position:', overlayContainer.x, overlayContainer.y);
+    console.log('Screenshot frame at position:', screenshotFrame.x, screenshotFrame.y);
   }
 
   // Step 3: Find and store the selected highlight rectangle info (before switching pages)
@@ -447,10 +448,20 @@ async function createFlowVisualization(
   
   if (overlayContainer) {
     const linkNumber = badgeElement.characters;
-    const highlightName = `link_${linkNumber}_highlight:`;
-    
+    const highlightNamePattern = `link_${linkNumber}_highlight:`;
+
+    console.log(`Looking for highlight with name starting with: ${highlightNamePattern}`);
+    console.log(`Overlay container has ${overlayContainer.children.length} children`);
+
+    // Debug: list all rectangles in overlay
+    const allRectangles = overlayContainer.findAll((node: SceneNode) =>
+      node.type === 'RECTANGLE'
+    ) as RectangleNode[];
+    console.log(`Found ${allRectangles.length} rectangles in overlay:`);
+    allRectangles.forEach(rect => console.log(`  - ${rect.name}`));
+
     const allHighlights = overlayContainer.findAll((node: SceneNode) =>
-      node.type === 'RECTANGLE' && node.name.startsWith(highlightName)
+      node.type === 'RECTANGLE' && node.name.startsWith(highlightNamePattern)
     ) as RectangleNode[];
 
     if (allHighlights.length > 0) {
@@ -459,7 +470,7 @@ async function createFlowVisualization(
       highlightY = highlightRect.y;
       console.log(`Found highlight rectangle: ${highlightRect.name} at position (${highlightX}, ${highlightY})`);
     } else {
-      console.warn(`Could not find highlight rectangle for link ${linkNumber}`);
+      console.warn(`Could not find highlight rectangle for link ${linkNumber}. Expected name pattern: ${highlightNamePattern}`);
     }
   }
 
@@ -476,32 +487,42 @@ async function createFlowVisualization(
   // Step 5: Clone the selected highlight rectangle on top of screenshot
   if (highlightRect) {
     const selectedHighlight = highlightRect.clone();
+    // Since both overlay container and screenshot frame are positioned at (0, 0) on the page,
+    // the highlight position is already correct relative to the screenshot
     selectedHighlight.x = sourceScreenshotClone.x + highlightX;
     selectedHighlight.y = sourceScreenshotClone.y + highlightY;
     flowPage.appendChild(selectedHighlight);
     console.log(`Cloned highlight rectangle to flow page at (${selectedHighlight.x}, ${selectedHighlight.y})`);
+    console.log(`Screenshot position: (${sourceScreenshotClone.x}, ${sourceScreenshotClone.y})`);
+    console.log(`Original highlight position: (${highlightX}, ${highlightY})`);
+    console.log(`Final highlight size: ${selectedHighlight.width}x${selectedHighlight.height}`);
   }
 
   console.log('Source screenshot and highlight created');
 
-  // Step 6: Create arrow
+// Step 6: Create simple red arrow between source and target frames
   const arrow = figma.createVector();
   arrow.name = "Flow Arrow";
-  arrow.x = sourceScreenshotClone.x + sourceScreenshotClone.width + 50;
-  arrow.y = sourceScreenshotClone.y + (sourceScreenshotClone.height / 2) - 10;
-
-  // Create simple arrow shape (right-pointing)
+  
+  // Position arrow top-aligned with source frame
+  arrow.x = sourceScreenshotClone.x + sourceScreenshotClone.width + 20;
+  arrow.y = sourceScreenshotClone.y - 15; // Top-aligned with source frame
+  
+  // Create bold red arrow shape with red stroke
   arrow.vectorPaths = [{
     windingRule: 'NONZERO',
-    data: 'M 0 10 L 40 10 L 40 0 L 60 15 L 40 30 L 40 20 L 0 20 Z'
+    data: 'M 0 15 L 80 15 L 80 5 L 100 15 L 80 25 L 80 15 Z'
   }];
-  arrow.fills = [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 0.8 } }];
+  arrow.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Red fill
+  arrow.strokes = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }]; // Red stroke
+  arrow.strokeWeight = 4; // 4px stroke weight
 
   flowPage.appendChild(arrow);
 
-  // Step 7: Fetch and render the target page
-  const targetX = arrow.x + 120;
-  const targetY = 100;
+  // Step 7: Fetch and render target page
+  // Position target page top-aligned with source frame
+  const finalTargetX = arrow.x + 120;
+  const finalTargetY = sourceScreenshotClone.y; // Top-aligned with source frame
 
   figma.notify(`Crawling target page: ${selectedLink.url}...`);
 
@@ -570,7 +591,7 @@ async function createFlowVisualization(
           }
 
           // Render the target page on the flow page
-          await renderTargetPage(flowPage, manifestData, targetX, targetY);
+          await renderTargetPage(flowPage, manifestData, finalTargetX, finalTargetY);
 
           figma.notify("Flow visualization complete!");
         }
