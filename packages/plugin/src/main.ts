@@ -77,16 +77,16 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
   const badgeLinks: Array<{ id: string, text: string, url: string }> = [];
 
   try {
-    // Find all groups with name "badge-with-link"
-    const badgeGroups = figma.currentPage.findAll(node =>
-      node.type === 'GROUP' && node.name === 'badge-with-link'
+    // Find all groups with name starting with "link_" and ending with "_badge"
+    const badgeGroups = figma.currentPage.findAll((node: SceneNode) =>
+      node.type === 'GROUP' && node.name.startsWith('link_') && node.name.endsWith('_badge')
     );
 
     for (const group of badgeGroups) {
       if (group.type === 'GROUP') {
         // Check badge color to filter internal vs external links
         // Orange badge = internal link, Cyan badge = external link
-        const ellipseNodes = group.findAll(node => node.type === 'ELLIPSE');
+        const ellipseNodes = group.findAll((node: SceneNode) => node.type === 'ELLIPSE');
 
         let isInternalLink = false;
         for (const node of ellipseNodes) {
@@ -110,7 +110,7 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
         }
 
         // Look for text nodes within the group that have hyperlinks
-        const textNodes = group.findAll(node => node.type === 'TEXT');
+        const textNodes = group.findAll((node: SceneNode) => node.type === 'TEXT');
 
         for (const node of textNodes) {
           if (node.type === 'TEXT') {
@@ -149,7 +149,7 @@ async function scanForBadgeLinks(): Promise<Array<{ id: string, text: string, ur
       }
     }
 
-    console.log(`Found ${badgeLinks.length} internal badge-with-link elements (filtered out external links by badge color)`);
+    console.log(`Found ${badgeLinks.length} internal badge links (filtered out external links by badge color)`);
     return badgeLinks;
   } catch (error) {
     console.error('Error scanning for badge links:', error);
@@ -397,7 +397,7 @@ async function createFlowVisualization(
   if (!badgeElement || badgeElement.type !== 'TEXT') {
     console.error(`Could not find badge element with ID: ${selectedLink.id}`);
     figma.notify("Could not find badge element");
-    figma.currentPage = previousPage; // Restore previous page
+    figma.currentPage = previousPage;
     return;
   }
 
@@ -414,31 +414,8 @@ async function createFlowVisualization(
 
   console.log('Found badge group:', badgeGroup.name);
 
-  // Find the overlay container and screenshot to get context
-  let overlayContainer: FrameNode | null = null;
-  let screenshotImage: RectangleNode | null = null;
-
-  // Navigate up to find the Page Overlay frame
-  let currentNode: BaseNode | null = badgeGroup.parent;
-  while (currentNode) {
-    if (currentNode.type === 'FRAME' && currentNode.name === 'Page Overlay') {
-      overlayContainer = currentNode;
-      break;
-    }
-    currentNode = currentNode.parent;
-  }
-
-  if (!overlayContainer) {
-    console.error('Could not find Page Overlay container');
-    figma.notify("Could not find Page Overlay container");
-    figma.currentPage = previousPage;
-    return;
-  }
-
-  console.log('Found overlay container');
-
-  // Find the screenshot frame (frame containing "Screenshots" in name)
-  const screenshotFrames = sourcePage.findAll(node =>
+  // Step 2: Find the screenshot frame and overlay container
+  const screenshotFrames = sourcePage.findAll((node: SceneNode) =>
     node.type === 'FRAME' && node.name.includes('Screenshots')
   ) as FrameNode[];
 
@@ -452,79 +429,88 @@ async function createFlowVisualization(
   const screenshotFrame = screenshotFrames[0];
   console.log('Found screenshot frame:', screenshotFrame.name);
 
-  // Get the first rectangle child (the actual screenshot image)
-  const rectangles = screenshotFrame.findAll(node => node.type === 'RECTANGLE') as RectangleNode[];
+  // Find the overlay container
+  let overlayContainer: FrameNode | null = null;
+  const overlayFrames = sourcePage.findAll((node: SceneNode) =>
+    node.type === 'FRAME' && node.name === 'Page Overlay'
+  ) as FrameNode[];
 
-  if (rectangles.length === 0) {
-    console.error('Could not find screenshot rectangles');
-    figma.notify("Could not find screenshot image");
-    figma.currentPage = previousPage;
-    return;
+  if (overlayFrames.length > 0) {
+    overlayContainer = overlayFrames[0];
+    console.log('Found overlay container');
   }
-
-  screenshotImage = rectangles[0];
-  console.log('Found screenshot image');
-
-  // Step 2: Create context screenshot (80px around the badge element)
-  const CONTEXT_PADDING = 80;
-  const badgeBounds = badgeGroup.absoluteBoundingBox;
-
-  if (!badgeBounds) {
-    console.error('Could not get badge bounds');
-    figma.notify("Could not get badge bounds");
-    figma.currentPage = previousPage;
-    return;
-  }
-
-  console.log('Badge bounds:', badgeBounds);
-
-  // Calculate context area
-  const contextX = Math.max(0, badgeBounds.x - CONTEXT_PADDING);
-  const contextY = Math.max(0, badgeBounds.y - CONTEXT_PADDING);
-  const contextWidth = badgeBounds.width + (CONTEXT_PADDING * 2);
-  const contextHeight = badgeBounds.height + (CONTEXT_PADDING * 2);
-
-  console.log('Creating context frame with dimensions:', contextWidth, contextHeight);
 
   // Switch to flow page before creating elements
   figma.currentPage = flowPage;
 
-  // Create a frame for the context screenshot
-  const contextFrame = figma.createFrame();
-  contextFrame.name = `Context_${selectedLink.text}`;
-  contextFrame.x = 100;
-  contextFrame.y = 100;
-  contextFrame.resize(contextWidth, contextHeight);
-  contextFrame.clipsContent = true;
-  contextFrame.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+  // Step 3: Clone the entire screenshot frame
+  const sourceScreenshotClone = screenshotFrame.clone();
+  sourceScreenshotClone.name = `Source_${selectedLink.text}`;
+  sourceScreenshotClone.x = 100;
+  sourceScreenshotClone.y = 100;
 
-  // Clone the screenshot frame to get the full image
-  const screenshotFrameClone = screenshotImage.parent?.type === 'FRAME'
-    ? (screenshotImage.parent as FrameNode).clone()
-    : screenshotImage.clone();
+  // Step 4: Clone overlay container if it exists and clean it
+  let sourceOverlayClone: FrameNode | null = null;
+  if (overlayContainer) {
+    // First, add cloned overlay to page so we can use findAll
+    sourceOverlayClone = overlayContainer.clone();
+    flowPage.appendChild(sourceOverlayClone);
+    sourceOverlayClone.x = sourceScreenshotClone.x;
+    sourceOverlayClone.y = sourceScreenshotClone.y;
 
-  // Position the cloned screenshot so the badge area is visible
-  const screenshotBounds = screenshotImage.absoluteBoundingBox!;
-  screenshotFrameClone.x = screenshotBounds.x - contextX;
-  screenshotFrameClone.y = screenshotBounds.y - contextY;
+    // Remove all badge groups except the selected one
+    const allBadgeGroups = sourceOverlayClone.findAll((node: SceneNode) =>
+      node.type === 'GROUP' && node.name.startsWith('link_') && node.name.endsWith('_badge')
+    );
 
-  contextFrame.appendChild(screenshotFrameClone);
+    for (const badge of allBadgeGroups) {
+      if (badge.type === 'GROUP') {
+        // Find the text node in this badge group to check if it's the selected one
+        const textNodes = badge.findAll((node: SceneNode) => node.type === 'TEXT');
+        let isSelectedBadge = false;
 
-  // Clone the badge and overlay elements that are within the context area
-  const badgeClone = badgeGroup.clone();
-  badgeClone.x = badgeBounds.x - contextX;
-  badgeClone.y = badgeBounds.y - contextY;
-  contextFrame.appendChild(badgeClone);
+        for (const textNode of textNodes) {
+          if (textNode.type === 'TEXT') {
+            // Check if this badge has the same number as our selected badge
+            if (textNode.characters === badgeElement.characters) {
+              isSelectedBadge = true;
+              // Remove hyperlink from the selected badge
+              textNode.hyperlink = null;
+              console.log('Removed hyperlink from selected badge:', textNode.characters);
+              break;
+            }
+          }
+        }
 
-  flowPage.appendChild(contextFrame);
+        // Remove badge if it's not the selected one
+        if (!isSelectedBadge) {
+          badge.remove();
+        }
+      }
+    }
 
-  console.log('Context frame created');
+    // Remove all highlight rectangles and other overlay elements (keep only selected badge group)
+    const allOverlayChildren = [...sourceOverlayClone.children];
+    for (const child of allOverlayChildren) {
+      // Keep only badge groups, remove everything else (rectangles, navigation, etc.)
+      if (child.type === 'RECTANGLE' || child.name === 'Navigation' || child.name === 'Link References') {
+        child.remove();
+      }
+    }
 
-  // Step 3: Create arrow
+    console.log('Cleaned overlay - kept only selected badge');
+  }
+
+  // Add screenshot to flow page (overlay already added above if it exists)
+  flowPage.appendChild(sourceScreenshotClone);
+
+  console.log('Source screenshot and overlay created');
+
+  // Step 5: Create arrow
   const arrow = figma.createVector();
   arrow.name = "Flow Arrow";
-  arrow.x = contextFrame.x + contextFrame.width + 50;
-  arrow.y = contextFrame.y + (contextFrame.height / 2) - 10;
+  arrow.x = sourceScreenshotClone.x + sourceScreenshotClone.width + 50;
+  arrow.y = sourceScreenshotClone.y + (sourceScreenshotClone.height / 2) - 10;
 
   // Create simple arrow shape (right-pointing)
   arrow.vectorPaths = [{
@@ -535,7 +521,7 @@ async function createFlowVisualization(
 
   flowPage.appendChild(arrow);
 
-  // Step 4: Fetch and render the target page
+  // Step 6: Fetch and render the target page
   const targetX = arrow.x + 120;
   const targetY = 100;
 
@@ -756,35 +742,36 @@ async function addInteractiveElementsOverlay(targetFrame: FrameNode, pageData: a
   let linkCounter = 1;
 
   for (const element of pageData.interactiveElements) {
+    const elementLabel = element.text || element.href || 'unnamed';
+    
     // Create highlight rectangle - RED stroke, no fill, 50% opacity (matching main crawl)
     const highlightRect = figma.createRectangle();
-    highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
     highlightRect.x = element.x;
     highlightRect.y = element.y;
     highlightRect.resize(element.width, element.height);
 
     // Style the highlight - red 1px stroke, no fill, 50% opacity
     highlightRect.fills = [];
-    highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }]; // Red color
+    highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
     highlightRect.strokeWeight = 1;
     highlightRect.opacity = 0.5;
 
-    overlayContainer.appendChild(highlightRect);
-
     // Add numbered badge for links with destinations
     if (element.href && element.href !== '#') {
+      highlightRect.name = `link_${linkCounter}_highlight: ${elementLabel}`;
+      
       // Determine if link is external
       const isExternal = isExternalLink(element.href, pageData.url);
       const badgeColor = isExternal
-        ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
-        : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
+        ? { r: 0.1, g: 0.6, b: 0.7 }
+        : { r: 0.9, g: 0.45, b: 0.1 };
 
       const badge = figma.createEllipse();
-      badge.name = `Link ${linkCounter}`;
+      badge.name = `link_${linkCounter}_badge_circle`;
 
       const badgeSize = 18;
-      badge.x = element.x + element.width - badgeSize - 4; // 4px margin from right edge
-      badge.y = element.y - 4; // 4px margin from top edge
+      badge.x = element.x + element.width - badgeSize - 4;
+      badge.y = element.y - 4;
       badge.resize(badgeSize, badgeSize);
 
       // Style badge - colored fill, no stroke
@@ -797,6 +784,7 @@ async function addInteractiveElementsOverlay(targetFrame: FrameNode, pageData: a
       badgeText.fontName = { family: "Inter", style: "Bold" };
       badgeText.fontSize = 9;
       badgeText.characters = linkCounter.toString();
+      badgeText.name = `link_${linkCounter}_badge_text`;
 
       // Add hyperlink to badge text
       try {
@@ -804,7 +792,6 @@ async function addInteractiveElementsOverlay(targetFrame: FrameNode, pageData: a
 
         // For internal links (relative URLs), prepend the base site URL
         if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
-          // Extract base URL from page.url
           const baseUrl = pageData.url.match(/^https?:\/\/[^\/]+/)?.[0];
           if (baseUrl) {
             if (!validUrl.startsWith('/')) {
@@ -829,17 +816,21 @@ async function addInteractiveElementsOverlay(targetFrame: FrameNode, pageData: a
         console.log(`Skipping hyperlink for: ${element.href}`);
       }
 
-      badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
+      badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
 
       // Center text in badge
       badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
       badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
       const badgeGroup = figma.group([badge, badgeText], overlayContainer);
-      badgeGroup.name = "badge-with-link";
+      badgeGroup.name = `link_${linkCounter}_badge`;
 
       linkCounter++;
+    } else {
+      highlightRect.name = `${element.type}_highlight: ${elementLabel}`;
     }
+
+    overlayContainer.appendChild(highlightRect);
   }
 
   targetFrame.appendChild(overlayContainer);

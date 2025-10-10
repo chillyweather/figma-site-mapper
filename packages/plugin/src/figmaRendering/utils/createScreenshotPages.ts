@@ -416,16 +416,17 @@ export async function createScreenshotPages(
         }
 
         // Add red frames and numbered badges for each interactive element
-        let linkCounter = 1; // Counter for numbering links
+        let linkCounter = 1;
 
         for (const element of page.interactiveElements) {
-          // Create main highlight rectangle
+          const elementLabel = element.text || element.href || 'unnamed';
+          
+          // Create main highlight rectangle with numbered name
           const highlightRect = figma.createRectangle();
-          highlightRect.name = `${element.type}: ${element.text || element.href || 'unnamed'}`;
-
+          
           // Scale coordinates and dimensions to match screenshot scaling
           const scaledX = element.x * scaleFactor;
-          const scaledY = element.y * scaleFactor; // Position relative to screenshots (no nav offset needed)
+          const scaledY = element.y * scaleFactor;
           const scaledWidth = element.width * scaleFactor;
           const scaledHeight = element.height * scaleFactor;
 
@@ -436,27 +437,27 @@ export async function createScreenshotPages(
 
           // Style the highlight - red 1px stroke, no fill, 50% opacity
           highlightRect.fills = [];
-          highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }]; // Red color
+          highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
           highlightRect.strokeWeight = 1;
           highlightRect.opacity = 0.5;
 
-          overlayContainer.appendChild(highlightRect);
-
           // Add numbered badge for links with destinations
           if (element.href && element.href !== '#') {
+            highlightRect.name = `link_${linkCounter}_highlight: ${elementLabel}`;
+            
             // Determine if link is external
             const isExternal = isExternalLink(element.href, page.url);
             const badgeColor = isExternal
-              ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
-              : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
+              ? { r: 0.1, g: 0.6, b: 0.7 }
+              : { r: 0.9, g: 0.45, b: 0.1 };
 
             const badge = figma.createEllipse();
-            badge.name = `Link ${linkCounter}`;
+            badge.name = `link_${linkCounter}_badge_circle`;
 
             // Position badge in top-right corner of element
             const badgeSize = 18;
-            badge.x = scaledX + scaledWidth - badgeSize - 4; // 4px margin from right edge
-            badge.y = scaledY - 4; // 4px margin from top edge
+            badge.x = scaledX + scaledWidth - badgeSize - 4;
+            badge.y = scaledY - 4;
             badge.resize(badgeSize, badgeSize);
 
             // Style badge - colored fill, no stroke
@@ -471,22 +472,21 @@ export async function createScreenshotPages(
             badgeText.fontName = { family: "Inter", style: "Bold" };
             badgeText.fontSize = 9;
             badgeText.characters = linkCounter.toString();
+            badgeText.name = `link_${linkCounter}_badge_text`;
+            
             // Validate and sanitize URL before setting hyperlink
             try {
               let validUrl = element.href;
 
               // For internal links (relative URLs), prepend the base site URL
               if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
-                // Extract base URL from page.url (e.g., https://crawlee.dev from https://crawlee.dev/js)
                 const baseUrl = page.url.match(/^https?:\/\/[^\/]+/)?.[0];
                 if (baseUrl) {
-                  // Ensure the href starts with / for proper URL joining
                   if (!validUrl.startsWith('/')) {
                     validUrl = '/' + validUrl;
                   }
                   validUrl = baseUrl + validUrl;
                 } else {
-                  // Fallback if we can't extract base URL
                   validUrl = 'https://' + validUrl;
                 }
               }
@@ -505,24 +505,25 @@ export async function createScreenshotPages(
               console.log(`Added hyperlink: ${validUrl}`);
             } catch (urlError) {
               console.log(`Skipping invalid hyperlink for: ${element.href}`, urlError);
-              // Don't add hyperlink if URL is invalid
             }
-            badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
+            badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
 
             // Center text in badge
             badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
             badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
             const badgeGroup = figma.group([badge, badgeText], figma.currentPage)
-            badgeGroup.name = "badge-with-link"
+            badgeGroup.name = `link_${linkCounter}_badge`
 
             overlayContainer.appendChild(badgeGroup)
-            //overlayContainer.appendChild(badge);
-            //overlayContainer.appendChild(badgeText);
 
             console.log(`Added link badge ${linkCounter} for ${element.href}`);
             linkCounter++;
+          } else {
+            highlightRect.name = `${element.type}_highlight: ${elementLabel}`;
           }
+
+          overlayContainer.appendChild(highlightRect);
 
           console.log(`Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`);
         }
