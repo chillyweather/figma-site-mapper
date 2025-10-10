@@ -314,6 +314,18 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   console.log('🚀 Starting the crawler with URL:', startUrl);
   console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements });
 
+  // Clear only request queues to avoid conflicts with previous crawls
+  // Keep session pool and other storage intact to avoid initialization errors
+  const requestQueuesDir = path.join(process.cwd(), 'storage', 'request_queues');
+  try {
+    if (fs.existsSync(requestQueuesDir)) {
+      fs.rmSync(requestQueuesDir, { recursive: true, force: true });
+      console.log('🗑️  Cleared request queues');
+    }
+  } catch (error) {
+    console.warn('⚠️  Could not clear request queues:', error);
+  }
+
   // List of realistic user agents to rotate
   const userAgents = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -324,7 +336,10 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   
   const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
-  const canonicalStartUrl = new URL(startUrl).toString();
+  // Strip hash fragments from URL since they're client-side only
+  const urlObj = new URL(startUrl);
+  urlObj.hash = '';
+  const canonicalStartUrl = urlObj.toString();
   const defaultLanguage = getDefaultLanguage(canonicalStartUrl);
 
   const crawledPages: PageData[] = [];
@@ -525,19 +540,10 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
       if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl && !isLikelyLoginPage) {
         log.info(`Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`);
         
-        // Terminate the crawler gracefully when limit is reached
+        // Mark as terminating to prevent new requests
         if (currentPage >= maxRequestsPerCrawl && !isTerminating) {
           isTerminating = true;
-          log.info(`🛑 Terminating crawler: reached max requests limit of ${maxRequestsPerCrawl}`);
-          // Stop processing new requests - the crawler will finish current requests and then terminate
-          setTimeout(async () => {
-            try {
-              await crawler.teardown();
-              log.info('✅ Crawler terminated successfully');
-            } catch (error) {
-              log.error(`❌ Error terminating crawler: ${error instanceof Error ? error.message : String(error)}`);
-            }
-          }, 100); // Small delay to allow current request to complete
+          log.info(`🛑 Reached max requests limit of ${maxRequestsPerCrawl}, will terminate after current page`);
         }
         
         return;
@@ -940,6 +946,14 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
   await updateProgress('starting', 0, totalPages, canonicalStartUrl);
 
   await crawler.run([canonicalStartUrl]);
+  
+  // Ensure proper cleanup
+  try {
+    await crawler.teardown();
+    console.log('✅ Crawler cleaned up successfully');
+  } catch (error) {
+    console.error(`❌ Error cleaning up crawler: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   console.log(`📊 Total pages crawled: ${crawledPages.length}`);
   console.log('📄 Crawled pages:', crawledPages.map(p => p.url));
@@ -954,13 +968,14 @@ export async function runCrawler(startUrl: string, publicUrl: string, maxRequest
     tree: siteTree,
   }
 
-  const manifestPath = path.join(screenshotDir, "manifest.json")
+  const manifestFilename = jobId ? `manifest-${jobId}.json` : "manifest.json";
+  const manifestPath = path.join(screenshotDir, manifestFilename);
   console.log('📄 Saving manifest to:', manifestPath);
 
   fs.writeFileSync(
     manifestPath,
     JSON.stringify(manifest, null, 2)
   )
-  console.log('✅ Crawler finished and manifest.json created.')
+  console.log(`✅ Crawler finished and ${manifestFilename} created.`)
 }
 

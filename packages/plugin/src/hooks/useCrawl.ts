@@ -48,21 +48,7 @@ export function useCrawl() {
         setIsLoading(true);
         setStatus("Starting crawl...");
 
-        const result = await startCrawl({
-          url: settings.url.trim(),
-          maxRequestsPerCrawl: parseMaxRequests(settings.maxRequests),
-          screenshotWidth: parseScreenshotWidth(settings.screenshotWidth),
-          deviceScaleFactor: parseDeviceScaleFactor(settings.deviceScaleFactor),
-          delay: parseDelay(settings.delay),
-          requestDelay: parseRequestDelay(settings.requestDelay),
-          maxDepth: parseMaxDepth(settings.maxDepth),
-          defaultLanguageOnly: settings.defaultLanguageOnly,
-          sampleSize: parseSampleSize(settings.sampleSize),
-          showBrowser: settings.showBrowser,
-          detectInteractiveElements: settings.detectInteractiveElements,
-          auth: authData,
-        });
-
+        // Send message to plugin to start crawl (plugin will handle API call)
         parent.postMessage(
           {
             pluginMessage: {

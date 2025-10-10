@@ -173,6 +173,12 @@ function buildTree(pages, startUrl) {
     if (pages.length === 0) {
         return null;
     }
+    // For single-page crawls, just return the first page
+    if (pages.length === 1) {
+        const page = pages[0];
+        const numberedTitle = page.crawlOrder ? `${page.crawlOrder}_${page.title}` : page.title;
+        return { ...page, title: numberedTitle, children: [] };
+    }
     const pageMap = new Map();
     let root = null;
     const canonicalStartUrl = new URL(startUrl).toString();
@@ -213,9 +219,21 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, auth) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, auth) {
     console.log('🚀 Starting the crawler with URL:', startUrl);
-    console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser });
+    console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements });
+    // Clear only request queues to avoid conflicts with previous crawls
+    // Keep session pool and other storage intact to avoid initialization errors
+    const requestQueuesDir = path.join(process.cwd(), 'storage', 'request_queues');
+    try {
+        if (fs.existsSync(requestQueuesDir)) {
+            fs.rmSync(requestQueuesDir, { recursive: true, force: true });
+            console.log('🗑️  Cleared request queues');
+        }
+    }
+    catch (error) {
+        console.warn('⚠️  Could not clear request queues:', error);
+    }
     // List of realistic user agents to rotate
     const userAgents = [
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -224,7 +242,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
     ];
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-    const canonicalStartUrl = new URL(startUrl).toString();
+    // Strip hash fragments from URL since they're client-side only
+    const urlObj = new URL(startUrl);
+    urlObj.hash = '';
+    const canonicalStartUrl = urlObj.toString();
     const defaultLanguage = getDefaultLanguage(canonicalStartUrl);
     const crawledPages = [];
     let currentPage = 0;
@@ -409,20 +430,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             log.info(`Current page: ${currentPage}, Max requests: ${maxRequestsPerCrawl}, Is login page: ${isLikelyLoginPage}`);
             if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl && !isLikelyLoginPage) {
                 log.info(`Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`);
-                // Terminate the crawler gracefully when limit is reached
+                // Mark as terminating to prevent new requests
                 if (currentPage >= maxRequestsPerCrawl && !isTerminating) {
                     isTerminating = true;
-                    log.info(`🛑 Terminating crawler: reached max requests limit of ${maxRequestsPerCrawl}`);
-                    // Stop processing new requests - the crawler will finish current requests and then terminate
-                    setTimeout(async () => {
-                        try {
-                            await crawler.teardown();
-                            log.info('✅ Crawler terminated successfully');
-                        }
-                        catch (error) {
-                            log.error(`❌ Error terminating crawler: ${error instanceof Error ? error.message : String(error)}`);
-                        }
-                    }, 100); // Small delay to allow current request to complete
+                    log.info(`🛑 Reached max requests limit of ${maxRequestsPerCrawl}, will terminate after current page`);
                 }
                 return;
             }
@@ -500,69 +511,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     return;
                 }
             }
-            // Login/Authentication detection and handling
-            const loginIndicators = await page.evaluate(() => {
-                // Check for login form elements
-                const hasPasswordField = document.querySelector('input[type="password"]');
-                const hasUsernameField = document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"], input[name="username"]');
-                // Check for login buttons using proper text search
-                const buttons = document.querySelectorAll('button, input[type="submit"]');
-                const hasLoginButton = Array.from(buttons).some(btn => {
-                    const text = btn.textContent?.toLowerCase() || btn.getAttribute('value')?.toLowerCase() || '';
-                    return text.includes('login') || text.includes('sign in') || text.includes('log in') || text.includes('submit');
-                });
-                // Check for login-related text
-                const bodyText = document.body.textContent?.toLowerCase() || '';
-                const titleText = document.title.toLowerCase();
-                const loginTexts = [
-                    'login', 'sign in', 'log in', 'authenticate', 'enter password',
-                    'please log in', 'access denied', 'unauthorized', 'authentication required',
-                    'you must be logged in', 'please sign in'
-                ];
-                const hasLoginText = loginTexts.some(text => bodyText.includes(text) || titleText.includes(text));
-                // Check for common login page patterns
-                const loginPaths = ['/login', '/signin', '/auth', '/authenticate'];
-                const hasLoginPath = loginPaths.some(path => window.location.pathname.includes(path));
-                // Check for HTTP auth dialogs (these show as specific page content)
-                const hasHttpAuth = bodyText.includes('401') && (bodyText.includes('unauthorized') || bodyText.includes('authentication required'));
-                // Debug logging
-                console.log('Login detection debug:', {
-                    hasPasswordField: !!hasPasswordField,
-                    hasUsernameField: !!hasUsernameField,
-                    hasLoginButton,
-                    hasLoginText,
-                    hasLoginPath,
-                    currentPath: window.location.pathname,
-                    pageTitle: document.title,
-                    bodyTextSnippet: bodyText.substring(0, 200)
-                });
-                // More flexible login detection - any of these conditions
-                const isLoginPage = hasLoginPath || (hasPasswordField && hasUsernameField) || hasLoginText;
-                return isLoginPage;
-            });
-            // Log the login detection result
-            log.info(`Login detection result for ${request.url}: ${loginIndicators}`);
-            if (loginIndicators) {
-                log.info(`🔐 Login page detected on ${request.url}`);
-                log.info(`👤 Please log in manually in the browser window. Browser will pause execution...`);
-                // Add a visual indicator in the browser
-                await page.evaluate(() => {
-                    const banner = document.createElement('div');
-                    banner.innerHTML = '🔐 LOGIN DETECTED - Please log in manually then press F8 or click Resume button to continue';
-                    banner.style.cssText = `
-            position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
-            background: #ff6b6b; color: white; padding: 15px;
-            text-align: center; font-size: 18px; font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-          `;
-                    document.body.insertBefore(banner, document.body.firstChild);
-                });
-                // Use Playwright's built-in pause functionality
-                // This will open the Playwright Inspector and pause execution
-                log.info(`🛑 Pausing crawler execution - please log in manually and press F8 to continue`);
-                await page.pause();
-                log.info(`✅ Login completed, continuing with crawl`);
-            }
+            // Login/Authentication detection and handling - DISABLED FOR NOW
+            // TODO: Re-enable with stricter detection when needed
+            // const loginIndicators = false; // Disabled
             // Additional wait for dynamic content (configurable delay)
             if (delay > 0) {
                 log.info(`Waiting ${delay}ms for dynamic content to load`);
@@ -643,62 +594,68 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             catch (error) {
                 log.info(`⚠️ Could not ensure top position for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
             }
-            // Find interactive elements (links and buttons) with their bounding boxes
+            // Find interactive elements (links and buttons) with their bounding boxes (if enabled)
             // IMPORTANT: This must happen AFTER final scroll positioning to ensure accurate coordinates
-            log.info(`Finding interactive elements on ${request.url}`);
-            const interactiveElements = await page.evaluate(() => {
-                const elements = [];
-                // Find all links with hrefs
-                const links = document.querySelectorAll('a[href]');
-                links.forEach((link) => {
-                    const rect = link.getBoundingClientRect();
-                    const href = link.getAttribute('href') || '';
-                    const id = link.getAttribute('id') || '';
-                    // Filter out unwanted links
-                    const shouldSkip = 
-                    // Skip docusaurus skip link
-                    id === '__docusaurus_skipToContent_fallback' ||
-                        // Skip empty or javascript links
-                        !href ||
-                        href === '#' ||
-                        href.startsWith('javascript:') ||
-                        // Skip very small elements (likely decorative)
-                        rect.width < 10 ||
-                        rect.height < 10;
-                    if (shouldSkip) {
-                        return;
-                    }
-                    if (rect.width > 0 && rect.height > 0) { // Only visible elements
-                        elements.push({
-                            type: 'link',
-                            x: rect.left + window.scrollX,
-                            y: rect.top + window.scrollY,
-                            width: rect.width,
-                            height: rect.height,
-                            href: href || undefined,
-                            text: link.textContent?.trim().substring(0, 100) || undefined
-                        });
-                    }
+            let interactiveElements = [];
+            if (detectInteractiveElements) {
+                log.info(`Finding interactive elements on ${request.url}`);
+                interactiveElements = await page.evaluate(() => {
+                    const elements = [];
+                    // Find all links with hrefs
+                    const links = document.querySelectorAll('a[href]');
+                    links.forEach((link) => {
+                        const rect = link.getBoundingClientRect();
+                        const href = link.getAttribute('href') || '';
+                        const id = link.getAttribute('id') || '';
+                        // Filter out unwanted links
+                        const shouldSkip = 
+                        // Skip docusaurus skip link
+                        id === '__docusaurus_skipToContent_fallback' ||
+                            // Skip empty or javascript links
+                            !href ||
+                            href === '#' ||
+                            href.startsWith('javascript:') ||
+                            // Skip very small elements (likely decorative)
+                            rect.width < 10 ||
+                            rect.height < 10;
+                        if (shouldSkip) {
+                            return;
+                        }
+                        if (rect.width > 0 && rect.height > 0) { // Only visible elements
+                            elements.push({
+                                type: 'link',
+                                x: rect.left + window.scrollX,
+                                y: rect.top + window.scrollY,
+                                width: rect.width,
+                                height: rect.height,
+                                href: href || undefined,
+                                text: link.textContent?.trim().substring(0, 100) || undefined
+                            });
+                        }
+                    });
+                    // Find all buttons
+                    const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
+                    buttons.forEach((button) => {
+                        const rect = button.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) { // Only visible elements
+                            elements.push({
+                                type: 'button',
+                                x: rect.left + window.scrollX,
+                                y: rect.top + window.scrollY,
+                                width: rect.width,
+                                height: rect.height,
+                                href: undefined,
+                                text: button.textContent?.trim().substring(0, 100) || button.value?.substring(0, 100) || undefined
+                            });
+                        }
+                    });
+                    return elements;
                 });
-                // Find all buttons
-                const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
-                buttons.forEach((button) => {
-                    const rect = button.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) { // Only visible elements
-                        elements.push({
-                            type: 'button',
-                            x: rect.left + window.scrollX,
-                            y: rect.top + window.scrollY,
-                            width: rect.width,
-                            height: rect.height,
-                            href: undefined,
-                            text: button.textContent?.trim().substring(0, 100) || button.value?.substring(0, 100) || undefined
-                        });
-                    }
-                });
-                return elements;
-            });
-            log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+                log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+            }
+            else {
+                log.info(`Skipping interactive elements detection (disabled)`);
+            }
             const fullPageBuffer = await page.screenshot({ fullPage: true });
             // Slice the screenshot into manageable pieces
             await updateProgress('processing', currentPage, totalPages, request.url);
@@ -822,6 +779,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     totalPages = maxRequestsPerCrawl || 100; // Default to 100 if no limit
     await updateProgress('starting', 0, totalPages, canonicalStartUrl);
     await crawler.run([canonicalStartUrl]);
+    // Ensure proper cleanup
+    try {
+        await crawler.teardown();
+        console.log('✅ Crawler cleaned up successfully');
+    }
+    catch (error) {
+        console.error(`❌ Error cleaning up crawler: ${error instanceof Error ? error.message : String(error)}`);
+    }
     console.log(`📊 Total pages crawled: ${crawledPages.length}`);
     console.log('📄 Crawled pages:', crawledPages.map(p => p.url));
     const siteTree = buildTree(crawledPages, canonicalStartUrl);
@@ -831,8 +796,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         crawlDate: new Date().toISOString(),
         tree: siteTree,
     };
-    const manifestPath = path.join(screenshotDir, "manifest.json");
+    const manifestFilename = jobId ? `manifest-${jobId}.json` : "manifest.json";
+    const manifestPath = path.join(screenshotDir, manifestFilename);
     console.log('📄 Saving manifest to:', manifestPath);
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-    console.log('✅ Crawler finished and manifest.json created.');
+    console.log(`✅ Crawler finished and ${manifestFilename} created.`);
 }

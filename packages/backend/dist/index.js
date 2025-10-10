@@ -54,7 +54,7 @@ server.post('/progress/:jobId', async (request, reply) => {
 });
 server.get("/status/:jobId", async (request, reply) => {
     const { jobId } = request.params;
-    const manifestPath = path.join(__dirname, "..", "screenshots", "manifest.json");
+    const manifestPath = path.join(__dirname, "..", "screenshots", `manifest-${jobId}.json`);
     try {
         const job = await crawlQueue.getJob(jobId);
         if (!job) {
@@ -68,7 +68,7 @@ server.get("/status/:jobId", async (request, reply) => {
                     status: 'completed',
                     progress: 100,
                     result: {
-                        manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+                        manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`
                     }
                 };
             }
@@ -90,7 +90,8 @@ server.get("/status/:jobId", async (request, reply) => {
             case 'completed':
                 status = 'completed';
                 result = {
-                    manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+                    manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`,
+                    detectInteractiveElements: jobData.detectInteractiveElements !== false
                 };
                 break;
             case 'failed':
@@ -117,7 +118,7 @@ server.get("/status/:jobId", async (request, reply) => {
 });
 server.post('/crawl', async (request, reply) => {
     //add validation
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, auth } = request.body;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, auth } = request.body;
     if (!url || !publicUrl) {
         reply.status(400).send({ error: "URL and publicUrl is required" });
         return;
@@ -133,6 +134,7 @@ server.post('/crawl', async (request, reply) => {
         defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
         sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
         showBrowser: showBrowser !== false, // Default to false (headless)
+        detectInteractiveElements: detectInteractiveElements !== false, // Default to true
         auth
     });
     return { message: "Crawl job successfully queued.", jobId: job.id };

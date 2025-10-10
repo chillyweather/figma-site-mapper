@@ -73,7 +73,7 @@ server.post('/progress/:jobId', async (request, reply) => {
 
 server.get("/status/:jobId", async (request, reply) => {
   const { jobId } = request.params as { jobId: string }
-  const manifestPath = path.join(__dirname, "..", "screenshots", "manifest.json");
+  const manifestPath = path.join(__dirname, "..", "screenshots", `manifest-${jobId}.json`);
 
   try {
     const job = await crawlQueue.getJob(jobId);
@@ -89,7 +89,7 @@ server.get("/status/:jobId", async (request, reply) => {
           status: 'completed',
           progress: 100,
           result: {
-            manifestUrl: `http://localhost:3006/screenshots/manifest.json`
+            manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`
           }
         };
       } catch {
@@ -114,7 +114,7 @@ server.get("/status/:jobId", async (request, reply) => {
       case 'completed':
         status = 'completed';
         result = {
-          manifestUrl: `http://localhost:3006/screenshots/manifest.json`,
+          manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`,
           detectInteractiveElements: jobData.detectInteractiveElements !== false
         };
         break;

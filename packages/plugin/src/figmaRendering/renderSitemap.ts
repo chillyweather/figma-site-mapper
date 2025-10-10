@@ -84,9 +84,16 @@ async function createIndexPage(tree: TreeNode, pageIdMap: Map<string, string>): 
   return indexPage.id;
 }
 
-export async function renderSitemap(manifestData: { tree: TreeNode }, screenshotWidth: number = 1440, detectInteractiveElements: boolean = true) {
+export async function renderSitemap(manifestData: { tree: TreeNode | null }, screenshotWidth: number = 1440, detectInteractiveElements: boolean = true) {
   console.log("Rendering sitemap for tree:", manifestData.tree);
   console.log("Detect interactive elements:", detectInteractiveElements);
+
+  // Check if tree exists
+  if (!manifestData.tree) {
+    console.error("Cannot render sitemap: tree is null or empty");
+    figma.notify("Error: No pages were crawled", { error: true });
+    return;
+  }
 
   // Flatten the tree to get all pages
   const pages = flattenTree(manifestData.tree);

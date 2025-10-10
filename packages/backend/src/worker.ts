@@ -21,10 +21,16 @@ const processor = async (job: Job) => {
   }
 }
 
-const worker = new Worker("crawl-jobs", processor, { connection });
+const worker = new Worker("crawl-jobs", processor, { 
+  connection,
+  autorun: true, // Keep worker running automatically
+  removeOnComplete: { count: 100 }, // Keep last 100 completed jobs
+  removeOnFail: { count: 50 } // Keep last 50 failed jobs
+});
 
 worker.on('completed', (job: Job) => {
   console.log(`✅ Job ${job.id} has completed!`);
+  console.log('👷 Worker ready for next job...');
 });
 
 worker.on('failed', (job: Job | undefined, err: Error) => {
@@ -33,6 +39,24 @@ worker.on('failed', (job: Job | undefined, err: Error) => {
   } else {
     console.error(`An unknown job has failed with error: ${err.message}`);
   }
+  console.log('👷 Worker ready for next job...');
+});
+
+worker.on('error', (err: Error) => {
+  console.error('Worker error:', err);
 });
 
 console.log('👷 Worker is listening for jobs...')
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing worker...');
+  await worker.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing worker...');
+  await worker.close();
+  process.exit(0);
+});
