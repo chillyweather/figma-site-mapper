@@ -437,76 +437,54 @@ async function createFlowVisualization(
 
   if (overlayFrames.length > 0) {
     overlayContainer = overlayFrames[0];
-    console.log('Found overlay container');
+    console.log('Found overlay container at position:', overlayContainer.x, overlayContainer.y);
+  }
+
+  // Step 3: Find and store the selected highlight rectangle info (before switching pages)
+  let highlightRect: RectangleNode | null = null;
+  let highlightX = 0;
+  let highlightY = 0;
+  
+  if (overlayContainer) {
+    const linkNumber = badgeElement.characters;
+    const highlightName = `link_${linkNumber}_highlight:`;
+    
+    const allHighlights = overlayContainer.findAll((node: SceneNode) =>
+      node.type === 'RECTANGLE' && node.name.startsWith(highlightName)
+    ) as RectangleNode[];
+
+    if (allHighlights.length > 0) {
+      highlightRect = allHighlights[0];
+      highlightX = highlightRect.x;
+      highlightY = highlightRect.y;
+      console.log(`Found highlight rectangle: ${highlightRect.name} at position (${highlightX}, ${highlightY})`);
+    } else {
+      console.warn(`Could not find highlight rectangle for link ${linkNumber}`);
+    }
   }
 
   // Switch to flow page before creating elements
   figma.currentPage = flowPage;
 
-  // Step 3: Clone the entire screenshot frame
+  // Step 4: Clone the entire screenshot frame
   const sourceScreenshotClone = screenshotFrame.clone();
   sourceScreenshotClone.name = `Source_${selectedLink.text}`;
   sourceScreenshotClone.x = 100;
   sourceScreenshotClone.y = 100;
-
-  // Step 4: Clone overlay container if it exists and clean it
-  let sourceOverlayClone: FrameNode | null = null;
-  if (overlayContainer) {
-    // First, add cloned overlay to page so we can use findAll
-    sourceOverlayClone = overlayContainer.clone();
-    flowPage.appendChild(sourceOverlayClone);
-    sourceOverlayClone.x = sourceScreenshotClone.x;
-    sourceOverlayClone.y = sourceScreenshotClone.y;
-
-    // Remove all badge groups except the selected one
-    const allBadgeGroups = sourceOverlayClone.findAll((node: SceneNode) =>
-      node.type === 'GROUP' && node.name.startsWith('link_') && node.name.endsWith('_badge')
-    );
-
-    for (const badge of allBadgeGroups) {
-      if (badge.type === 'GROUP') {
-        // Find the text node in this badge group to check if it's the selected one
-        const textNodes = badge.findAll((node: SceneNode) => node.type === 'TEXT');
-        let isSelectedBadge = false;
-
-        for (const textNode of textNodes) {
-          if (textNode.type === 'TEXT') {
-            // Check if this badge has the same number as our selected badge
-            if (textNode.characters === badgeElement.characters) {
-              isSelectedBadge = true;
-              // Remove hyperlink from the selected badge
-              textNode.hyperlink = null;
-              console.log('Removed hyperlink from selected badge:', textNode.characters);
-              break;
-            }
-          }
-        }
-
-        // Remove badge if it's not the selected one
-        if (!isSelectedBadge) {
-          badge.remove();
-        }
-      }
-    }
-
-    // Remove all highlight rectangles and other overlay elements (keep only selected badge group)
-    const allOverlayChildren = [...sourceOverlayClone.children];
-    for (const child of allOverlayChildren) {
-      // Keep only badge groups, remove everything else (rectangles, navigation, etc.)
-      if (child.type === 'RECTANGLE' || child.name === 'Navigation' || child.name === 'Link References') {
-        child.remove();
-      }
-    }
-
-    console.log('Cleaned overlay - kept only selected badge');
-  }
-
-  // Add screenshot to flow page (overlay already added above if it exists)
   flowPage.appendChild(sourceScreenshotClone);
 
-  console.log('Source screenshot and overlay created');
+  // Step 5: Clone the selected highlight rectangle on top of screenshot
+  if (highlightRect) {
+    const selectedHighlight = highlightRect.clone();
+    selectedHighlight.x = sourceScreenshotClone.x + highlightX;
+    selectedHighlight.y = sourceScreenshotClone.y + highlightY;
+    flowPage.appendChild(selectedHighlight);
+    console.log(`Cloned highlight rectangle to flow page at (${selectedHighlight.x}, ${selectedHighlight.y})`);
+  }
 
-  // Step 5: Create arrow
+  console.log('Source screenshot and highlight created');
+
+  // Step 6: Create arrow
   const arrow = figma.createVector();
   arrow.name = "Flow Arrow";
   arrow.x = sourceScreenshotClone.x + sourceScreenshotClone.width + 50;
@@ -521,7 +499,7 @@ async function createFlowVisualization(
 
   flowPage.appendChild(arrow);
 
-  // Step 6: Fetch and render the target page
+  // Step 7: Fetch and render the target page
   const targetX = arrow.x + 120;
   const targetY = 100;
 
