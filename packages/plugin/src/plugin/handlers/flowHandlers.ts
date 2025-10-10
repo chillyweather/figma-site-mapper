@@ -1,0 +1,285 @@
+/**
+ * FLOW VISUALIZATION HANDLERS
+ * 
+ * Handles creating user flow visualizations by:
+ * 1. Creating flow pages
+ * 2. Cloning source screenshots
+ * 3. Fetching and rendering target pages
+ * 4. Creating arrow connectors
+ */
+
+import { FlowLink } from '../types';
+import { startCrawl, getJobStatus, fetchManifest } from '../services/apiClient';
+import { POLLING_CONFIG, FLOW_ARROW_PATH } from '../constants';
+import { renderTargetPage } from '../services/targetPageRenderer';
+
+/**
+ * Handle show-flow request from UI
+ */
+export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
+  if (selectedLinks.length === 0) {
+    figma.notify("No links selected");
+    return;
+  }
+
+  if (selectedLinks.length > 1) {
+    figma.notify("Multiple flow visualization not yet implemented. Please select one link.");
+    return;
+  }
+
+  const selectedLink = selectedLinks[0];
+  console.log('📊 Creating flow for:', selectedLink);
+
+  try {
+    await createFlowPage(selectedLink);
+  } catch (error) {
+    console.error("Failed to create flow:", error);
+    figma.notify("Error: Could not create flow visualization.", { error: true });
+  }
+}
+
+/**
+ * Create a flow page with source and target visualization
+ */
+async function createFlowPage(selectedLink: FlowLink): Promise<void> {
+  const currentPage = figma.currentPage;
+  const flowPageName = generateFlowPageName(currentPage.name, selectedLink.text);
+  
+  // Find or create flow page
+  let flowPage = figma.root.children.find(p => p.name === flowPageName) as PageNode | undefined;
+  
+  if (!flowPage) {
+    flowPage = figma.createPage();
+    flowPage.name = flowPageName;
+    
+    const currentPageIndex = figma.root.children.indexOf(currentPage);
+    figma.root.insertChild(currentPageIndex + 1, flowPage);
+    console.log(`Created flow page: ${flowPageName}`);
+  } else {
+    console.log(`Flow page already exists: ${flowPageName}`);
+  }
+
+  await createFlowVisualization(flowPage, selectedLink, currentPage);
+  figma.notify(`Flow visualization started for link ${selectedLink.text}`);
+}
+
+/**
+ * Generate flow page name with hierarchy
+ */
+function generateFlowPageName(currentPageName: string, linkText: string): string {
+  const pageMatch = currentPageName.match(/^(\s*)([\d-]+)_(.*)/);
+  
+  if (!pageMatch) {
+    return `Flow_${linkText}`;
+  }
+
+  const currentIndent = pageMatch[1];
+  const currentHierarchy = pageMatch[2];
+  const newHierarchy = `${currentHierarchy}-${linkText}`;
+  const currentLevel = currentHierarchy.split('-').length;
+  const newLevel = currentLevel + 1;
+  const newIndent = '  '.repeat(Math.max(0, newLevel - 1));
+
+  return `${newIndent}${newHierarchy}_Loading...`;
+}
+
+/**
+ * Create complete flow visualization
+ */
+async function createFlowVisualization(
+  flowPage: PageNode,
+  selectedLink: FlowLink,
+  sourcePage: PageNode
+): Promise<void> {
+  console.log('Creating flow visualization for:', selectedLink);
+
+  const previousPage = figma.currentPage;
+  figma.currentPage = sourcePage;
+
+  try {
+    // Find and clone source elements
+    const { screenshotClone, highlightClone } = await cloneSourceElements(
+      selectedLink,
+      sourcePage,
+      flowPage
+    );
+
+    if (!screenshotClone) {
+      throw new Error('Could not clone source screenshot');
+    }
+
+    // Create arrow connector
+    const arrow = createFlowArrow(screenshotClone);
+    flowPage.appendChild(arrow);
+
+    // Fetch and render target page
+    const targetX = arrow.x + 120;
+    const targetY = screenshotClone.y;
+
+    await fetchAndRenderTargetPage(selectedLink.url, flowPage, targetX, targetY);
+  } finally {
+    figma.currentPage = previousPage;
+  }
+}
+
+/**
+ * Clone source screenshot and highlight from source page
+ */
+async function cloneSourceElements(
+  selectedLink: FlowLink,
+  sourcePage: PageNode,
+  flowPage: PageNode
+): Promise<{ screenshotClone: FrameNode | null, highlightClone: RectangleNode | null }> {
+  const badgeElement = await figma.getNodeByIdAsync(selectedLink.id);
+
+  if (!badgeElement || badgeElement.type !== 'TEXT') {
+    throw new Error(`Could not find badge element with ID: ${selectedLink.id}`);
+  }
+
+  // Find screenshot frame
+  const screenshotFrames = sourcePage.findAll((node: SceneNode) =>
+    node.type === 'FRAME' && node.name.includes('Screenshots')
+  ) as FrameNode[];
+
+  if (screenshotFrames.length === 0) {
+    throw new Error('Could not find Screenshots frame');
+  }
+
+  const screenshotFrame = screenshotFrames[0];
+  
+  // Clone screenshot
+  figma.currentPage = flowPage;
+  const screenshotClone = screenshotFrame.clone();
+  screenshotClone.name = `Source_${selectedLink.text}`;
+  screenshotClone.x = 100;
+  screenshotClone.y = 100;
+  flowPage.appendChild(screenshotClone);
+
+  // Find and clone highlight
+  let highlightClone: RectangleNode | null = null;
+  const overlayFrames = sourcePage.findAll((node: SceneNode) =>
+    node.type === 'FRAME' && node.name === 'Page Overlay'
+  ) as FrameNode[];
+
+  if (overlayFrames.length > 0) {
+    const linkNumber = badgeElement.characters;
+    const highlightNamePattern = `link_${linkNumber}_highlight:`;
+    
+    const highlights = overlayFrames[0].findAll((node: SceneNode) =>
+      node.type === 'RECTANGLE' && node.name.startsWith(highlightNamePattern)
+    ) as RectangleNode[];
+
+    if (highlights.length > 0) {
+      const originalHighlight = highlights[0];
+      highlightClone = originalHighlight.clone();
+      highlightClone.x = screenshotClone.x + originalHighlight.x;
+      highlightClone.y = screenshotClone.y + originalHighlight.y;
+      flowPage.appendChild(highlightClone);
+    }
+  }
+
+  return { screenshotClone, highlightClone };
+}
+
+/**
+ * Create arrow connector between source and target
+ */
+function createFlowArrow(sourceFrame: FrameNode): VectorNode {
+  const arrow = figma.createVector();
+  arrow.name = "Flow Arrow";
+  arrow.x = sourceFrame.x + sourceFrame.width + 20;
+  arrow.y = sourceFrame.y - 15;
+  
+  arrow.vectorPaths = [{
+    windingRule: 'NONZERO',
+    data: FLOW_ARROW_PATH
+  }];
+  
+  arrow.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }];
+  arrow.strokes = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }];
+  arrow.strokeWeight = 4;
+
+  return arrow;
+}
+
+/**
+ * Fetch and render target page
+ */
+async function fetchAndRenderTargetPage(
+  url: string,
+  flowPage: PageNode,
+  x: number,
+  y: number
+): Promise<void> {
+  figma.notify(`Crawling target page: ${url}...`);
+
+  try {
+    const result = await startCrawl({
+      url,
+      maxRequestsPerCrawl: 1,
+      screenshotWidth: 1440,
+      deviceScaleFactor: 1,
+      delay: 0,
+      requestDelay: 1000,
+      maxDepth: 0,
+      defaultLanguageOnly: false,
+      sampleSize: 1,
+      showBrowser: false,
+      detectInteractiveElements: true,
+      auth: null
+    });
+
+    const jobId = result.jobId;
+    console.log(`Started crawl job ${jobId} for target page`);
+
+    // Poll for completion
+    await pollForCompletion(jobId, flowPage, x, y);
+  } catch (error) {
+    console.error("Failed to crawl target page:", error);
+    figma.notify("Error: Could not crawl target page.", { error: true });
+  }
+}
+
+/**
+ * Poll for job completion and render when ready
+ */
+async function pollForCompletion(
+  jobId: string,
+  flowPage: PageNode,
+  x: number,
+  y: number
+): Promise<void> {
+  let attempts = 0;
+
+  const pollInterval = setInterval(async () => {
+    attempts++;
+
+    if (attempts > POLLING_CONFIG.MAX_ATTEMPTS) {
+      clearInterval(pollInterval);
+      figma.notify("Target page crawl timed out", { error: true });
+      return;
+    }
+
+    try {
+      const statusResult = await getJobStatus(jobId);
+
+      if (statusResult.status === 'completed' && statusResult.result?.manifestUrl) {
+        clearInterval(pollInterval);
+
+        const manifestData = await fetchManifest(statusResult.result.manifestUrl);
+        console.log('Target page crawl completed, rendering...');
+
+        // Update flow page name with target title
+        if (manifestData.tree?.title) {
+          const cleanTitle = manifestData.tree.title.replace(/^\d+_/, '');
+          flowPage.name = flowPage.name.replace('_Loading...', `_${cleanTitle}`);
+        }
+
+        await renderTargetPage(flowPage, manifestData, x, y);
+        figma.notify("Flow visualization complete!");
+      }
+    } catch (error) {
+      console.error('Error polling for target page status:', error);
+    }
+  }, POLLING_CONFIG.INTERVAL_MS);
+}
