@@ -116,6 +116,33 @@ async function createFlowVisualization(
       flowPage
     );
 
+    if (highlightClone) {
+      highlightClone.strokeWeight = 6;
+      highlightClone.opacity = 1;
+      highlightClone.strokes = [
+        {
+          type: "SOLID",
+          visible: true,
+          opacity: 1,
+          blendMode: "NORMAL",
+          color: {
+            r: 1,
+            g: 0,
+            b: 0.01666666753590107,
+          },
+          boundVariables: {},
+        },
+      ];
+      highlightClone.dashPattern = [6, 6];
+      highlightClone.x -= 4;
+      highlightClone.y -= 4;
+      highlightClone.resize(
+        highlightClone.width + 8,
+        highlightClone.height + 8
+      );
+      highlightClone.strokeAlign = "OUTSIDE";
+    }
+
     if (!screenshotClone) {
       throw new Error("Could not clone source screenshot");
     }
