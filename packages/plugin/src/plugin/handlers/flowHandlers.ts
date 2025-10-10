@@ -1,6 +1,6 @@
 /**
  * FLOW VISUALIZATION HANDLERS
- * 
+ *
  * Handles creating user flow visualizations by:
  * 1. Creating flow pages
  * 2. Cloning source screenshots
@@ -8,10 +8,10 @@
  * 4. Creating arrow connectors
  */
 
-import { FlowLink } from '../types';
-import { startCrawl, getJobStatus, fetchManifest } from '../services/apiClient';
-import { POLLING_CONFIG, FLOW_ARROW_PATH } from '../constants';
-import { renderTargetPage } from '../services/targetPageRenderer';
+import { FlowLink } from "../types";
+import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { POLLING_CONFIG, FLOW_ARROW_PATH } from "../constants";
+import { renderTargetPage } from "../services/targetPageRenderer";
 
 /**
  * Handle show-flow request from UI
@@ -23,18 +23,22 @@ export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
   }
 
   if (selectedLinks.length > 1) {
-    figma.notify("Multiple flow visualization not yet implemented. Please select one link.");
+    figma.notify(
+      "Multiple flow visualization not yet implemented. Please select one link."
+    );
     return;
   }
 
   const selectedLink = selectedLinks[0];
-  console.log('📊 Creating flow for:', selectedLink);
+  console.log("📊 Creating flow for:", selectedLink);
 
   try {
     await createFlowPage(selectedLink);
   } catch (error) {
     console.error("Failed to create flow:", error);
-    figma.notify("Error: Could not create flow visualization.", { error: true });
+    figma.notify("Error: Could not create flow visualization.", {
+      error: true,
+    });
   }
 }
 
@@ -43,15 +47,20 @@ export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
  */
 async function createFlowPage(selectedLink: FlowLink): Promise<void> {
   const currentPage = figma.currentPage;
-  const flowPageName = generateFlowPageName(currentPage.name, selectedLink.text);
-  
+  const flowPageName = generateFlowPageName(
+    currentPage.name,
+    selectedLink.text
+  );
+
   // Find or create flow page
-  let flowPage = figma.root.children.find(p => p.name === flowPageName) as PageNode | undefined;
-  
+  let flowPage = figma.root.children.find((p) => p.name === flowPageName) as
+    | PageNode
+    | undefined;
+
   if (!flowPage) {
     flowPage = figma.createPage();
     flowPage.name = flowPageName;
-    
+
     const currentPageIndex = figma.root.children.indexOf(currentPage);
     figma.root.insertChild(currentPageIndex + 1, flowPage);
     console.log(`Created flow page: ${flowPageName}`);
@@ -66,9 +75,12 @@ async function createFlowPage(selectedLink: FlowLink): Promise<void> {
 /**
  * Generate flow page name with hierarchy
  */
-function generateFlowPageName(currentPageName: string, linkText: string): string {
+function generateFlowPageName(
+  currentPageName: string,
+  linkText: string
+): string {
   const pageMatch = currentPageName.match(/^(\s*)([\d-]+)_(.*)/);
-  
+
   if (!pageMatch) {
     return `Flow_${linkText}`;
   }
@@ -76,9 +88,9 @@ function generateFlowPageName(currentPageName: string, linkText: string): string
   const currentIndent = pageMatch[1];
   const currentHierarchy = pageMatch[2];
   const newHierarchy = `${currentHierarchy}-${linkText}`;
-  const currentLevel = currentHierarchy.split('-').length;
+  const currentLevel = currentHierarchy.split("-").length;
   const newLevel = currentLevel + 1;
-  const newIndent = '  '.repeat(Math.max(0, newLevel - 1));
+  const newIndent = "  ".repeat(Math.max(0, newLevel - 1));
 
   return `${newIndent}${newHierarchy}_Loading...`;
 }
@@ -91,7 +103,7 @@ async function createFlowVisualization(
   selectedLink: FlowLink,
   sourcePage: PageNode
 ): Promise<void> {
-  console.log('Creating flow visualization for:', selectedLink);
+  console.log("Creating flow visualization for:", selectedLink);
 
   const previousPage = figma.currentPage;
   figma.currentPage = sourcePage;
@@ -105,7 +117,7 @@ async function createFlowVisualization(
     );
 
     if (!screenshotClone) {
-      throw new Error('Could not clone source screenshot');
+      throw new Error("Could not clone source screenshot");
     }
 
     // Create arrow connector
@@ -116,7 +128,12 @@ async function createFlowVisualization(
     const targetX = arrow.x + 120;
     const targetY = screenshotClone.y;
 
-    await fetchAndRenderTargetPage(selectedLink.url, flowPage, targetX, targetY);
+    await fetchAndRenderTargetPage(
+      selectedLink.url,
+      flowPage,
+      targetX,
+      targetY
+    );
   } finally {
     figma.currentPage = previousPage;
   }
@@ -129,24 +146,28 @@ async function cloneSourceElements(
   selectedLink: FlowLink,
   sourcePage: PageNode,
   flowPage: PageNode
-): Promise<{ screenshotClone: FrameNode | null, highlightClone: RectangleNode | null }> {
+): Promise<{
+  screenshotClone: FrameNode | null;
+  highlightClone: RectangleNode | null;
+}> {
   const badgeElement = await figma.getNodeByIdAsync(selectedLink.id);
 
-  if (!badgeElement || badgeElement.type !== 'TEXT') {
+  if (!badgeElement || badgeElement.type !== "TEXT") {
     throw new Error(`Could not find badge element with ID: ${selectedLink.id}`);
   }
 
   // Find screenshot frame
-  const screenshotFrames = sourcePage.findAll((node: SceneNode) =>
-    node.type === 'FRAME' && node.name.includes('Screenshots')
+  const screenshotFrames = sourcePage.findAll(
+    (node: SceneNode) =>
+      node.type === "FRAME" && node.name.includes("Screenshots")
   ) as FrameNode[];
 
   if (screenshotFrames.length === 0) {
-    throw new Error('Could not find Screenshots frame');
+    throw new Error("Could not find Screenshots frame");
   }
 
   const screenshotFrame = screenshotFrames[0];
-  
+
   // Clone screenshot
   figma.currentPage = flowPage;
   const screenshotClone = screenshotFrame.clone();
@@ -157,16 +178,17 @@ async function cloneSourceElements(
 
   // Find and clone highlight
   let highlightClone: RectangleNode | null = null;
-  const overlayFrames = sourcePage.findAll((node: SceneNode) =>
-    node.type === 'FRAME' && node.name === 'Page Overlay'
+  const overlayFrames = sourcePage.findAll(
+    (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
   ) as FrameNode[];
 
   if (overlayFrames.length > 0) {
     const linkNumber = badgeElement.characters;
     const highlightNamePattern = `link_${linkNumber}_highlight:`;
-    
-    const highlights = overlayFrames[0].findAll((node: SceneNode) =>
-      node.type === 'RECTANGLE' && node.name.startsWith(highlightNamePattern)
+
+    const highlights = overlayFrames[0].findAll(
+      (node: SceneNode) =>
+        node.type === "RECTANGLE" && node.name.startsWith(highlightNamePattern)
     ) as RectangleNode[];
 
     if (highlights.length > 0) {
@@ -189,14 +211,16 @@ function createFlowArrow(sourceFrame: FrameNode): VectorNode {
   arrow.name = "Flow Arrow";
   arrow.x = sourceFrame.x + sourceFrame.width + 20;
   arrow.y = sourceFrame.y - 15;
-  
-  arrow.vectorPaths = [{
-    windingRule: 'NONZERO',
-    data: FLOW_ARROW_PATH
-  }];
-  
-  arrow.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }];
-  arrow.strokes = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }];
+
+  arrow.vectorPaths = [
+    {
+      windingRule: "NONZERO",
+      data: FLOW_ARROW_PATH,
+    },
+  ];
+
+  arrow.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+  arrow.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
   arrow.strokeWeight = 4;
 
   return arrow;
@@ -226,7 +250,7 @@ async function fetchAndRenderTargetPage(
       sampleSize: 1,
       showBrowser: false,
       detectInteractiveElements: true,
-      auth: null
+      auth: null,
     });
 
     const jobId = result.jobId;
@@ -263,23 +287,31 @@ async function pollForCompletion(
     try {
       const statusResult = await getJobStatus(jobId);
 
-      if (statusResult.status === 'completed' && statusResult.result?.manifestUrl) {
+      if (
+        statusResult.status === "completed" &&
+        statusResult.result?.manifestUrl
+      ) {
         clearInterval(pollInterval);
 
-        const manifestData = await fetchManifest(statusResult.result.manifestUrl);
-        console.log('Target page crawl completed, rendering...');
+        const manifestData = await fetchManifest(
+          statusResult.result.manifestUrl
+        );
+        console.log("Target page crawl completed, rendering...");
 
         // Update flow page name with target title
         if (manifestData.tree?.title) {
-          const cleanTitle = manifestData.tree.title.replace(/^\d+_/, '');
-          flowPage.name = flowPage.name.replace('_Loading...', `_${cleanTitle}`);
+          const cleanTitle = manifestData.tree.title.replace(/^\d+_/, "");
+          flowPage.name = flowPage.name.replace(
+            "_Loading...",
+            `_${cleanTitle}`
+          );
         }
 
         await renderTargetPage(flowPage, manifestData, x, y);
         figma.notify("Flow visualization complete!");
       }
     } catch (error) {
-      console.error('Error polling for target page status:', error);
+      console.error("Error polling for target page status:", error);
     }
   }, POLLING_CONFIG.INTERVAL_MS);
 }

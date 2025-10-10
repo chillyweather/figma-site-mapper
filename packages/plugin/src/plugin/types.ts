@@ -22,7 +22,7 @@ export interface ManifestData {
 }
 
 export interface InteractiveElement {
-  type: 'link' | 'button';
+  type: "link" | "button";
   x: number;
   y: number;
   width: number;

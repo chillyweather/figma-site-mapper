@@ -1,10 +1,12 @@
-import { BACKEND_URL } from '../constants';
-import { CrawlParams } from '../types';
+import { BACKEND_URL } from "../constants";
+import { CrawlParams } from "../types";
 
 /**
  * Start a crawl job on the backend
  */
-export async function startCrawl(params: CrawlParams): Promise<{ jobId: string }> {
+export async function startCrawl(
+  params: CrawlParams
+): Promise<{ jobId: string }> {
   const response = await fetch(`${BACKEND_URL}/crawl`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,7 +23,7 @@ export async function startCrawl(params: CrawlParams): Promise<{ jobId: string }
       delay: params.delay || 0,
       requestDelay: params.requestDelay || 1000,
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
-      detectInteractiveElements: params.detectInteractiveElements !== false
+      detectInteractiveElements: params.detectInteractiveElements !== false,
     }),
   });
 
@@ -41,10 +43,12 @@ export async function getJobStatus(jobId: string): Promise<any> {
  */
 export async function fetchManifest(manifestUrl: string): Promise<any> {
   const response = await fetch(manifestUrl);
-  
+
   if (!response.ok) {
-    throw new Error(`Failed to fetch manifest: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch manifest: ${response.status} ${response.statusText}`
+    );
   }
-  
+
   return response.json();
 }

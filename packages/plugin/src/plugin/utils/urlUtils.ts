@@ -3,7 +3,7 @@
  */
 export function parseHostname(url: string): string | null {
   try {
-    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    const withoutProtocol = url.replace(/^https?:\/\//, "");
     const hostname = withoutProtocol.split(/[\/:\?#]/)[0];
     return hostname.toLowerCase();
   } catch (error) {
@@ -17,7 +17,7 @@ export function parseHostname(url: string): string | null {
 export function isExternalLink(href: string, baseUrl: string): boolean {
   try {
     // Handle relative URLs - they are internal
-    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+    if (!href.startsWith("http://") && !href.startsWith("https://")) {
       return false;
     }
 

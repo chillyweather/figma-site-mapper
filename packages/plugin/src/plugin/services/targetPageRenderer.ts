@@ -1,13 +1,13 @@
 /**
  * TARGET PAGE RENDERER
- * 
+ *
  * Renders target page screenshots with interactive elements overlay
  */
 
-import { ManifestData, InteractiveElement } from '../types';
-import { getImageDimensionsFromPNG } from '../utils/imageUtils';
-import { isExternalLink } from '../utils/urlUtils';
-import { BADGE_COLORS } from '../constants';
+import { ManifestData, InteractiveElement } from "../types";
+import { getImageDimensionsFromPNG } from "../utils/imageUtils";
+import { isExternalLink } from "../utils/urlUtils";
+import { BADGE_COLORS } from "../constants";
 
 /**
  * Render target page on flow page
@@ -18,7 +18,7 @@ export async function renderTargetPage(
   x: number,
   y: number
 ): Promise<void> {
-  console.log('Rendering target page at', x, y);
+  console.log("Rendering target page at", x, y);
 
   const pageData = manifestData.tree;
 
@@ -27,14 +27,18 @@ export async function renderTargetPage(
     return;
   }
 
-  if (!pageData.screenshot || !Array.isArray(pageData.screenshot) || pageData.screenshot.length === 0) {
-    console.error('No screenshot data:', pageData);
+  if (
+    !pageData.screenshot ||
+    !Array.isArray(pageData.screenshot) ||
+    pageData.screenshot.length === 0
+  ) {
+    console.error("No screenshot data:", pageData);
     figma.notify("No screenshot data in manifest");
     return;
   }
 
   const targetFrame = figma.createFrame();
-  targetFrame.name = `Target_${pageData.title || 'Page'}`;
+  targetFrame.name = `Target_${pageData.title || "Page"}`;
   targetFrame.x = x;
   targetFrame.y = y;
   targetFrame.clipsContent = false;
@@ -79,12 +83,14 @@ async function loadScreenshotSlices(
       const figmaImage = figma.createImage(imageData);
       const image = figma.createRectangle();
       image.name = `Screenshot_Slice_${i}`;
-      
-      const imageFills: ImagePaint[] = [{
-        type: 'IMAGE',
-        scaleMode: 'FILL',
-        imageHash: figmaImage.hash
-      }];
+
+      const imageFills: ImagePaint[] = [
+        {
+          type: "IMAGE",
+          scaleMode: "FILL",
+          imageHash: figmaImage.hash,
+        },
+      ];
 
       image.resize(totalWidth, imageHeight);
       image.fills = imageFills;
@@ -94,7 +100,9 @@ async function loadScreenshotSlices(
       targetFrame.appendChild(image);
       currentY += imageHeight;
 
-      console.log(`✅ Successfully loaded screenshot slice ${i}: ${totalWidth}x${imageHeight}`);
+      console.log(
+        `✅ Successfully loaded screenshot slice ${i}: ${totalWidth}x${imageHeight}`
+      );
     } catch (error) {
       console.error(`❌ Failed to load screenshot slice ${i}:`, error);
       figma.notify(`Error loading screenshot: ${error}`, { error: true });
@@ -114,7 +122,7 @@ async function addInteractiveElementsOverlay(
   pageData: any
 ): Promise<void> {
   const overlayContainer = figma.createFrame();
-  overlayContainer.name = 'Page Overlay';
+  overlayContainer.name = "Page Overlay";
   overlayContainer.resize(targetFrame.width, targetFrame.height);
   overlayContainer.x = 0;
   overlayContainer.y = 0;
@@ -124,19 +132,15 @@ async function addInteractiveElementsOverlay(
   let linkCounter = 1;
 
   for (const element of pageData.interactiveElements) {
-    const elementLabel = element.text || element.href || 'unnamed';
-    
+    const elementLabel = element.text || element.href || "unnamed";
+
     const highlightRect = createHighlightRect(element);
 
-    if (element.href && element.href !== '#') {
+    if (element.href && element.href !== "#") {
       highlightRect.name = `link_${linkCounter}_highlight: ${elementLabel}`;
-      
-      const badge = await createBadge(
-        element,
-        pageData.url,
-        linkCounter
-      );
-      
+
+      const badge = await createBadge(element, pageData.url, linkCounter);
+
       overlayContainer.appendChild(badge);
       linkCounter++;
     } else {
@@ -161,7 +165,7 @@ function createHighlightRect(element: InteractiveElement): RectangleNode {
   highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
   highlightRect.strokeWeight = 1;
   highlightRect.opacity = 0.5;
-  
+
   return highlightRect;
 }
 
@@ -197,13 +201,17 @@ async function createBadge(
   try {
     let validUrl = normalizeUrl(element.href!, pageUrl);
     const urlPattern = /^https?:\/\/[^\s]+$/;
-    
+
     if (urlPattern.test(validUrl)) {
       const hyperlinkTarget: HyperlinkTarget = {
         type: "URL",
-        value: validUrl
+        value: validUrl,
       };
-      badgeText.setRangeHyperlink(0, badgeText.characters.length, hyperlinkTarget);
+      badgeText.setRangeHyperlink(
+        0,
+        badgeText.characters.length,
+        hyperlinkTarget
+      );
     }
   } catch (error) {
     console.log(`Skipping hyperlink for: ${element.href}`);
@@ -222,15 +230,19 @@ async function createBadge(
 function normalizeUrl(href: string, pageUrl: string): string {
   let validUrl = href;
 
-  if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
+  if (
+    !validUrl.startsWith("http://") &&
+    !validUrl.startsWith("https://") &&
+    !validUrl.startsWith("mailto:")
+  ) {
     const baseUrl = pageUrl.match(/^https?:\/\/[^\/]+/)?.[0];
     if (baseUrl) {
-      if (!validUrl.startsWith('/')) {
-        validUrl = '/' + validUrl;
+      if (!validUrl.startsWith("/")) {
+        validUrl = "/" + validUrl;
       }
       validUrl = baseUrl + validUrl;
     } else {
-      validUrl = 'https://' + validUrl;
+      validUrl = "https://" + validUrl;
     }
   }
 
