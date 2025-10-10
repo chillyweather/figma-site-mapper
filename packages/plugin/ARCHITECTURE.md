@@ -72,25 +72,25 @@ App (Jotai Provider)
 └─────────────────────────────────────────────────────────┘
                             │
                             ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Custom Hooks                          │
+┌────────────────────────────────────────────────────────┐
+│                    Custom Hooks                        │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │  useSettings()                                    │  │
+│  │  useSettings()                                   │  │
 │  │    ├── Load settings from clientStorage          │  │
 │  │    ├── Save settings with debounce               │  │
 │  │    └── Update individual settings                │  │
-│  │                                                    │  │
-│  │  useCrawl()                                       │  │
-│  │    ├── Start crawl                                │  │
-│  │    ├── Poll for status                            │  │
-│  │    └── Handle completion                          │  │
-│  │                                                    │  │
-│  │  useFlowMapping()                                 │  │
-│  │    ├── Track badge links                          │  │
-│  │    ├── Handle link selection                      │  │
-│  │    └── Show flow visualization                    │  │
+│  │                                                  │  │
+│  │  useCrawl()                                      │  │
+│  │    ├── Start crawl                               │  │
+│  │    ├── Poll for status                           │  │
+│  │    └── Handle completion                         │  │
+│  │                                                  │  │
+│  │  useFlowMapping()                                │  │
+│  │    ├── Track badge links                         │  │
+│  │    ├── Handle link selection                     │  │
+│  │    └── Show flow visualizatio                    │  │
 │  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────┐
