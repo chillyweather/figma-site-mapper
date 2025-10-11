@@ -221,7 +221,10 @@ async function createBadge(
   badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
   badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
-  return figma.group([badge, badgeText], figma.currentPage);
+  const badgeGroup = figma.group([badge, badgeText], figma.currentPage);
+  badgeGroup.name = `link_${linkCounter}_badge`;
+  
+  return badgeGroup;
 }
 
 /**
