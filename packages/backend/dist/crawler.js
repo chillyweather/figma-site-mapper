@@ -1,4 +1,4 @@
-import { PlaywrightCrawler } from "crawlee";
+import { PlaywrightCrawler, Configuration } from "crawlee";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
@@ -222,18 +222,12 @@ function buildTree(pages, startUrl) {
 export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, auth) {
     console.log('🚀 Starting the crawler with URL:', startUrl);
     console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements });
-    // Clear only request queues to avoid conflicts with previous crawls
-    // Keep session pool and other storage intact to avoid initialization errors
-    const requestQueuesDir = path.join(process.cwd(), 'storage', 'request_queues');
-    try {
-        if (fs.existsSync(requestQueuesDir)) {
-            fs.rmSync(requestQueuesDir, { recursive: true, force: true });
-            console.log('🗑️  Cleared request queues');
-        }
-    }
-    catch (error) {
-        console.warn('⚠️  Could not clear request queues:', error);
-    }
+    // Use job-specific storage directory to avoid conflicts between concurrent jobs
+    // This allows multiple crawls to run simultaneously without interfering with each other
+    const storageDir = jobId
+        ? path.join(process.cwd(), 'storage', `job-${jobId}`)
+        : path.join(process.cwd(), 'storage', 'default');
+    console.log(`📁 Using storage directory: ${storageDir}`);
     // List of realistic user agents to rotate
     const userAgents = [
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -342,6 +336,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     // Calculate max requests per minute based on request delay
     const maxRequestsPerMinute = requestDelay > 0 ? Math.floor(60000 / (requestDelay + 500)) : 30; // 500ms buffer for processing
     let crawler; // Declare crawler variable for access in request handler
+    // Create a new Configuration instance for this crawl with job-specific storage
+    const crawlerConfig = new Configuration({
+        storageClientOptions: {
+            localDataDirectory: storageDir,
+        },
+    });
     crawler = new PlaywrightCrawler({
         launchContext: {
             launchOptions: {
@@ -372,7 +372,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         maxRequestsPerMinute: maxRequestsPerMinute, // Dynamic based on request delay
         retryOnBlocked: true,
         maxRequestRetries: 3,
-        // Use session pool to rotate identities
+        // Use session pool to rotate identities and avoid blocking
         useSessionPool: true,
         persistCookiesPerSession: true,
         async requestHandler({ request, page, log, enqueueLinks }) {
@@ -774,7 +774,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 await new Promise(resolve => setTimeout(resolve, totalDelay));
             }
         ],
-    });
+    }, crawlerConfig);
     // Get total pages count before starting
     totalPages = maxRequestsPerCrawl || 100; // Default to 100 if no limit
     await updateProgress('starting', 0, totalPages, canonicalStartUrl);
