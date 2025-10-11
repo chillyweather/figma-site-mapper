@@ -109,11 +109,25 @@ async function createFlowVisualization(
   figma.currentPage = sourcePage;
 
   try {
-    // Find and clone source elements
+    let currentX = 100;
+    const baseY = 100;
+
+    // Check if source page is a flow page (has existing breadcrumb trail)
+    const isSourceFlowPage = isFlowPage(sourcePage.name);
+    
+    if (isSourceFlowPage) {
+      // Clone all existing screenshots from the flow trail
+      console.log("Source is a flow page, cloning breadcrumb trail");
+      currentX = await cloneFlowBreadcrumb(sourcePage, flowPage, currentX, baseY);
+    }
+
+    // Find and clone source screenshot with highlight
     const { screenshotClone, highlightClone } = await cloneSourceElements(
       selectedLink,
       sourcePage,
-      flowPage
+      flowPage,
+      currentX,
+      baseY
     );
 
     if (highlightClone) {
@@ -153,7 +167,7 @@ async function createFlowVisualization(
 
     // Fetch and render target page
     const targetX = arrow.x + 120;
-    const targetY = screenshotClone.y;
+    const targetY = baseY;
 
     await fetchAndRenderTargetPage(
       selectedLink.url,
@@ -167,12 +181,70 @@ async function createFlowVisualization(
 }
 
 /**
+ * Check if page is a flow page (hierarchical naming pattern)
+ */
+function isFlowPage(pageName: string): boolean {
+  const hierarchyMatch = pageName.match(/^\s*([\d-]+)_/);
+  return hierarchyMatch ? hierarchyMatch[1].includes('-') : false;
+}
+
+/**
+ * Clone existing breadcrumb trail from a flow page
+ */
+async function cloneFlowBreadcrumb(
+  sourcePage: PageNode,
+  flowPage: PageNode,
+  startX: number,
+  baseY: number
+): Promise<number> {
+  let currentX = startX;
+  
+  // Find all Source_ frames and arrows (in order)
+  const sourceFrames = sourcePage.findAll(
+    (node) => node.type === "FRAME" && node.name.startsWith("Source_")
+  ) as FrameNode[];
+  
+  const arrows = sourcePage.findAll(
+    (node) => node.type === "VECTOR" && node.name === "Flow Arrow"
+  ) as VectorNode[];
+
+  console.log(`Found ${sourceFrames.length} source frames and ${arrows.length} arrows to clone`);
+
+  // Clone each source frame and its arrow
+  for (let i = 0; i < sourceFrames.length; i++) {
+    const sourceFrame = sourceFrames[i];
+    
+    // Clone the frame
+    const frameClone = sourceFrame.clone();
+    frameClone.x = currentX;
+    frameClone.y = baseY;
+    flowPage.appendChild(frameClone);
+    
+    currentX += frameClone.width + 20;
+    
+    // Clone the arrow if it exists
+    if (arrows[i]) {
+      const arrowClone = arrows[i].clone();
+      arrowClone.x = currentX;
+      arrowClone.y = baseY - 15;
+      flowPage.appendChild(arrowClone);
+      
+      currentX += 120;
+    }
+  }
+  
+  return currentX;
+}
+
+/**
  * Clone source screenshot and highlight from source page
  */
 async function cloneSourceElements(
   selectedLink: FlowLink,
   sourcePage: PageNode,
-  flowPage: PageNode
+  flowPage: PageNode,
+  x: number = 100,
+  y: number = 100
 ): Promise<{
   screenshotClone: FrameNode | null;
   highlightClone: RectangleNode | null;
@@ -184,13 +256,23 @@ async function cloneSourceElements(
   }
 
   // Find screenshot frame
-  const screenshotFrames = sourcePage.findAll(
+  // On regular pages, it's named "Screenshots"
+  // On flow pages, it's named "Target_..."
+  let screenshotFrames = sourcePage.findAll(
     (node: SceneNode) =>
       node.type === "FRAME" && node.name.includes("Screenshots")
   ) as FrameNode[];
 
+  // If not found, try looking for Target_ frames (flow pages)
   if (screenshotFrames.length === 0) {
-    throw new Error("Could not find Screenshots frame");
+    screenshotFrames = sourcePage.findAll(
+      (node: SceneNode) =>
+        node.type === "FRAME" && node.name.startsWith("Target_")
+    ) as FrameNode[];
+  }
+
+  if (screenshotFrames.length === 0) {
+    throw new Error("Could not find Screenshots or Target frame");
   }
 
   const screenshotFrame = screenshotFrames[0];
@@ -199,8 +281,8 @@ async function cloneSourceElements(
   figma.currentPage = flowPage;
   const screenshotClone = screenshotFrame.clone();
   screenshotClone.name = `Source_${selectedLink.text}`;
-  screenshotClone.x = 100;
-  screenshotClone.y = 100;
+  screenshotClone.x = x;
+  screenshotClone.y = y;
   flowPage.appendChild(screenshotClone);
 
   // Find and clone highlight
