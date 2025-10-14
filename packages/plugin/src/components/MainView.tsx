@@ -25,7 +25,7 @@ export const MainView: React.FC<MainViewProps> = ({
   return (
     <div
       id="main-view"
-      style={{ padding: "16px", fontFamily: "Inter, sans-serif" }}
+      style={{ fontFamily: "Inter, sans-serif" }}
     >
       <div
         id="main-header"
@@ -34,6 +34,7 @@ export const MainView: React.FC<MainViewProps> = ({
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: "16px",
+          padding: "16px 16px 0 16px",
         }}
       >
         <h3
@@ -65,6 +66,7 @@ export const MainView: React.FC<MainViewProps> = ({
           display: "flex",
           marginBottom: "16px",
           borderBottom: "1px solid #e0e0e0",
+          padding: "0 16px",
         }}
       >
         <button

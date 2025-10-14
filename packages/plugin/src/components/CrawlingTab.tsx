@@ -11,7 +11,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   status,
   handleClose,
 }) => (
-  <div id="crawling-tab">
+  <div id="crawling-tab" style={{ padding: "0 16px 16px 16px" }}>
     <div id="crawl-form" style={{ marginBottom: "16px" }}>
       <FocusedInput
         id="url-input"
