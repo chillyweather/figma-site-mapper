@@ -147,7 +147,8 @@ async function createFlowVisualization(
     );
 
     if (highlightClone) {
-      highlightClone.strokeWeight = 6;
+      // Magenta/pink dashed border (#ff00e1)
+      highlightClone.strokeWeight = 8;
       highlightClone.opacity = 1;
       highlightClone.strokes = [
         {
@@ -158,19 +159,57 @@ async function createFlowVisualization(
           color: {
             r: 1,
             g: 0,
-            b: 0.01666666753590107,
+            b: 0.88235294117647056, // #ff00e1
           },
           boundVariables: {},
         },
       ];
-      highlightClone.dashPattern = [6, 6];
+      
+      // Add pink fill with 30% opacity
+      highlightClone.fills = [
+        {
+          type: "SOLID",
+          visible: true,
+          opacity: 0.3,
+          blendMode: "NORMAL",
+          color: {
+            r: 1,
+            g: 0,
+            b: 0.88235294117647056, // #ff00e1
+          },
+          boundVariables: {},
+        },
+      ];
+      
+      highlightClone.dashPattern = [12, 8]; // Dashed pattern
+      highlightClone.cornerRadius = 4; // Rounded corners
+      
+      // Add pink drop shadow
+      highlightClone.effects = [
+        {
+          type: "DROP_SHADOW",
+          visible: true,
+          color: {
+            r: 1,
+            g: 0,
+            b: 0.88235294117647056, // #ff00e1
+            a: 0.5, // 50% opacity
+          },
+          blendMode: "NORMAL",
+          offset: { x: 0, y: 0 },
+          radius: 10,
+          spread: 6,
+          showShadowBehindNode: false,
+        },
+      ];
+      
       highlightClone.x -= 4;
       highlightClone.y -= 4;
       highlightClone.resize(
         highlightClone.width + 8,
         highlightClone.height + 8
       );
-      highlightClone.strokeAlign = "OUTSIDE";
+      highlightClone.strokeAlign = "INSIDE";
     }
 
     if (!screenshotClone) {
