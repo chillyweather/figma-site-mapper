@@ -303,6 +303,12 @@ async function cloneSourceElements(
     if (highlights.length > 0) {
       const originalHighlight = highlights[0];
       highlightClone = originalHighlight.clone();
+      
+      // Rename from link_X_highlight: to clicked_link_X:
+      const linkNumber = badgeElement.characters;
+      const originalText = originalHighlight.name.replace(`link_${linkNumber}_highlight:`, '').trim();
+      highlightClone.name = `clicked_link_${linkNumber}: ${originalText}`;
+      
       highlightClone.x = screenshotClone.x + originalHighlight.x;
       highlightClone.y = screenshotClone.y + originalHighlight.y;
       flowPage.appendChild(highlightClone);
