@@ -215,7 +215,7 @@ async function cloneFlowBreadcrumb(
 ): Promise<number> {
   let currentX = startX;
 
-  // Find all Source_ frames, arrows, and clicked_link highlights (in order)
+  // Find all Source_ frames, arrows, and clicked_link highlights
   const sourceFrames = sourcePage.findAll(
     (node) => node.type === "FRAME" && node.name.startsWith("Source_")
   ) as FrameNode[];
@@ -232,9 +232,20 @@ async function cloneFlowBreadcrumb(
     `Found ${sourceFrames.length} source frames, ${arrows.length} arrows, and ${clickedLinks.length} clicked links to clone`
   );
 
-  // Clone each source frame, its clicked_link highlight, and arrow
+  // Track frame position mappings for repositioning clicked_links
+  const framePositions = new Map<string, { originalX: number; originalY: number; newX: number; newY: number }>();
+
+  // Clone each source frame and arrow
   for (let i = 0; i < sourceFrames.length; i++) {
     const sourceFrame = sourceFrames[i];
+
+    // Store position mapping
+    framePositions.set(sourceFrame.name, {
+      originalX: sourceFrame.x,
+      originalY: sourceFrame.y,
+      newX: currentX,
+      newY: baseY,
+    });
 
     // Clone the frame
     const frameClone = sourceFrame.clone();
@@ -242,8 +253,7 @@ async function cloneFlowBreadcrumb(
     frameClone.y = baseY;
     flowPage.appendChild(frameClone);
 
-    // Remove the Page Overlay from the cloned frame (it contains all link highlights/badges)
-    // We only want the clicked_link_ highlight, which we'll add separately
+    // Remove the Page Overlay from the cloned frame
     const pageOverlay = frameClone.findOne(
       (node) => node.type === "FRAME" && node.name === "Page Overlay"
     ) as FrameNode | null;
@@ -251,25 +261,6 @@ async function cloneFlowBreadcrumb(
     if (pageOverlay) {
       pageOverlay.remove();
       console.log(`Removed Page Overlay from ${frameClone.name}`);
-    }
-
-    // Clone the corresponding clicked_link highlight if it exists
-    // Find the clicked link that belongs to this source frame (by position proximity)
-    const clickedLink = clickedLinks.find(
-      (link) => Math.abs(link.x - sourceFrame.x) < sourceFrame.width + 100
-    );
-
-    if (clickedLink) {
-      const clickedLinkClone = clickedLink.clone();
-      // Calculate offset from source frame and apply to cloned frame
-      const offsetX = clickedLink.x - sourceFrame.x;
-      const offsetY = clickedLink.y - sourceFrame.y;
-      clickedLinkClone.x = currentX + offsetX;
-      clickedLinkClone.y = baseY + offsetY;
-      flowPage.appendChild(clickedLinkClone);
-      console.log(
-        `Cloned clicked_link: ${clickedLink.name} for ${sourceFrame.name}`
-      );
     }
 
     currentX += frameClone.width + 20;
@@ -285,7 +276,62 @@ async function cloneFlowBreadcrumb(
     }
   }
 
+  // Clone ALL clicked_links and reposition based on frame movements
+  for (const clickedLink of clickedLinks) {
+    const associatedFrame = findAssociatedFrame(clickedLink, sourceFrames);
+    if (associatedFrame) {
+      const positions = framePositions.get(associatedFrame.name);
+      if (positions) {
+        const clickedLinkClone = clickedLink.clone();
+        const offsetX = clickedLink.x - positions.originalX;
+        const offsetY = clickedLink.y - positions.originalY;
+        clickedLinkClone.x = positions.newX + offsetX;
+        clickedLinkClone.y = positions.newY + offsetY;
+        flowPage.appendChild(clickedLinkClone);
+        console.log(
+          `Cloned ${clickedLink.name} for ${associatedFrame.name} at (${clickedLinkClone.x}, ${clickedLinkClone.y})`
+        );
+      }
+    }
+  }
+
   return currentX;
+}
+
+/**
+ * Find which Source frame a clicked_link belongs to based on position
+ * A clicked_link belongs to a frame if it's positioned over it
+ */
+function findAssociatedFrame(
+  clickedLink: RectangleNode,
+  sourceFrames: FrameNode[]
+): FrameNode | null {
+  for (const frame of sourceFrames) {
+    // Check if clicked_link is within the frame bounds
+    const isWithinX = clickedLink.x >= frame.x && 
+                      clickedLink.x <= frame.x + frame.width;
+    const isWithinY = clickedLink.y >= frame.y && 
+                      clickedLink.y <= frame.y + frame.height;
+    
+    if (isWithinX && isWithinY) {
+      return frame;
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if a clicked_link element is positioned on a specific frame
+ */
+function isClickedLinkOnFrame(
+  clickedLink: RectangleNode,
+  frame: FrameNode
+): boolean {
+  const isWithinX = clickedLink.x >= frame.x && 
+                    clickedLink.x <= frame.x + frame.width;
+  const isWithinY = clickedLink.y >= frame.y && 
+                    clickedLink.y <= frame.y + frame.height;
+  return isWithinX && isWithinY;
 }
 
 /**
@@ -347,6 +393,26 @@ async function cloneSourceElements(
   if (clonedOverlay) {
     clonedOverlay.remove();
     console.log(`Removed Page Overlay from cloned ${screenshotClone.name}`);
+  }
+
+  // Copy all existing clicked_links from source page to the new Source frame
+  const existingClickedLinks = sourcePage.findAll(
+    (node) => node.type === "RECTANGLE" && node.name.startsWith("clicked_link_")
+  ) as RectangleNode[];
+
+  console.log(`Found ${existingClickedLinks.length} existing clicked_links to copy`);
+
+  for (const clickedLink of existingClickedLinks) {
+    // Check if this clicked_link is associated with the screenshot we're cloning
+    if (isClickedLinkOnFrame(clickedLink, screenshotFrame)) {
+      const clickedLinkClone = clickedLink.clone();
+      const offsetX = clickedLink.x - screenshotFrame.x;
+      const offsetY = clickedLink.y - screenshotFrame.y;
+      clickedLinkClone.x = x + offsetX;
+      clickedLinkClone.y = y + offsetY;
+      flowPage.appendChild(clickedLinkClone);
+      console.log(`Copied existing ${clickedLink.name} to new Source frame`);
+    }
   }
 
   // Find and clone highlight (from original page's overlay, before we removed the clone's overlay)
