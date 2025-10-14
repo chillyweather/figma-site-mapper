@@ -241,11 +241,18 @@ async function createFlowVisualization(
 
     // Verify the arrow has correct caps (no cap at start, arrow cap at end)
     const network = arrow.vectorNetwork;
-    if (network && Array.isArray(network.vertices) && network.vertices.length >= 2) {
+    if (
+      network &&
+      Array.isArray(network.vertices) &&
+      network.vertices.length >= 2
+    ) {
       const startVertex = network.vertices[0];
       const endVertex = network.vertices[1];
-      
-      if (startVertex.strokeCap !== "NONE" || endVertex.strokeCap !== "ARROW_EQUILATERAL") {
+
+      if (
+        startVertex.strokeCap !== "NONE" ||
+        endVertex.strokeCap !== "ARROW_EQUILATERAL"
+      ) {
         arrow.vectorNetwork = {
           regions: network.regions || [],
           segments: network.segments || [],
@@ -495,11 +502,18 @@ async function cloneFlowBreadcrumb(
 
   for (const arrow of allFlowArrows) {
     const network = arrow.vectorNetwork;
-    if (network && Array.isArray(network.vertices) && network.vertices.length >= 2) {
+    if (
+      network &&
+      Array.isArray(network.vertices) &&
+      network.vertices.length >= 2
+    ) {
       const startVertex = network.vertices[0];
       const endVertex = network.vertices[1];
-      
-      if (startVertex.strokeCap !== "NONE" || endVertex.strokeCap !== "ARROW_EQUILATERAL") {
+
+      if (
+        startVertex.strokeCap !== "NONE" ||
+        endVertex.strokeCap !== "ARROW_EQUILATERAL"
+      ) {
         arrow.vectorNetwork = {
           regions: network.regions || [],
           segments: network.segments || [],
