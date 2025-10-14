@@ -1,5 +1,10 @@
 import { atom } from "jotai";
-import { PluginSettings, BadgeLink, FlowProgress } from "../types";
+import {
+  PluginSettings,
+  BadgeLink,
+  FlowProgress,
+  CrawlProgress,
+} from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
 
 // Settings atoms
@@ -13,6 +18,11 @@ export const jobIdAtom = atom<string | null>(null);
 export const authStatusAtom = atom<
   "idle" | "authenticating" | "success" | "failed"
 >("idle");
+export const crawlProgressAtom = atom<CrawlProgress>({
+  status: "idle",
+  message: "",
+  progress: 0,
+});
 
 // Flow mapping atoms
 export const badgeLinksAtom = atom<BadgeLink[]>([]);

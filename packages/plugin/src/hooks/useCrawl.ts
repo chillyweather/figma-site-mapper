@@ -5,6 +5,7 @@ import {
   statusAtom,
   jobIdAtom,
   authStatusAtom,
+  crawlProgressAtom,
 } from "../store/atoms";
 import { useSettings } from "./useSettings";
 import { startCrawl } from "../utils/api";
@@ -25,6 +26,7 @@ export function useCrawl() {
   const [status, setStatus] = useAtom(statusAtom);
   const [jobId, setJobId] = useAtom(jobIdAtom);
   const [authStatus, setAuthStatus] = useAtom(authStatusAtom);
+  const [crawlProgress, setCrawlProgress] = useAtom(crawlProgressAtom);
   const intervalRef = useRef<number | null>(null);
 
   const handleSubmit = useCallback(
@@ -89,6 +91,11 @@ export function useCrawl() {
         setStatus(`Crawl started! Job ID: ${msg.jobId}`);
         setJobId(msg.jobId);
         setIsLoading(false);
+        setCrawlProgress({
+          status: "crawling",
+          message: "Crawl started...",
+          progress: 0,
+        });
       }
 
       if (msg.type === "status-update") {
@@ -110,8 +117,31 @@ export function useCrawl() {
           if (typeof progress === "number") {
             statusText += ` ${progress}%`;
           }
+
+          // Update crawl progress
+          const isComplete = msg.status === "completed";
+          const isRendering = msg.status === "rendering";
+
+          setCrawlProgress({
+            status: isComplete
+              ? "complete"
+              : isRendering
+                ? "rendering"
+                : "crawling",
+            message: stage || msg.status,
+            progress: progress || 0,
+            currentPage,
+            totalPages,
+            currentUrl,
+            stage,
+          });
         } else if (msg.progress && typeof msg.progress === "number") {
           statusText += ` (${msg.progress}%)`;
+          setCrawlProgress({
+            status: msg.status === "completed" ? "complete" : "crawling",
+            message: msg.status,
+            progress: msg.progress,
+          });
         }
 
         setStatus(statusText);
@@ -121,15 +151,24 @@ export function useCrawl() {
             window.clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
-          setStatus(`Crawl complete! Manifest at: ${msg.manifestUrl}`);
+          setStatus(`Sitemap created successfully!`);
           setJobId(null);
+
+          // Reset progress to idle after 3 seconds
+          setTimeout(() => {
+            setCrawlProgress({
+              status: "idle",
+              message: "",
+              progress: 0,
+            });
+          }, 3000);
         }
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setStatus, setJobId, setIsLoading]);
+  }, [setStatus, setJobId, setIsLoading, setCrawlProgress]);
 
   // Start polling when jobId is set
   useEffect(() => {
@@ -156,5 +195,6 @@ export function useCrawl() {
     jobId,
     authStatus,
     handleSubmit,
+    crawlProgress,
   };
 }

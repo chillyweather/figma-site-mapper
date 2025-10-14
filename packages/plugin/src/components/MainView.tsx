@@ -18,6 +18,7 @@ export const MainView: React.FC<MainViewProps> = ({
   handleLinkCheck,
   handleShowFlow,
   flowProgress,
+  crawlProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<"crawling" | "mapping">(
     "crawling"
@@ -117,6 +118,7 @@ export const MainView: React.FC<MainViewProps> = ({
           handleSubmit={handleSubmit}
           status={status}
           handleClose={handleClose}
+          crawlProgress={crawlProgress}
         />
       )}
 

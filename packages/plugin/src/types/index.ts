@@ -37,6 +37,16 @@ export interface FlowStep {
   status: "pending" | "in-progress" | "complete" | "error";
 }
 
+export interface CrawlProgress {
+  status: "idle" | "crawling" | "rendering" | "complete" | "error";
+  message: string;
+  progress: number;
+  currentPage?: number;
+  totalPages?: number;
+  currentUrl?: string;
+  stage?: string;
+}
+
 export interface FlowLink {
   id: string;
   text: string;
@@ -100,6 +110,7 @@ export interface MainViewProps {
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
+  crawlProgress: CrawlProgress;
 }
 
 export interface CrawlingTabProps {
@@ -110,6 +121,7 @@ export interface CrawlingTabProps {
   handleSubmit: (e: React.FormEvent) => void;
   status: string;
   handleClose: () => void;
+  crawlProgress: CrawlProgress;
 }
 
 export interface MappingTabProps {

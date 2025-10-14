@@ -112,23 +112,64 @@ export async function handleGetStatus(msg: any): Promise<void> {
       hasRenderedSitemap = true;
       console.log("🎉 Job completed, rendering sitemap");
 
+      // Update progress: Fetching manifest
+      figma.ui.postMessage({
+        type: "status-update",
+        jobId,
+        status: "rendering",
+        detailedProgress: {
+          stage: "Fetching manifest...",
+          progress: 5,
+        },
+      });
+
       const manifestData = await fetchManifest(result.result.manifestUrl);
       console.log("Successfully fetched manifest");
 
-      figma.notify("Crawl complete and manifest fetched!");
-
       const detectInteractiveElements =
         result.result?.detectInteractiveElements !== false;
+
+      // Render sitemap with progress updates
       await renderSitemap(
         manifestData,
         screenshotWidth,
-        detectInteractiveElements
+        detectInteractiveElements,
+        (stage: string, progress: number) => {
+          // Send progress update to UI
+          figma.ui.postMessage({
+            type: "status-update",
+            jobId,
+            status: "rendering",
+            detailedProgress: {
+              stage,
+              progress,
+            },
+          });
+        }
       );
+
+      // Final completion - now set status to completed
+      figma.ui.postMessage({
+        type: "status-update",
+        jobId,
+        status: "completed",
+        detailedProgress: {
+          stage: "Complete!",
+          progress: 100,
+        },
+      });
+
+      figma.notify("Sitemap created successfully!");
+
+      // Don't send the backend status update since we've handled rendering
+      return;
     } else if (result.status === "completed" && hasRenderedSitemap) {
       console.log("⚠️ Skipping duplicate sitemap rendering");
+      // Don't send duplicate updates
+      return;
     }
 
-    // Send status update to UI
+    // Send status update to UI (only if not handled above)
     figma.ui.postMessage({
       type: "status-update",
       jobId,

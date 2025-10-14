@@ -1,6 +1,7 @@
 import React from "react";
 import { CrawlingTabProps } from "../types/index";
 import { FocusedInput } from "./common/FocusedInput";
+import { CrawlProgress } from "./CrawlProgress";
 
 export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   url,
@@ -10,6 +11,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   handleSubmit,
   status,
   handleClose,
+  crawlProgress,
 }) => (
   <div id="crawling-tab" style={{ padding: "0 16px 16px 16px" }}>
     <div id="crawl-form" style={{ marginBottom: "16px" }}>
@@ -43,6 +45,9 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
             : "Start Crawl"}
       </button>
     </div>
+
+    {/* Crawl Progress */}
+    <CrawlProgress progress={crawlProgress} />
 
     {status && (
       <div

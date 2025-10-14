@@ -10,7 +10,8 @@ import { SettingsView } from "./SettingsView";
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
   const { settings, updateSetting } = useSettings();
-  const { isLoading, status, jobId, authStatus, handleSubmit } = useCrawl();
+  const { isLoading, status, jobId, authStatus, handleSubmit, crawlProgress } =
+    useCrawl();
   const {
     badgeLinks,
     checkedLinks,
@@ -204,6 +205,7 @@ export const App: React.FC = () => {
       handleLinkCheck={handleLinkCheck}
       handleShowFlow={handleShowFlow}
       flowProgress={flowProgress}
+      crawlProgress={crawlProgress}
     />
   );
 };
