@@ -23,10 +23,7 @@ export const MainView: React.FC<MainViewProps> = ({
   );
 
   return (
-    <div
-      id="main-view"
-      style={{ fontFamily: "Inter, sans-serif" }}
-    >
+    <div id="main-view" style={{ fontFamily: "Inter, sans-serif" }}>
       <div
         id="main-header"
         style={{
