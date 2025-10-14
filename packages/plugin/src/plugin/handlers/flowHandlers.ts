@@ -115,6 +115,9 @@ async function createFlowVisualization(
     // Check if source page is a flow page (has existing breadcrumb trail)
     const isSourceFlowPage = isFlowPage(sourcePage.name);
 
+    // Calculate the flow step number (how many clicks in the chain)
+    let flowStepNumber = 1;
+
     if (isSourceFlowPage) {
       // Clone all existing screenshots from the flow trail
       console.log("Source is a flow page, cloning breadcrumb trail");
@@ -124,6 +127,13 @@ async function createFlowVisualization(
         currentX,
         baseY
       );
+
+      // Count existing clicked_links to determine the next step number
+      const existingClickedLinks = flowPage.findAll(
+        (node) =>
+          node.type === "RECTANGLE" && node.name.startsWith("clicked_link_")
+      );
+      flowStepNumber = existingClickedLinks.length + 1;
     }
 
     // Find and clone source screenshot with highlight
@@ -132,7 +142,8 @@ async function createFlowVisualization(
       sourcePage,
       flowPage,
       currentX,
-      baseY
+      baseY,
+      flowStepNumber
     );
 
     if (highlightClone) {
@@ -285,7 +296,8 @@ async function cloneSourceElements(
   sourcePage: PageNode,
   flowPage: PageNode,
   x: number = 100,
-  y: number = 100
+  y: number = 100,
+  flowStepNumber: number = 1
 ): Promise<{
   screenshotClone: FrameNode | null;
   highlightClone: RectangleNode | null;
@@ -356,16 +368,21 @@ async function cloneSourceElements(
       const originalHighlight = highlights[0];
       highlightClone = originalHighlight.clone();
 
-      // Rename from link_X_highlight: to clicked_link_X:
+      // Rename from link_X_highlight: to clicked_link_STEP:
+      // Use flowStepNumber for sequential numbering (clicked_link_1, clicked_link_2, etc.)
       const linkNumber = badgeElement.characters;
       const originalText = originalHighlight.name
         .replace(`link_${linkNumber}_highlight:`, "")
         .trim();
-      highlightClone.name = `clicked_link_${linkNumber}: ${originalText}`;
+      highlightClone.name = `clicked_link_${flowStepNumber}: ${originalText}`;
 
       highlightClone.x = screenshotClone.x + originalHighlight.x;
       highlightClone.y = screenshotClone.y + originalHighlight.y;
       flowPage.appendChild(highlightClone);
+
+      console.log(
+        `Created clicked_link_${flowStepNumber} (from link_${linkNumber}): ${originalText}`
+      );
     }
   }
 
