@@ -114,11 +114,16 @@ async function createFlowVisualization(
 
     // Check if source page is a flow page (has existing breadcrumb trail)
     const isSourceFlowPage = isFlowPage(sourcePage.name);
-    
+
     if (isSourceFlowPage) {
       // Clone all existing screenshots from the flow trail
       console.log("Source is a flow page, cloning breadcrumb trail");
-      currentX = await cloneFlowBreadcrumb(sourcePage, flowPage, currentX, baseY);
+      currentX = await cloneFlowBreadcrumb(
+        sourcePage,
+        flowPage,
+        currentX,
+        baseY
+      );
     }
 
     // Find and clone source screenshot with highlight
@@ -185,7 +190,7 @@ async function createFlowVisualization(
  */
 function isFlowPage(pageName: string): boolean {
   const hierarchyMatch = pageName.match(/^\s*([\d-]+)_/);
-  return hierarchyMatch ? hierarchyMatch[1].includes('-') : false;
+  return hierarchyMatch ? hierarchyMatch[1].includes("-") : false;
 }
 
 /**
@@ -198,41 +203,43 @@ async function cloneFlowBreadcrumb(
   baseY: number
 ): Promise<number> {
   let currentX = startX;
-  
+
   // Find all Source_ frames and arrows (in order)
   const sourceFrames = sourcePage.findAll(
     (node) => node.type === "FRAME" && node.name.startsWith("Source_")
   ) as FrameNode[];
-  
+
   const arrows = sourcePage.findAll(
     (node) => node.type === "VECTOR" && node.name === "Flow Arrow"
   ) as VectorNode[];
 
-  console.log(`Found ${sourceFrames.length} source frames and ${arrows.length} arrows to clone`);
+  console.log(
+    `Found ${sourceFrames.length} source frames and ${arrows.length} arrows to clone`
+  );
 
   // Clone each source frame and its arrow
   for (let i = 0; i < sourceFrames.length; i++) {
     const sourceFrame = sourceFrames[i];
-    
+
     // Clone the frame
     const frameClone = sourceFrame.clone();
     frameClone.x = currentX;
     frameClone.y = baseY;
     flowPage.appendChild(frameClone);
-    
+
     currentX += frameClone.width + 20;
-    
+
     // Clone the arrow if it exists
     if (arrows[i]) {
       const arrowClone = arrows[i].clone();
       arrowClone.x = currentX;
       arrowClone.y = baseY - 15;
       flowPage.appendChild(arrowClone);
-      
+
       currentX += 120;
     }
   }
-  
+
   return currentX;
 }
 
@@ -303,12 +310,14 @@ async function cloneSourceElements(
     if (highlights.length > 0) {
       const originalHighlight = highlights[0];
       highlightClone = originalHighlight.clone();
-      
+
       // Rename from link_X_highlight: to clicked_link_X:
       const linkNumber = badgeElement.characters;
-      const originalText = originalHighlight.name.replace(`link_${linkNumber}_highlight:`, '').trim();
+      const originalText = originalHighlight.name
+        .replace(`link_${linkNumber}_highlight:`, "")
+        .trim();
       highlightClone.name = `clicked_link_${linkNumber}: ${originalText}`;
-      
+
       highlightClone.x = screenshotClone.x + originalHighlight.x;
       highlightClone.y = screenshotClone.y + originalHighlight.y;
       flowPage.appendChild(highlightClone);
