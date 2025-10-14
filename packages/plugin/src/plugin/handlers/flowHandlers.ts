@@ -10,7 +10,7 @@
 
 import { FlowLink } from "../types";
 import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
-import { POLLING_CONFIG, FLOW_ARROW_PATH } from "../constants";
+import { POLLING_CONFIG } from "../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 
 /**
@@ -216,12 +216,14 @@ async function createFlowVisualization(
       throw new Error("Could not clone source screenshot");
     }
 
-    // Create arrow connector
-    const arrow = createFlowArrow(screenshotClone);
+    // Calculate target X position (where the target screenshot will be placed)
+    const targetX = screenshotClone.x + screenshotClone.width + 140;
+
+    // Create arrow connector (from clicked_link to target screenshot)
+    const arrow = createFlowArrow(screenshotClone, highlightClone, targetX);
     flowPage.appendChild(arrow);
 
     // Fetch and render target page
-    const targetX = arrow.x + 120;
     const targetY = baseY;
 
     await fetchAndRenderTargetPage(
@@ -501,23 +503,59 @@ async function cloneSourceElements(
 
 /**
  * Create arrow connector between source and target
+ * Uses a line with TRIANGLE_FILLED stroke cap for the arrow
  */
-function createFlowArrow(sourceFrame: FrameNode): VectorNode {
+function createFlowArrow(
+  sourceFrame: FrameNode,
+  highlightClone: RectangleNode | null,
+  targetX: number
+): VectorNode {
+  // Calculate start position: middle of right side of clicked_link (or fallback to source frame)
+  let startX: number;
+  let startY: number;
+
+  if (highlightClone) {
+    // Start from middle of right edge of the clicked_link highlight
+    startX = highlightClone.x + highlightClone.width;
+    startY = highlightClone.y + highlightClone.height / 2;
+  } else {
+    // Fallback: start from middle of right edge of source frame
+    startX = sourceFrame.x + sourceFrame.width;
+    startY = sourceFrame.y + sourceFrame.height / 2;
+  }
+
+  // End position: left edge of target screenshot (with some spacing)
+  const endX = targetX - 20;
+  const endY = startY; // Keep horizontal line
+
+  // Create a line from start to end
   const arrow = figma.createVector();
   arrow.name = "Flow Arrow";
-  arrow.x = sourceFrame.x + sourceFrame.width + 20;
-  arrow.y = sourceFrame.y - 15;
 
+  // Create a horizontal line path
+  const lineLength = endX - startX;
   arrow.vectorPaths = [
     {
       windingRule: "NONZERO",
-      data: FLOW_ARROW_PATH,
+      data: `M 0 0 L ${lineLength} 0`,
     },
   ];
 
-  arrow.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-  arrow.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-  arrow.strokeWeight = 4;
+  // Position the line
+  arrow.x = startX;
+  arrow.y = startY;
+
+  // Style with pink color to match clicked_link highlights (#FF00E1)
+  const pinkColor = {
+    r: 1,
+    g: 0,
+    b: 0.88235294117647056, // #FF00E1
+  };
+
+  arrow.strokes = [{ type: "SOLID", color: pinkColor }];
+  arrow.strokeWeight = 3;
+  arrow.strokeCap = "ARROW_EQUILATERAL"; // Triangle filled arrow at the end
+  arrow.fills = []; // No fill for the line itself
 
   return arrow;
 }

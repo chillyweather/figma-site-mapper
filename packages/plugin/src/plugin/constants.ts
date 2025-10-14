@@ -12,9 +12,6 @@ export const BADGE_COLORS = {
   EXTERNAL: { r: 0.1, g: 0.6, b: 0.7 },
 } as const;
 
-export const FLOW_ARROW_PATH =
-  "M 0 15 L 80 15 L 80 5 L 100 15 L 80 25 L 80 15 Z";
-
 export const POLLING_CONFIG = {
   INTERVAL_MS: 3000,
   MAX_ATTEMPTS: 60,
