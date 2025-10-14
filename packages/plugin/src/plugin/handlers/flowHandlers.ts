@@ -231,6 +231,17 @@ async function cloneFlowBreadcrumb(
     frameClone.y = baseY;
     flowPage.appendChild(frameClone);
 
+    // Remove the Page Overlay from the cloned frame (it contains all link highlights/badges)
+    // We only want the clicked_link_ highlight, which we'll add separately
+    const pageOverlay = frameClone.findOne(
+      (node) => node.type === "FRAME" && node.name === "Page Overlay"
+    ) as FrameNode | null;
+
+    if (pageOverlay) {
+      pageOverlay.remove();
+      console.log(`Removed Page Overlay from ${frameClone.name}`);
+    }
+
     // Clone the corresponding clicked_link highlight if it exists
     // Find the clicked link that belongs to this source frame (by position proximity)
     const clickedLink = clickedLinks.find(
@@ -315,7 +326,18 @@ async function cloneSourceElements(
   screenshotClone.y = y;
   flowPage.appendChild(screenshotClone);
 
-  // Find and clone highlight
+  // Remove Page Overlay from the cloned screenshot (only needed on target page)
+  // This ensures breadcrumb screenshots show only the base image + clicked_link highlight
+  const clonedOverlay = screenshotClone.findOne(
+    (node) => node.type === "FRAME" && node.name === "Page Overlay"
+  ) as FrameNode | null;
+
+  if (clonedOverlay) {
+    clonedOverlay.remove();
+    console.log(`Removed Page Overlay from cloned ${screenshotClone.name}`);
+  }
+
+  // Find and clone highlight (from original page's overlay, before we removed the clone's overlay)
   let highlightClone: RectangleNode | null = null;
   const overlayFrames = sourcePage.findAll(
     (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
