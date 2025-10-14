@@ -233,7 +233,10 @@ async function cloneFlowBreadcrumb(
   );
 
   // Track frame position mappings for repositioning clicked_links
-  const framePositions = new Map<string, { originalX: number; originalY: number; newX: number; newY: number }>();
+  const framePositions = new Map<
+    string,
+    { originalX: number; originalY: number; newX: number; newY: number }
+  >();
 
   // Clone each source frame and arrow
   for (let i = 0; i < sourceFrames.length; i++) {
@@ -308,11 +311,11 @@ function findAssociatedFrame(
 ): FrameNode | null {
   for (const frame of sourceFrames) {
     // Check if clicked_link is within the frame bounds
-    const isWithinX = clickedLink.x >= frame.x && 
-                      clickedLink.x <= frame.x + frame.width;
-    const isWithinY = clickedLink.y >= frame.y && 
-                      clickedLink.y <= frame.y + frame.height;
-    
+    const isWithinX =
+      clickedLink.x >= frame.x && clickedLink.x <= frame.x + frame.width;
+    const isWithinY =
+      clickedLink.y >= frame.y && clickedLink.y <= frame.y + frame.height;
+
     if (isWithinX && isWithinY) {
       return frame;
     }
@@ -327,10 +330,10 @@ function isClickedLinkOnFrame(
   clickedLink: RectangleNode,
   frame: FrameNode
 ): boolean {
-  const isWithinX = clickedLink.x >= frame.x && 
-                    clickedLink.x <= frame.x + frame.width;
-  const isWithinY = clickedLink.y >= frame.y && 
-                    clickedLink.y <= frame.y + frame.height;
+  const isWithinX =
+    clickedLink.x >= frame.x && clickedLink.x <= frame.x + frame.width;
+  const isWithinY =
+    clickedLink.y >= frame.y && clickedLink.y <= frame.y + frame.height;
   return isWithinX && isWithinY;
 }
 
@@ -400,7 +403,9 @@ async function cloneSourceElements(
     (node) => node.type === "RECTANGLE" && node.name.startsWith("clicked_link_")
   ) as RectangleNode[];
 
-  console.log(`Found ${existingClickedLinks.length} existing clicked_links to copy`);
+  console.log(
+    `Found ${existingClickedLinks.length} existing clicked_links to copy`
+  );
 
   for (const clickedLink of existingClickedLinks) {
     // Check if this clicked_link is associated with the screenshot we're cloning
