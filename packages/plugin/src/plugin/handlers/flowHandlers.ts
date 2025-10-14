@@ -164,7 +164,7 @@ async function createFlowVisualization(
           boundVariables: {},
         },
       ];
-      
+
       // Add pink fill with 30% opacity
       highlightClone.fills = [
         {
@@ -180,10 +180,10 @@ async function createFlowVisualization(
           boundVariables: {},
         },
       ];
-      
+
       highlightClone.dashPattern = [12, 8]; // Dashed pattern
       highlightClone.cornerRadius = 4; // Rounded corners
-      
+
       // Add pink drop shadow
       highlightClone.effects = [
         {
@@ -202,7 +202,7 @@ async function createFlowVisualization(
           showShadowBehindNode: false,
         },
       ];
-      
+
       highlightClone.x -= 4;
       highlightClone.y -= 4;
       highlightClone.resize(
