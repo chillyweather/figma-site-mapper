@@ -11,8 +11,13 @@ export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
   const { settings, updateSetting } = useSettings();
   const { isLoading, status, jobId, authStatus, handleSubmit } = useCrawl();
-  const { badgeLinks, checkedLinks, handleLinkCheck, handleShowFlow } =
-    useFlowMapping();
+  const {
+    badgeLinks,
+    checkedLinks,
+    handleLinkCheck,
+    handleShowFlow,
+    flowProgress,
+  } = useFlowMapping();
 
   // View switching
   const switchToMain = useCallback(
@@ -198,6 +203,7 @@ export const App: React.FC = () => {
       checkedLinks={checkedLinks}
       handleLinkCheck={handleLinkCheck}
       handleShowFlow={handleShowFlow}
+      flowProgress={flowProgress}
     />
   );
 };

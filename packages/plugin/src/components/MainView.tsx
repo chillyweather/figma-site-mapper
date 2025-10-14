@@ -17,6 +17,7 @@ export const MainView: React.FC<MainViewProps> = ({
   checkedLinks,
   handleLinkCheck,
   handleShowFlow,
+  flowProgress,
 }) => {
   const [activeTab, setActiveTab] = useState<"crawling" | "mapping">(
     "crawling"
@@ -125,6 +126,7 @@ export const MainView: React.FC<MainViewProps> = ({
           checkedLinks={checkedLinks}
           handleLinkCheck={handleLinkCheck}
           handleShowFlow={handleShowFlow}
+          flowProgress={flowProgress}
         />
       )}
     </div>

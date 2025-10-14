@@ -23,6 +23,26 @@ export interface BadgeLink {
   url: string;
 }
 
+export interface FlowProgress {
+  status: "idle" | "building" | "complete" | "error";
+  message: string;
+  progress: number;
+  currentStep: number;
+  totalSteps: number;
+  steps: FlowStep[];
+}
+
+export interface FlowStep {
+  name: string;
+  status: "pending" | "in-progress" | "complete" | "error";
+}
+
+export interface FlowLink {
+  id: string;
+  text: string;
+  url: string;
+}
+
 export interface SettingsViewProps {
   screenshotWidth: string;
   handleScreenshotWidthChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -79,6 +99,7 @@ export interface MainViewProps {
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
+  flowProgress: FlowProgress;
 }
 
 export interface CrawlingTabProps {
@@ -96,6 +117,7 @@ export interface MappingTabProps {
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
+  flowProgress: FlowProgress;
 }
 
 export interface FocusedInputProps {

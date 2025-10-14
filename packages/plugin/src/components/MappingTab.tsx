@@ -1,11 +1,13 @@
 import React from "react";
 import { MappingTabProps, BadgeLink } from "../types/index";
+import { FlowProgress } from "./FlowProgress";
 
 export const MappingTab: React.FC<MappingTabProps> = ({
   badgeLinks,
   checkedLinks,
   handleLinkCheck,
   handleShowFlow,
+  flowProgress,
 }) => (
   <div
     id="flows-tab"
@@ -19,6 +21,9 @@ export const MappingTab: React.FC<MappingTabProps> = ({
       id="flows-content"
       style={{ flex: 1, overflowY: "auto", padding: "16px" }}
     >
+      {/* Flow Progress Component */}
+      <FlowProgress progress={flowProgress} />
+
       {badgeLinks.length === 0 ? (
         <div
           id="flows-empty-state"

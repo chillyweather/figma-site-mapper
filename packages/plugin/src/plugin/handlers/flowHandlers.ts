@@ -32,14 +32,54 @@ export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
   const selectedLink = selectedLinks[0];
   console.log("📊 Creating flow for:", selectedLink);
 
+  // Initialize progress
+  sendProgressUpdate({
+    status: "building",
+    message: "Creating flow page...",
+    progress: 0,
+    currentStep: 0,
+    totalSteps: 5,
+    steps: [
+      { name: "Create flow page", status: "in-progress" },
+      { name: "Clone source elements", status: "pending" },
+      { name: "Crawl target page", status: "pending" },
+      { name: "Render target page", status: "pending" },
+      { name: "Create arrows", status: "pending" },
+    ],
+  });
+
   try {
     await createFlowPage(selectedLink);
   } catch (error) {
     console.error("Failed to create flow:", error);
+    sendProgressUpdate({
+      status: "error",
+      message: "Error creating flow visualization",
+      progress: 0,
+      currentStep: 0,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "error" },
+        { name: "Clone source elements", status: "pending" },
+        { name: "Crawl target page", status: "pending" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
     figma.notify("Error: Could not create flow visualization.", {
       error: true,
     });
   }
+}
+
+/**
+ * Send progress update to UI
+ */
+function sendProgressUpdate(progress: any): void {
+  figma.ui.postMessage({
+    type: "flow-progress-update",
+    flowProgress: progress,
+  });
 }
 
 /**
@@ -67,6 +107,22 @@ async function createFlowPage(selectedLink: FlowLink): Promise<void> {
   } else {
     console.log(`Flow page already exists: ${flowPageName}`);
   }
+
+  // Update progress: Flow page created
+  sendProgressUpdate({
+    status: "building",
+    message: "Cloning source elements...",
+    progress: 20,
+    currentStep: 1,
+    totalSteps: 5,
+    steps: [
+      { name: "Create flow page", status: "complete" },
+      { name: "Clone source elements", status: "in-progress" },
+      { name: "Crawl target page", status: "pending" },
+      { name: "Render target page", status: "pending" },
+      { name: "Create arrows", status: "pending" },
+    ],
+  });
 
   await createFlowVisualization(flowPage, selectedLink, currentPage);
   figma.notify(`Flow visualization started for link ${selectedLink.text}`);
@@ -145,6 +201,22 @@ async function createFlowVisualization(
       baseY,
       flowStepNumber
     );
+
+    // Update progress: Source elements cloned
+    sendProgressUpdate({
+      status: "building",
+      message: "Crawling target page...",
+      progress: 40,
+      currentStep: 2,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "complete" },
+        { name: "Clone source elements", status: "complete" },
+        { name: "Crawl target page", status: "in-progress" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
 
     if (highlightClone) {
       // Magenta/pink dashed border (#ff00e1)
@@ -828,8 +900,40 @@ async function pollForCompletion(
   const pollInterval = setInterval(async () => {
     attempts++;
 
+    // Update progress during polling
+    const pollProgress =
+      40 + Math.min(40, (attempts / POLLING_CONFIG.MAX_ATTEMPTS) * 40);
+    sendProgressUpdate({
+      status: "building",
+      message: `Crawling target page... (${attempts}/${POLLING_CONFIG.MAX_ATTEMPTS})`,
+      progress: Math.round(pollProgress),
+      currentStep: 2,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "complete" },
+        { name: "Clone source elements", status: "complete" },
+        { name: "Crawl target page", status: "in-progress" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
+
     if (attempts > POLLING_CONFIG.MAX_ATTEMPTS) {
       clearInterval(pollInterval);
+      sendProgressUpdate({
+        status: "error",
+        message: "Target page crawl timed out",
+        progress: 0,
+        currentStep: 2,
+        totalSteps: 5,
+        steps: [
+          { name: "Create flow page", status: "complete" },
+          { name: "Clone source elements", status: "complete" },
+          { name: "Crawl target page", status: "error" },
+          { name: "Render target page", status: "pending" },
+          { name: "Create arrows", status: "pending" },
+        ],
+      });
       figma.notify("Target page crawl timed out", { error: true });
       return;
     }
@@ -842,6 +946,22 @@ async function pollForCompletion(
         statusResult.result?.manifestUrl
       ) {
         clearInterval(pollInterval);
+
+        // Update progress: Rendering target page
+        sendProgressUpdate({
+          status: "building",
+          message: "Rendering target page...",
+          progress: 80,
+          currentStep: 3,
+          totalSteps: 5,
+          steps: [
+            { name: "Create flow page", status: "complete" },
+            { name: "Clone source elements", status: "complete" },
+            { name: "Crawl target page", status: "complete" },
+            { name: "Render target page", status: "in-progress" },
+            { name: "Create arrows", status: "pending" },
+          ],
+        });
 
         const manifestData = await fetchManifest(
           statusResult.result.manifestUrl
@@ -858,6 +978,60 @@ async function pollForCompletion(
         }
 
         await renderTargetPage(flowPage, manifestData, x, y);
+
+        // Update progress: Creating arrows
+        sendProgressUpdate({
+          status: "building",
+          message: "Creating arrows...",
+          progress: 90,
+          currentStep: 4,
+          totalSteps: 5,
+          steps: [
+            { name: "Create flow page", status: "complete" },
+            { name: "Clone source elements", status: "complete" },
+            { name: "Crawl target page", status: "complete" },
+            { name: "Render target page", status: "complete" },
+            { name: "Create arrows", status: "in-progress" },
+          ],
+        });
+
+        // Small delay to show arrow creation step
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Flow complete
+        sendProgressUpdate({
+          status: "complete",
+          message: "Flow visualization complete!",
+          progress: 100,
+          currentStep: 5,
+          totalSteps: 5,
+          steps: [
+            { name: "Create flow page", status: "complete" },
+            { name: "Clone source elements", status: "complete" },
+            { name: "Crawl target page", status: "complete" },
+            { name: "Render target page", status: "complete" },
+            { name: "Create arrows", status: "complete" },
+          ],
+        });
+
+        // Reset to idle after 3 seconds
+        setTimeout(() => {
+          sendProgressUpdate({
+            status: "idle",
+            message: "",
+            progress: 0,
+            currentStep: 0,
+            totalSteps: 5,
+            steps: [
+              { name: "Create flow page", status: "pending" },
+              { name: "Clone source elements", status: "pending" },
+              { name: "Crawl target page", status: "pending" },
+              { name: "Render target page", status: "pending" },
+              { name: "Create arrows", status: "pending" },
+            ],
+          });
+        }, 3000);
+
         figma.notify("Flow visualization complete!");
       }
     } catch (error) {
