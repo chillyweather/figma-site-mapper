@@ -421,6 +421,13 @@ export async function runCrawler(
   let totalPages = 0;
   let isTerminating = false; // Flag to prevent multiple termination attempts
   let pageCounter = 1; // Counter to track crawl order for numbering
+  // Helper to decide if we reached or exceeded limit (excluding login/auth pages)
+  const shouldTerminate = () =>
+    !!(
+      maxRequestsPerCrawl &&
+      maxRequestsPerCrawl > 0 &&
+      currentPage >= maxRequestsPerCrawl
+    );
 
   // Handle authentication if provided
   let authSuccess = false;
@@ -656,24 +663,24 @@ export async function runCrawler(
         log.info(
           `Current page: ${currentPage}, Max requests: ${maxRequestsPerCrawl}, Is login page: ${isLikelyLoginPage}`
         );
-        if (
-          maxRequestsPerCrawl &&
-          maxRequestsPerCrawl > 0 &&
-          currentPage >= maxRequestsPerCrawl &&
-          !isLikelyLoginPage
-        ) {
+        if (shouldTerminate() && !isLikelyLoginPage) {
           log.info(
             `Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`
           );
-
-          // Mark as terminating to prevent new requests
-          if (currentPage >= maxRequestsPerCrawl && !isTerminating) {
+          if (!isTerminating) {
             isTerminating = true;
             log.info(
-              `🛑 Reached max requests limit of ${maxRequestsPerCrawl}, will terminate after current page`
+              `🛑 Reached max requests limit of ${maxRequestsPerCrawl}, initiating early shutdown`
             );
+            try {
+              // Abort autoscaled pool to prevent further task scheduling
+              await crawler.autoscaledPool?.abort();
+            } catch (e) {
+              log.info(
+                `Graceful abort failed: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
           }
-
           return;
         }
 
@@ -1054,16 +1061,22 @@ export async function runCrawler(
 
         // Enhanced link discovery with multiple strategies
         // Skip if we're only crawling a single page (maxRequestsPerCrawl === 1)
-        if (!maxRequestsPerCrawl || maxRequestsPerCrawl > 1) {
-          try {
-            // Wait a bit more for any lazy-loaded links
-            await page.waitForTimeout(1000);
+        // Avoid enqueueing links if we're at or about to hit the limit
+        const nearLimit =
+          maxRequestsPerCrawl &&
+          maxRequestsPerCrawl > 0 &&
+          currentPage >= maxRequestsPerCrawl - 1;
 
-            // Enqueue links with same hostname strategy
+        if (
+          !shouldTerminate() &&
+          !nearLimit &&
+          (!maxRequestsPerCrawl || maxRequestsPerCrawl > 1)
+        ) {
+          try {
+            await page.waitForTimeout(500); // shorter wait; we are rate-limited anyway
             await enqueueLinks({
               strategy: "same-hostname",
               transformRequestFunction: (request) => {
-                // Filter out common non-content URLs
                 const url = new URL(request.url);
                 const blockedPatterns = [
                   /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar)$/i,
@@ -1075,21 +1088,15 @@ export async function runCrawler(
                   /\#.*$/,
                   /\?.*$/,
                 ];
-
-                const shouldBlock = blockedPatterns.some((pattern) =>
-                  pattern.test(url.pathname)
-                );
-                if (shouldBlock) {
+                if (blockedPatterns.some((p) => p.test(url.pathname))) {
                   log.info(
                     `Skipping URL due to blocked pattern: ${request.url}`
                   );
                   return false;
                 }
-
                 return request;
               },
             });
-
             log.info(`Successfully enqueued links from ${request.url}`);
           } catch (error) {
             log.error(
@@ -1098,7 +1105,7 @@ export async function runCrawler(
           }
         } else {
           log.info(
-            `Skipping link enqueueing for single-page crawl (maxRequestsPerCrawl=${maxRequestsPerCrawl})`
+            `Not enqueueing further links (limit reached or near limit)`
           );
         }
       },
@@ -1110,6 +1117,25 @@ export async function runCrawler(
       // Add pre-navigation hooks for random delays and better request spacing
       preNavigationHooks: [
         async ({ request, page, log }) => {
+          // Fast path: skip delay/navigation if termination condition met
+          if (isTerminating || shouldTerminate()) {
+            if (!isTerminating) {
+              isTerminating = true;
+              log.info(
+                `🛑 Early termination engaged before navigating to ${request.url}`
+              );
+              try {
+                await crawler.autoscaledPool?.abort();
+              } catch (e) {
+                log.info(
+                  `Abort in preNavigation failed: ${e instanceof Error ? e.message : String(e)}`
+                );
+              }
+            } else {
+              log.info(`Skipping (pre-nav) ${request.url} - terminating`);
+            }
+            return; // Do not delay or navigate
+          }
           // Handle credential-based authentication
           if (
             auth?.method === "credentials" &&
@@ -1187,12 +1213,16 @@ export async function runCrawler(
           }
 
           // Use configured request delay with some randomization to avoid rate limiting
-          const baseDelay = requestDelay;
+          // If crawl is very small, skip artificial delay for snappier UX
+          const baseDelay =
+            maxRequestsPerCrawl && maxRequestsPerCrawl <= 3 ? 0 : requestDelay;
           const randomVariation = Math.floor(Math.random() * 500) - 250; // ±250ms variation
           const totalDelay = Math.max(0, baseDelay + randomVariation);
-          log.info(
-            `Adding ${totalDelay}ms delay before navigating to ${request.url}`
-          );
+          if (totalDelay > 0) {
+            log.info(
+              `Adding ${totalDelay}ms delay before navigating to ${request.url}`
+            );
+          }
           await new Promise((resolve) => setTimeout(resolve, totalDelay));
         },
       ],
