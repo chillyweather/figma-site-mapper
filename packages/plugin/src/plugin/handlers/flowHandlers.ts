@@ -232,6 +232,38 @@ async function createFlowVisualization(
       targetX,
       targetY
     );
+
+    // Move arrow to the top so it appears above all other elements
+    const arrowIndex = flowPage.children.indexOf(arrow);
+    if (arrowIndex !== -1) {
+      flowPage.insertChild(flowPage.children.length, arrow);
+    }
+
+    // Verify the arrow has correct caps (no cap at start, arrow cap at end)
+    const network = arrow.vectorNetwork;
+    if (network && Array.isArray(network.vertices) && network.vertices.length >= 2) {
+      const startVertex = network.vertices[0];
+      const endVertex = network.vertices[1];
+      
+      if (startVertex.strokeCap !== "NONE" || endVertex.strokeCap !== "ARROW_EQUILATERAL") {
+        arrow.vectorNetwork = {
+          regions: network.regions || [],
+          segments: network.segments || [],
+          vertices: [
+            {
+              x: startVertex.x,
+              y: startVertex.y,
+              strokeCap: "NONE",
+            },
+            {
+              x: endVertex.x,
+              y: endVertex.y,
+              strokeCap: "ARROW_EQUILATERAL",
+            },
+          ],
+        };
+      }
+    }
   } finally {
     figma.currentPage = previousPage;
   }
@@ -279,6 +311,15 @@ async function cloneFlowBreadcrumb(
     { originalX: number; originalY: number; newX: number; newY: number }
   >();
 
+  // Track arrows for repositioning after clicked_links are placed
+  const arrowsToReposition: Array<{
+    arrow: VectorNode;
+    originalY: number;
+    frameIndex: number;
+  }> = [];
+
+  const frameClones: FrameNode[] = [];
+
   // Clone each source frame and arrow
   for (let i = 0; i < sourceFrames.length; i++) {
     const sourceFrame = sourceFrames[i];
@@ -296,6 +337,7 @@ async function cloneFlowBreadcrumb(
     frameClone.x = currentX;
     frameClone.y = baseY;
     flowPage.appendChild(frameClone);
+    frameClones.push(frameClone);
 
     // Remove the Page Overlay from the cloned frame
     const pageOverlay = frameClone.findOne(
@@ -309,11 +351,17 @@ async function cloneFlowBreadcrumb(
 
     currentX += frameClone.width + 20;
 
-    // Clone the arrow if it exists
+    // Clone the arrow if it exists and store for later repositioning
     if (arrows[i]) {
-      const arrowClone = arrows[i].clone();
+      const originalArrow = arrows[i];
+      const arrowClone = originalArrow.clone();
       arrowClone.x = currentX;
-      arrowClone.y = baseY - 15;
+      // Store original Y and frame info for repositioning after clicked_links
+      arrowsToReposition.push({
+        arrow: arrowClone,
+        originalY: originalArrow.y,
+        frameIndex: i,
+      });
       flowPage.appendChild(arrowClone);
 
       currentX += 120;
@@ -321,6 +369,7 @@ async function cloneFlowBreadcrumb(
   }
 
   // Clone ALL clicked_links and reposition based on frame movements
+  const clonedClickedLinks: RectangleNode[] = [];
   for (const clickedLink of clickedLinks) {
     const associatedFrame = findAssociatedFrame(clickedLink, sourceFrames);
     if (associatedFrame) {
@@ -332,9 +381,141 @@ async function cloneFlowBreadcrumb(
         clickedLinkClone.x = positions.newX + offsetX;
         clickedLinkClone.y = positions.newY + offsetY;
         flowPage.appendChild(clickedLinkClone);
+        clonedClickedLinks.push(clickedLinkClone);
         console.log(
           `Cloned ${clickedLink.name} for ${associatedFrame.name} at (${clickedLinkClone.x}, ${clickedLinkClone.y})`
         );
+      }
+    }
+  }
+
+  // Reposition arrows to align with their corresponding clicked_links
+  for (const arrowInfo of arrowsToReposition) {
+    // Find the clicked_link associated with this arrow (same frame index)
+    const associatedFrame = sourceFrames[arrowInfo.frameIndex];
+    if (associatedFrame) {
+      // Find clicked_link on this frame
+      const clickedLinkOnFrame = clickedLinks.find((cl) =>
+        isClickedLinkOnFrame(cl, associatedFrame)
+      );
+
+      if (clickedLinkOnFrame) {
+        // Find the cloned version
+        const clonedClickedLink = clonedClickedLinks.find(
+          (cl) => cl.name === clickedLinkOnFrame.name
+        );
+
+        if (clonedClickedLink) {
+          const startX = clonedClickedLink.x + clonedClickedLink.width;
+
+          // Position arrow start to touch the clicked_link's right edge and align vertically
+          arrowInfo.arrow.x = startX;
+          arrowInfo.arrow.y =
+            clonedClickedLink.y + clonedClickedLink.height / 2;
+
+          const targetFrameClone = frameClones[arrowInfo.frameIndex + 1];
+          if (targetFrameClone) {
+            const newLength = Math.max(0, targetFrameClone.x - startX);
+
+            const originalPath = arrowInfo.arrow.vectorPaths[0];
+            if (originalPath) {
+              arrowInfo.arrow.vectorPaths = [
+                {
+                  windingRule: originalPath.windingRule,
+                  data: `M 0 0 L ${newLength} 0`,
+                },
+              ];
+            }
+
+            const originalNetwork = arrowInfo.arrow.vectorNetwork;
+            if (
+              originalNetwork &&
+              Array.isArray(originalNetwork.vertices) &&
+              originalNetwork.vertices.length >= 2
+            ) {
+              const startVertex = originalNetwork.vertices[0];
+              const endVertex = originalNetwork.vertices[1];
+              const segments = Array.isArray(originalNetwork.segments)
+                ? originalNetwork.segments.map((segment) => ({
+                    start: segment.start,
+                    end: segment.end,
+                    tangentStart: {
+                      x: segment.tangentStart.x,
+                      y: segment.tangentStart.y,
+                    },
+                    tangentEnd: {
+                      x: segment.tangentEnd.x,
+                      y: segment.tangentEnd.y,
+                    },
+                  }))
+                : [];
+              const regions = Array.isArray(originalNetwork.regions)
+                ? originalNetwork.regions.slice()
+                : [];
+
+              arrowInfo.arrow.vectorNetwork = {
+                regions,
+                segments,
+                vertices: [
+                  {
+                    x: 0,
+                    y: 0,
+                    strokeCap: startVertex.strokeCap || "NONE",
+                  },
+                  {
+                    x: newLength,
+                    y: 0,
+                    strokeCap: endVertex.strokeCap || "ARROW_EQUILATERAL",
+                  },
+                ],
+              };
+            }
+          }
+
+          console.log(
+            `Repositioned arrow to (${arrowInfo.arrow.x}, ${arrowInfo.arrow.y}) based on ${clonedClickedLink.name}`
+          );
+        }
+      }
+    }
+  }
+
+  // Move all arrows to the top so they appear above all other elements
+  for (const arrowInfo of arrowsToReposition) {
+    const arrowIndex = flowPage.children.indexOf(arrowInfo.arrow);
+    if (arrowIndex !== -1) {
+      flowPage.insertChild(flowPage.children.length, arrowInfo.arrow);
+    }
+  }
+
+  // Verify all Flow Arrow elements have arrow cap on the end side
+  const allFlowArrows = flowPage.findAll(
+    (node) => node.type === "VECTOR" && node.name === "Flow Arrow"
+  ) as VectorNode[];
+
+  for (const arrow of allFlowArrows) {
+    const network = arrow.vectorNetwork;
+    if (network && Array.isArray(network.vertices) && network.vertices.length >= 2) {
+      const startVertex = network.vertices[0];
+      const endVertex = network.vertices[1];
+      
+      if (startVertex.strokeCap !== "NONE" || endVertex.strokeCap !== "ARROW_EQUILATERAL") {
+        arrow.vectorNetwork = {
+          regions: network.regions || [],
+          segments: network.segments || [],
+          vertices: [
+            {
+              x: startVertex.x,
+              y: startVertex.y,
+              strokeCap: "NONE",
+            },
+            {
+              x: endVertex.x,
+              y: endVertex.y,
+              strokeCap: "ARROW_EQUILATERAL",
+            },
+          ],
+        };
       }
     }
   }
@@ -524,8 +705,8 @@ function createFlowArrow(
     startY = sourceFrame.y + sourceFrame.height / 2;
   }
 
-  // End position: left edge of target screenshot (with some spacing)
-  const endX = targetX - 20;
+  // End position: left edge of target screenshot
+  const endX = targetX;
   const endY = startY; // Keep horizontal line
 
   // Create a line from start to end
@@ -553,8 +734,29 @@ function createFlowArrow(
   };
 
   arrow.strokes = [{ type: "SOLID", color: pinkColor }];
-  arrow.strokeWeight = 3;
-  arrow.strokeCap = "ARROW_EQUILATERAL"; // Triangle filled arrow at the end
+  arrow.strokeWeight = 6;
+
+  // Set arrow cap only at the end (target screenshot side)
+  arrow.strokeCap = "NONE"; // No cap at the start
+  arrow.strokeJoin = "MITER";
+
+  // Use vectorNetwork to control arrow direction - arrow only at the end
+  arrow.vectorNetwork = {
+    regions: [],
+    segments: [
+      {
+        start: 0,
+        end: 1,
+        tangentStart: { x: 0, y: 0 },
+        tangentEnd: { x: 0, y: 0 },
+      },
+    ],
+    vertices: [
+      { x: 0, y: 0, strokeCap: "NONE" },
+      { x: lineLength, y: 0, strokeCap: "ARROW_EQUILATERAL" },
+    ],
+  };
+
   arrow.fills = []; // No fill for the line itself
 
   return arrow;
