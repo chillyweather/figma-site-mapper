@@ -204,7 +204,7 @@ async function cloneFlowBreadcrumb(
 ): Promise<number> {
   let currentX = startX;
 
-  // Find all Source_ frames and arrows (in order)
+  // Find all Source_ frames, arrows, and clicked_link highlights (in order)
   const sourceFrames = sourcePage.findAll(
     (node) => node.type === "FRAME" && node.name.startsWith("Source_")
   ) as FrameNode[];
@@ -213,11 +213,15 @@ async function cloneFlowBreadcrumb(
     (node) => node.type === "VECTOR" && node.name === "Flow Arrow"
   ) as VectorNode[];
 
+  const clickedLinks = sourcePage.findAll(
+    (node) => node.type === "RECTANGLE" && node.name.startsWith("clicked_link_")
+  ) as RectangleNode[];
+
   console.log(
-    `Found ${sourceFrames.length} source frames and ${arrows.length} arrows to clone`
+    `Found ${sourceFrames.length} source frames, ${arrows.length} arrows, and ${clickedLinks.length} clicked links to clone`
   );
 
-  // Clone each source frame and its arrow
+  // Clone each source frame, its clicked_link highlight, and arrow
   for (let i = 0; i < sourceFrames.length; i++) {
     const sourceFrame = sourceFrames[i];
 
@@ -226,6 +230,25 @@ async function cloneFlowBreadcrumb(
     frameClone.x = currentX;
     frameClone.y = baseY;
     flowPage.appendChild(frameClone);
+
+    // Clone the corresponding clicked_link highlight if it exists
+    // Find the clicked link that belongs to this source frame (by position proximity)
+    const clickedLink = clickedLinks.find(
+      (link) => Math.abs(link.x - sourceFrame.x) < sourceFrame.width + 100
+    );
+
+    if (clickedLink) {
+      const clickedLinkClone = clickedLink.clone();
+      // Calculate offset from source frame and apply to cloned frame
+      const offsetX = clickedLink.x - sourceFrame.x;
+      const offsetY = clickedLink.y - sourceFrame.y;
+      clickedLinkClone.x = currentX + offsetX;
+      clickedLinkClone.y = baseY + offsetY;
+      flowPage.appendChild(clickedLinkClone);
+      console.log(
+        `Cloned clicked_link: ${clickedLink.name} for ${sourceFrame.name}`
+      );
+    }
 
     currentX += frameClone.width + 20;
 
