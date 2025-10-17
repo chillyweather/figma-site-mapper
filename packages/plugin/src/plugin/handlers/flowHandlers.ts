@@ -15,6 +15,26 @@ import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 
 /**
+ * Extract domain from URL string without using URL constructor
+ * (URL constructor is not available in Figma plugin sandbox)
+ */
+function extractDomain(url: string): string | null {
+  try {
+    // Remove protocol
+    let domain = url.replace(/^https?:\/\//, "");
+    // Remove path and query string
+    domain = domain.split("/")[0];
+    domain = domain.split("?")[0];
+    // Remove port if present
+    domain = domain.split(":")[0];
+    return domain;
+  } catch (error) {
+    console.error("Failed to extract domain from URL:", error);
+    return null;
+  }
+}
+
+/**
  * Load settings from client storage
  */
 async function loadSettings(): Promise<any> {
@@ -881,9 +901,10 @@ async function fetchAndRenderTargetPage(
     // Try to load cached cookies for this domain
     let domainCookies = null;
     try {
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname;
-      domainCookies = await loadDomainCookies(domain);
+      const domain = extractDomain(url);
+      if (domain) {
+        domainCookies = await loadDomainCookies(domain);
+      }
     } catch (error) {
       console.log("Could not load domain cookies:", error);
     }

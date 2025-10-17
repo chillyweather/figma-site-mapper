@@ -13,6 +13,26 @@ let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
 
 /**
+ * Extract domain from URL string without using URL constructor
+ * (URL constructor is not available in Figma plugin sandbox)
+ */
+function extractDomain(url: string): string | null {
+  try {
+    // Remove protocol
+    let domain = url.replace(/^https?:\/\//, "");
+    // Remove path and query string
+    domain = domain.split("/")[0];
+    domain = domain.split("?")[0];
+    // Remove port if present
+    domain = domain.split(":")[0];
+    return domain;
+  } catch (error) {
+    console.error("Failed to extract domain from URL:", error);
+    return null;
+  }
+}
+
+/**
  * Store cookies for a specific domain
  */
 async function storeDomainCookies(
@@ -185,12 +205,13 @@ export async function handleGetStatus(msg: any): Promise<void> {
       // Store cookies for this domain if available
       if (manifestData.cookies && manifestData.cookies.length > 0) {
         try {
-          const url = new URL(manifestData.startUrl);
-          const domain = url.hostname;
-          await storeDomainCookies(domain, manifestData.cookies);
-          console.log(
-            `🍪 Stored ${manifestData.cookies.length} cookies for domain ${domain}`
-          );
+          const domain = extractDomain(manifestData.startUrl);
+          if (domain) {
+            await storeDomainCookies(domain, manifestData.cookies);
+            console.log(
+              `🍪 Stored ${manifestData.cookies.length} cookies for domain ${domain}`
+            );
+          }
         } catch (error) {
           console.error("Failed to store domain cookies:", error);
         }
