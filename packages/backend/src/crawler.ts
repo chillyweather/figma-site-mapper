@@ -1314,7 +1314,9 @@ export async function runCrawler(
  */
 export async function openAuthSession(
   url: string
-): Promise<{ cookies: Array<{ name: string; value: string; domain: string }> }> {
+): Promise<{
+  cookies: Array<{ name: string; value: string; domain: string }>;
+}> {
   console.log(`🔐 Opening authentication session for ${url}`);
 
   const { chromium } = await import("playwright");

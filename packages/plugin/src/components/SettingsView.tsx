@@ -357,11 +357,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 return;
               }
               parent.postMessage(
-                { 
-                  pluginMessage: { 
+                {
+                  pluginMessage: {
                     type: "open-auth-session",
-                    url: url.trim()
-                  } 
+                    url: url.trim(),
+                  },
                 },
                 "*"
               );
@@ -370,11 +370,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             style={{
               width: "100%",
               padding: "8px 16px",
-              backgroundColor: isLoading || !!jobId || !url.trim() ? "#e9ecef" : "#0066cc",
+              backgroundColor:
+                isLoading || !!jobId || !url.trim() ? "#e9ecef" : "#0066cc",
               color: isLoading || !!jobId || !url.trim() ? "#6c757d" : "white",
               border: "none",
               borderRadius: "4px",
-              cursor: isLoading || !!jobId || !url.trim() ? "not-allowed" : "pointer",
+              cursor:
+                isLoading || !!jobId || !url.trim() ? "not-allowed" : "pointer",
               fontSize: "12px",
               fontWeight: "500",
             }}

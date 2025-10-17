@@ -58,7 +58,9 @@ export async function fetchManifest(manifestUrl: string): Promise<any> {
  */
 export async function openAuthSession(
   url: string
-): Promise<{ cookies: Array<{ name: string; value: string; domain: string }> }> {
+): Promise<{
+  cookies: Array<{ name: string; value: string; domain: string }>;
+}> {
   const response = await fetch(`${BACKEND_URL}/auth-session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

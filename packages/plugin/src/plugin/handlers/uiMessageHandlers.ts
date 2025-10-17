@@ -6,7 +6,12 @@
  */
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
-import { startCrawl, getJobStatus, fetchManifest, openAuthSession } from "../services/apiClient";
+import {
+  startCrawl,
+  getJobStatus,
+  fetchManifest,
+  openAuthSession,
+} from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
 
 let screenshotWidth = 1440;
