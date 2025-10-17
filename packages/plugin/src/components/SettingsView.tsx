@@ -5,6 +5,7 @@ import { FocusedInput } from "./common/FocusedInput";
 import { FocusedTextarea } from "./common/FocusedTextarea";
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
+  url,
   screenshotWidth,
   handleScreenshotWidthChange,
   deviceScaleFactor,
@@ -25,6 +26,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleShowBrowserChange,
   detectInteractiveElements,
   handleDetectInteractiveElementsChange,
+  captureOnlyVisibleElements,
+  handleCaptureOnlyVisibleElementsChange,
   authMethod,
   handleAuthMethodChange,
   loginUrl,
@@ -334,9 +337,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         }}
       >
         <option value="none">No Authentication</option>
+        <option value="manual">Manual (Browser Session)</option>
         <option value="credentials">Auto Login (Username/Password)</option>
         <option value="cookies">Import Cookies</option>
       </select>
+
+      {authMethod === "manual" && (
+        <div id="auth-manual-section" style={{ marginBottom: "8px" }}>
+          <div style={{ fontSize: "11px", color: "#666", marginBottom: "8px" }}>
+            Opens a browser where you can manually log in or solve CAPTCHA.
+            Cookies will be captured automatically when you close the browser.
+          </div>
+          <button
+            id="open-auth-browser-button"
+            type="button"
+            onClick={() => {
+              if (!url.trim()) {
+                alert("Please enter a URL first (in the main view)");
+                return;
+              }
+              parent.postMessage(
+                { 
+                  pluginMessage: { 
+                    type: "open-auth-session",
+                    url: url.trim()
+                  } 
+                },
+                "*"
+              );
+            }}
+            disabled={isLoading || !!jobId || !url.trim()}
+            style={{
+              width: "100%",
+              padding: "8px 16px",
+              backgroundColor: isLoading || !!jobId || !url.trim() ? "#e9ecef" : "#0066cc",
+              color: isLoading || !!jobId || !url.trim() ? "#6c757d" : "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: isLoading || !!jobId || !url.trim() ? "not-allowed" : "pointer",
+              fontSize: "12px",
+              fontWeight: "500",
+            }}
+          >
+            {authStatus === "authenticating"
+              ? "Browser Open - Complete auth and close..."
+              : "Open Authentication Browser"}
+          </button>
+          {authStatus === "success" && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#155724",
+                marginTop: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <IconCheck size={12} />
+              Authentication successful - cookies captured
+            </div>
+          )}
+          {authStatus === "failed" && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#721c24",
+                marginTop: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <IconX size={12} />
+              Authentication failed
+            </div>
+          )}
+        </div>
+      )}
 
       {authMethod === "credentials" && (
         <div id="auth-credentials-inputs" style={{ marginBottom: "8px" }}>

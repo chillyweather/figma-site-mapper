@@ -44,12 +44,20 @@ export function parseSampleSize(sampleSize: string): number {
 }
 
 export function parseAuthData(
-  authMethod: 'none' | 'credentials' | 'cookies',
+  authMethod: 'none' | 'manual' | 'credentials' | 'cookies',
   loginUrl: string,
   username: string,
   password: string,
   cookies: string
 ): AuthData | null {
+  if (authMethod === 'manual') {
+    // For manual auth, return a placeholder that will be replaced
+    // with stored cookies in the message handler
+    return {
+      method: 'manual'
+    };
+  }
+  
   if (authMethod === 'credentials' && loginUrl && username) {
     return {
       method: 'credentials',

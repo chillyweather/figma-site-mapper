@@ -6,7 +6,7 @@
  */
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
-import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { startCrawl, getJobStatus, fetchManifest, openAuthSession } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
 
 let screenshotWidth = 1440;
@@ -104,6 +104,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    captureOnlyVisibleElements,
     auth,
   } = msg;
 
@@ -113,6 +114,33 @@ export async function handleStartCrawl(msg: any): Promise<void> {
   hasRenderedSitemap = false;
 
   try {
+    // If auth method is manual, load cookies from storage
+    let authData = auth;
+    if (auth && auth.method === "manual") {
+      const domain = extractDomain(url);
+      if (domain) {
+        const cookies = await loadDomainCookies(domain);
+        if (cookies && cookies.length > 0) {
+          console.log(
+            `🍪 Using ${cookies.length} stored cookies for manual auth`
+          );
+          authData = {
+            method: "cookies",
+            cookies,
+          };
+        } else {
+          console.log(
+            "⚠️ Manual auth selected but no cookies found. Run authentication session first."
+          );
+          figma.notify(
+            "No authentication cookies found. Please complete the authentication session first.",
+            { error: true }
+          );
+          return;
+        }
+      }
+    }
+
     const result = await startCrawl({
       url,
       maxRequestsPerCrawl,
@@ -125,7 +153,8 @@ export async function handleStartCrawl(msg: any): Promise<void> {
       sampleSize,
       showBrowser,
       detectInteractiveElements,
-      auth,
+      captureOnlyVisibleElements,
+      auth: authData,
     });
 
     figma.ui.postMessage({
@@ -283,6 +312,65 @@ export function handleClose(): void {
 }
 
 /**
+ * Handle open-auth-session message from UI
+ */
+export async function handleOpenAuthSession(msg: any): Promise<void> {
+  const { url } = msg;
+
+  console.log("🔐 Opening authentication session for URL:", url);
+
+  try {
+    // Notify UI that auth session is starting
+    figma.ui.postMessage({
+      type: "auth-session-status",
+      status: "opening",
+    });
+
+    const result = await openAuthSession(url);
+
+    // Store cookies for this domain
+    const domain = extractDomain(url);
+    if (domain && result.cookies && result.cookies.length > 0) {
+      await storeDomainCookies(domain, result.cookies);
+      console.log(
+        `🍪 Stored ${result.cookies.length} cookies for domain ${domain}`
+      );
+
+      figma.ui.postMessage({
+        type: "auth-session-status",
+        status: "success",
+        cookieCount: result.cookies.length,
+      });
+
+      figma.notify(
+        `Authentication successful! Captured ${result.cookies.length} cookies.`
+      );
+    } else {
+      figma.ui.postMessage({
+        type: "auth-session-status",
+        status: "failed",
+        error: "No cookies captured",
+      });
+
+      figma.notify("Authentication completed but no cookies were captured.", {
+        error: true,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to open auth session:", error);
+    figma.ui.postMessage({
+      type: "auth-session-status",
+      status: "failed",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    figma.notify("Error: Could not open authentication session.", {
+      error: true,
+    });
+  }
+}
+
+/**
  * Main message router for UI messages
  */
 export async function handleUIMessage(msg: any): Promise<void> {
@@ -305,6 +393,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "show-flow":
       await handleShowFlow(msg.selectedLinks);
+      break;
+
+    case "open-auth-session":
+      await handleOpenAuthSession(msg);
       break;
 
     case "close":

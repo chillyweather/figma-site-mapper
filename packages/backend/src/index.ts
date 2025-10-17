@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import { crawlQueue } from './queue.js'
+import { openAuthSession } from './crawler.js'
 import cors from "@fastify/cors"
 import fastifyStatic from '@fastify/static'
 import path from 'path'
@@ -185,6 +186,26 @@ server.post('/crawl', async (request, reply) => {
   });
 
   return { message: "Crawl job successfully queued.", jobId: job.id }
+})
+
+server.post('/auth-session', async (request, reply) => {
+  const { url } = request.body as { url: string };
+
+  if (!url) {
+    reply.status(400).send({ error: "URL is required" });
+    return;
+  }
+
+  try {
+    const result = await openAuthSession(url);
+    return result;
+  } catch (error) {
+    server.log.error(`Error in auth session: ${error}`);
+    return reply.status(500).send({ 
+      error: "Failed to open authentication session",
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
 })
 
 const start = async () => {

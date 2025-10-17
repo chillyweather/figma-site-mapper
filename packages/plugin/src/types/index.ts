@@ -10,7 +10,8 @@ export interface PluginSettings {
   sampleSize: string;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
-  authMethod: "none" | "credentials" | "cookies";
+  captureOnlyVisibleElements: boolean;
+  authMethod: "none" | "manual" | "credentials" | "cookies";
   loginUrl: string;
   username: string;
   password: string;
@@ -54,6 +55,7 @@ export interface FlowLink {
 }
 
 export interface SettingsViewProps {
+  url: string;
   screenshotWidth: string;
   handleScreenshotWidthChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   deviceScaleFactor: string;
@@ -80,7 +82,11 @@ export interface SettingsViewProps {
   handleDetectInteractiveElementsChange: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => void;
-  authMethod: "none" | "credentials" | "cookies";
+  captureOnlyVisibleElements: boolean;
+  handleCaptureOnlyVisibleElementsChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  authMethod: "none" | "manual" | "credentials" | "cookies";
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   loginUrl: string;
   handleLoginUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;

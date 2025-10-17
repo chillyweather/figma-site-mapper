@@ -113,11 +113,18 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleCaptureOnlyVisibleElementsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateSetting("captureOnlyVisibleElements", e.target.checked);
+    },
+    [updateSetting]
+  );
+
   const handleAuthMethodChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSetting(
         "authMethod",
-        e.target.value as "none" | "credentials" | "cookies"
+        e.target.value as "none" | "manual" | "credentials" | "cookies"
       );
     },
     [updateSetting]
@@ -153,6 +160,7 @@ export const App: React.FC = () => {
 
   return currentView === "settings" ? (
     <SettingsView
+      url={settings.url}
       screenshotWidth={settings.screenshotWidth}
       handleScreenshotWidthChange={handleScreenshotWidthChange}
       deviceScaleFactor={settings.deviceScaleFactor}
@@ -174,6 +182,10 @@ export const App: React.FC = () => {
       detectInteractiveElements={settings.detectInteractiveElements}
       handleDetectInteractiveElementsChange={
         handleDetectInteractiveElementsChange
+      }
+      captureOnlyVisibleElements={settings.captureOnlyVisibleElements}
+      handleCaptureOnlyVisibleElementsChange={
+        handleCaptureOnlyVisibleElementsChange
       }
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}

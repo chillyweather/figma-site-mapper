@@ -911,7 +911,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     try {
         // Access the browser pool to get cookies before closing
         const browserPool = crawler.browserPool;
-        if (browserPool && browserPool.activeBrowsers && browserPool.activeBrowsers.size > 0) {
+        if (browserPool &&
+            browserPool.activeBrowsers &&
+            browserPool.activeBrowsers.size > 0) {
             const browserController = Array.from(browserPool.activeBrowsers.values())[0];
             if (browserController && browserController.browser) {
                 const contexts = browserController.browser.contexts();
@@ -953,4 +955,80 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     console.log("📄 Saving manifest to:", manifestPath);
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     console.log(`✅ Crawler finished and ${manifestFilename} created.`);
+}
+/**
+ * Open a browser session for manual authentication (login/CAPTCHA)
+ * User can interact with the browser, and cookies are captured when closed
+ */
+export async function openAuthSession(url) {
+    console.log(`🔐 Opening authentication session for ${url}`);
+    const { chromium } = await import("playwright");
+    const browser = await chromium.launch({
+        headless: false, // Must be visible for manual interaction
+        args: [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-popup-blocking",
+            "--disable-web-security",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-site-isolation-trials",
+        ],
+    });
+    const context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        viewport: { width: 1440, height: 900 },
+        locale: "en-US",
+        timezoneId: "America/New_York",
+    });
+    const page = await context.newPage();
+    // Override webdriver detection
+    await page.addInitScript(() => {
+        Object.defineProperty(navigator, "webdriver", {
+            get: () => false,
+        });
+    });
+    try {
+        // Navigate to the page
+        await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+        console.log(`✅ Browser opened at ${url}`);
+        console.log(`👤 Please complete login/CAPTCHA and close the browser when done...`);
+        // Keep polling for cookies and wait for browser to close
+        let cookies = [];
+        let browserClosed = false;
+        // Set up listener for browser disconnect
+        browser.on("disconnected", () => {
+            browserClosed = true;
+        });
+        // Poll for cookies every second and capture the latest
+        const pollInterval = setInterval(async () => {
+            try {
+                const allCookies = await context.cookies();
+                cookies = allCookies.map((cookie) => ({
+                    name: cookie.name,
+                    value: cookie.value,
+                    domain: cookie.domain,
+                }));
+            }
+            catch (error) {
+                // Browser/context might be closing, stop polling
+                clearInterval(pollInterval);
+            }
+        }, 1000);
+        // Wait for browser to be closed
+        await new Promise((resolve) => {
+            const checkClosed = setInterval(() => {
+                if (browserClosed) {
+                    clearInterval(checkClosed);
+                    clearInterval(pollInterval);
+                    resolve();
+                }
+            }, 100);
+        });
+        console.log(`🔒 Browser closed by user`);
+        console.log(`🍪 Captured ${cookies.length} cookies`);
+        return { cookies };
+    }
+    catch (error) {
+        console.error(`❌ Auth session error: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+    }
 }
