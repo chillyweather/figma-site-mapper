@@ -302,6 +302,101 @@ async function detectInteractiveElementsOnPage(page, log) {
     log.info(`Found ${elements.length} interactive elements`);
     return elements;
 }
+/**
+ * Open a browser session for manual authentication (login, CAPTCHA, etc.)
+ * User interacts with the browser, then closes it when done
+ * Returns captured cookies for use in subsequent crawls
+ */
+export async function openAuthSession(url) {
+    console.log(`🔓 Opening authentication session for: ${url}`);
+    const { chromium } = await import("playwright");
+    // Launch a visible browser for user interaction
+    const browser = await chromium.launch({
+        headless: false,
+        args: [
+            "--disable-infobars",
+            "--no-first-run",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-popup-blocking",
+            "--disable-web-security",
+            "--disable-features=IsolateOrigins,site-per-process",
+        ],
+    });
+    const context = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    });
+    // Grant permissions for CAPTCHA
+    await context.grantPermissions(['geolocation', 'notifications'], {
+        origin: new URL(url).origin
+    });
+    const page = await context.newPage();
+    // Override webdriver detection
+    await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => false,
+        });
+    });
+    try {
+        // Navigate to the page
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+        console.log(`✅ Browser opened at ${url}`);
+        console.log(`👤 Please complete login/CAPTCHA and close the browser when done...`);
+        // Keep polling for cookies and wait for browser to close
+        let cookies = [];
+        let browserClosed = false;
+        // Set up listener for browser disconnect
+        browser.on('disconnected', () => {
+            browserClosed = true;
+        });
+        // Poll for cookies every second and capture the latest
+        const pollInterval = setInterval(async () => {
+            try {
+                const allCookies = await context.cookies();
+                cookies = allCookies.map((cookie) => ({
+                    name: cookie.name,
+                    value: cookie.value,
+                    domain: cookie.domain,
+                }));
+            }
+            catch (error) {
+                // Browser/context might be closing, stop polling
+                clearInterval(pollInterval);
+            }
+        }, 1000);
+        // Wait for browser to be closed
+        await new Promise((resolve) => {
+            const checkClosed = setInterval(() => {
+                if (browserClosed) {
+                    clearInterval(checkClosed);
+                    clearInterval(pollInterval);
+                    resolve();
+                }
+            }, 100);
+        });
+        console.log(`🔒 Browser closed by user`);
+        console.log(`🍪 Captured ${cookies.length} cookies`);
+        return cookies;
+    }
+    catch (error) {
+        console.error(`❌ Authentication session error:`, error);
+        // Try to capture cookies even if there was an error
+        try {
+            const allCookies = await context.cookies();
+            const cookies = allCookies.map((cookie) => ({
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain,
+            }));
+            await browser.close();
+            return cookies;
+        }
+        catch {
+            await browser.close();
+            throw error;
+        }
+    }
+}
 export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, auth) {
     console.log("🚀 Starting the crawler with URL:", startUrl);
     console.log("📊 Crawler settings:", {
@@ -462,6 +557,13 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     "--disable-dev-shm-usage",
                     // Additional arguments for better compatibility
                     "--disable-blink-features=AutomationControlled",
+                    // CAPTCHA support - allow popups and iframes
+                    "--disable-popup-blocking",
+                    "--disable-web-security", // Allow cross-origin requests for CAPTCHA
+                    "--disable-features=IsolateOrigins,site-per-process", // Allow CAPTCHA iframes
+                    // Network and connection settings
+                    "--enable-features=NetworkService,NetworkServiceInProcess",
+                    "--disable-site-isolation-trials",
                 ],
                 // Add additional browser arguments for better compatibility
                 headless: !showBrowser, // Control browser visibility based on setting
@@ -487,6 +589,22 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             if (isTerminating) {
                 log.info(`Skipping ${request.url} - crawler is terminating`);
                 return;
+            }
+            // Grant permissions for CAPTCHA functionality (popups, notifications, etc.)
+            try {
+                const context = page.context();
+                await context.grantPermissions(["geolocation", "notifications"], {
+                    origin: new URL(request.url).origin,
+                });
+                // Override navigator.webdriver to avoid detection
+                await page.addInitScript(() => {
+                    Object.defineProperty(navigator, "webdriver", {
+                        get: () => false,
+                    });
+                });
+            }
+            catch (error) {
+                log.info(`Could not grant permissions: ${error instanceof Error ? error.message : String(error)}`);
             }
             // Handle cookie authentication on first request
             if (auth?.method === "cookies" && auth.cookies && !authSuccess) {

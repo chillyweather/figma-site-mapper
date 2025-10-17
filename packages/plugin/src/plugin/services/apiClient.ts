@@ -53,3 +53,26 @@ export async function fetchManifest(manifestUrl: string): Promise<any> {
 
   return response.json();
 }
+
+/**
+ * Open authentication session for manual login/CAPTCHA
+ */
+export async function openAuthSession(
+  url: string
+): Promise<{
+  cookies: Array<{ name: string; value: string; domain: string }>;
+}> {
+  const response = await fetch(`${BACKEND_URL}/auth-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to open auth session: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}

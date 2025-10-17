@@ -165,6 +165,25 @@ export function useCrawl() {
           }, 3000);
         }
       }
+
+      if (msg.type === "auth-session-status") {
+        if (msg.status === "opening") {
+          setAuthStatus("authenticating");
+          setStatus("Opening authentication browser...");
+        } else if (msg.status === "success") {
+          setAuthStatus("success");
+          setStatus(
+            `Authentication successful! Captured ${msg.cookieCount} cookies.`
+          );
+          // Reset auth status after 5 seconds
+          setTimeout(() => setAuthStatus(null), 5000);
+        } else if (msg.status === "failed") {
+          setAuthStatus("failed");
+          setStatus(`Authentication failed: ${msg.error || "Unknown error"}`);
+          // Reset auth status after 5 seconds
+          setTimeout(() => setAuthStatus(null), 5000);
+        }
+      }
     };
 
     window.addEventListener("message", handleMessage);

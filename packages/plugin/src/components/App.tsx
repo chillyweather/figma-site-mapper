@@ -160,6 +160,7 @@ export const App: React.FC = () => {
 
   return currentView === "settings" ? (
     <SettingsView
+      url={settings.url}
       screenshotWidth={settings.screenshotWidth}
       handleScreenshotWidthChange={handleScreenshotWidthChange}
       deviceScaleFactor={settings.deviceScaleFactor}

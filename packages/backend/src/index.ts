@@ -208,6 +208,34 @@ server.post("/crawl", async (request, reply) => {
   return { message: "Crawl job successfully queued.", jobId: job.id };
 });
 
+server.post("/auth-session", async (request, reply) => {
+  const { url } = request.body as { url: string };
+
+  if (!url) {
+    reply.status(400).send({ error: "URL is required" });
+    return;
+  }
+
+  try {
+    // Import the auth session function
+    const { openAuthSession } = await import("./crawler.js");
+
+    const cookies = await openAuthSession(url);
+
+    return {
+      message: "Authentication session completed",
+      cookies: cookies,
+      count: cookies.length,
+    };
+  } catch (error) {
+    server.log.error(`Error in auth session: ${error}`);
+    return reply.status(500).send({
+      error: "Authentication session failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 const start = async () => {
   try {
     await server.listen({ port: 3006 });

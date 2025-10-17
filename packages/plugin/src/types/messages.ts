@@ -8,7 +8,8 @@ export type PluginMessageType =
   | "crawl-started"
   | "settings-loaded"
   | "status-update"
-  | "badge-links-update";
+  | "badge-links-update"
+  | "open-auth-session";
 
 export interface CrawlStartMessage {
   type: "start-crawl";
@@ -28,11 +29,16 @@ export interface CrawlStartMessage {
 }
 
 export interface AuthData {
-  method: "credentials" | "cookies";
+  method: "manual" | "credentials" | "cookies";
   loginUrl?: string;
   username?: string;
   password?: string;
   cookies?: Array<{ name: string; value: string }>;
+}
+
+export interface OpenAuthSessionMessage {
+  type: "open-auth-session";
+  url: string;
 }
 
 export interface DetailedProgress {
