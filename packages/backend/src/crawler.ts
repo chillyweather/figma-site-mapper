@@ -1237,12 +1237,19 @@ export async function runCrawler(
   await crawler.run([canonicalStartUrl]);
 
   // Capture cookies from browser context BEFORE teardown
-  let capturedCookies: Array<{ name: string; value: string; domain: string }> = [];
+  let capturedCookies: Array<{ name: string; value: string; domain: string }> =
+    [];
   try {
     // Access the browser pool to get cookies before closing
     const browserPool = (crawler as any).browserPool;
-    if (browserPool && browserPool.activeBrowsers && browserPool.activeBrowsers.size > 0) {
-      const browserController = Array.from(browserPool.activeBrowsers.values())[0] as any;
+    if (
+      browserPool &&
+      browserPool.activeBrowsers &&
+      browserPool.activeBrowsers.size > 0
+    ) {
+      const browserController = Array.from(
+        browserPool.activeBrowsers.values()
+      )[0] as any;
       if (browserController && browserController.browser) {
         const contexts = browserController.browser.contexts();
         if (contexts && contexts.length > 0) {
@@ -1252,12 +1259,16 @@ export async function runCrawler(
             value: cookie.value,
             domain: cookie.domain,
           }));
-          console.log(`🍪 Captured ${capturedCookies.length} cookies from browser session`);
+          console.log(
+            `🍪 Captured ${capturedCookies.length} cookies from browser session`
+          );
         }
       }
     }
   } catch (error) {
-    console.log(`Could not capture cookies: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(
+      `Could not capture cookies: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   // Ensure proper cleanup

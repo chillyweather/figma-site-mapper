@@ -3,6 +3,7 @@
 ## Overview
 
 This implementation ensures that:
+
 1. **Settings are respected across all plugin operations** (crawling and flow visualization)
 2. **Cookies are captured from initial crawls** and stored per domain
 3. **Cached cookies are reused** when creating flow visualizations for the same domain
@@ -17,7 +18,7 @@ After crawling completes, the system captures all cookies from the browser conte
 
 ```typescript
 // Captures cookies from browser session
-capturedCookies = allCookies.map(cookie => ({
+capturedCookies = allCookies.map((cookie) => ({
   name: cookie.name,
   value: cookie.value,
   domain: cookie.domain,
@@ -33,6 +34,7 @@ const manifest = {
 ```
 
 **What this captures**:
+
 - Session tokens from successful logins
 - Authentication cookies from CAPTCHA solutions
 - Any other cookies set during the crawl (e.g., preferences, tracking)
@@ -48,6 +50,7 @@ await storeDomainCookies(domain, manifestData.cookies);
 ```
 
 **Storage structure**:
+
 ```typescript
 {
   "example.com": {
@@ -70,10 +73,12 @@ await storeDomainCookies(domain, manifestData.cookies);
 When creating a flow visualization:
 
 1. **Load user settings** from client storage
+
    - Includes `showBrowser` preference
    - Respects user's browser visibility choice
 
 2. **Load cached cookies** for the target domain
+
    - Only if cookies exist and are fresh (<24 hours)
    - Automatically matches domain from URL
 
@@ -81,23 +86,25 @@ When creating a flow visualization:
    ```typescript
    const result = await startCrawl({
      url,
-     showBrowser: showBrowser,  // From settings
+     showBrowser: showBrowser, // From settings
      auth: {
        method: "cookies",
-       cookies: domainCookies     // From cache
-     }
+       cookies: domainCookies, // From cache
+     },
    });
    ```
 
 ## Benefits
 
 ### For Users
+
 - ✅ **No re-authentication needed**: Login once, create multiple flows
 - ✅ **Consistent browser behavior**: Settings work everywhere
 - ✅ **Works with CAPTCHA**: Cookies from solved CAPTCHAs are reused
 - ✅ **Automatic cleanup**: Old cookies expire after 24 hours
 
 ### For Developers
+
 - ✅ **Domain isolation**: Cookies are stored per domain
 - ✅ **Type-safe**: Full TypeScript support
 - ✅ **Transparent**: Extensive console logging for debugging
@@ -106,6 +113,7 @@ When creating a flow visualization:
 ## Usage Examples
 
 ### Example 1: Login-Protected Site
+
 ```
 1. User enables "Show browser" in settings
 2. User starts crawl of https://app.example.com
@@ -116,6 +124,7 @@ When creating a flow visualization:
 ```
 
 ### Example 2: CAPTCHA-Protected Site
+
 ```
 1. User crawls https://protected-site.com
 2. CAPTCHA appears, user solves it
@@ -158,6 +167,7 @@ Plugin (Flow):
 To verify the implementation:
 
 1. **Test basic flow**:
+
    ```
    1. Crawl a site with authentication
    2. Create a flow to authenticated page
@@ -165,6 +175,7 @@ To verify the implementation:
    ```
 
 2. **Test setting persistence**:
+
    ```
    1. Enable "Show browser" in settings
    2. Create a flow → Browser should be visible
@@ -181,6 +192,7 @@ To verify the implementation:
 ## Future Enhancements
 
 Potential improvements:
+
 - [ ] User-visible cookie management UI
 - [ ] Manual cookie refresh button
 - [ ] Configurable cookie expiry time

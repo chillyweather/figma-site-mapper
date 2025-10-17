@@ -877,7 +877,7 @@ async function fetchAndRenderTargetPage(
     // Load settings to get user preferences
     const settings = await loadSettings();
     const showBrowser = settings.showBrowser || false;
-    
+
     // Try to load cached cookies for this domain
     let domainCookies = null;
     try {
@@ -895,7 +895,9 @@ async function fetchAndRenderTargetPage(
         method: "cookies" as const,
         cookies: domainCookies,
       };
-      console.log(`🍪 Using ${domainCookies.length} cached cookies for authentication`);
+      console.log(
+        `🍪 Using ${domainCookies.length} cached cookies for authentication`
+      );
     }
 
     const result = await startCrawl({
