@@ -12,6 +12,20 @@ import { FlowLink } from "../types";
 import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
+import { loadDomainCookies } from "./uiMessageHandlers";
+
+/**
+ * Load settings from client storage
+ */
+async function loadSettings(): Promise<any> {
+  try {
+    const settings = await figma.clientStorage.getAsync("settings");
+    return settings || {};
+  } catch (error) {
+    console.error("Failed to load settings:", error);
+    return {};
+  }
+}
 
 /**
  * Handle show-flow request from UI
@@ -860,6 +874,30 @@ async function fetchAndRenderTargetPage(
   figma.notify(`Crawling target page: ${url}...`);
 
   try {
+    // Load settings to get user preferences
+    const settings = await loadSettings();
+    const showBrowser = settings.showBrowser || false;
+    
+    // Try to load cached cookies for this domain
+    let domainCookies = null;
+    try {
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname;
+      domainCookies = await loadDomainCookies(domain);
+    } catch (error) {
+      console.log("Could not load domain cookies:", error);
+    }
+
+    // Build auth object if we have cookies
+    let auth = null;
+    if (domainCookies && domainCookies.length > 0) {
+      auth = {
+        method: "cookies" as const,
+        cookies: domainCookies,
+      };
+      console.log(`🍪 Using ${domainCookies.length} cached cookies for authentication`);
+    }
+
     const result = await startCrawl({
       url,
       maxRequestsPerCrawl: 1,
@@ -870,9 +908,9 @@ async function fetchAndRenderTargetPage(
       maxDepth: 0,
       defaultLanguageOnly: false,
       sampleSize: 1,
-      showBrowser: false,
+      showBrowser: showBrowser, // Use setting from storage
       detectInteractiveElements: true,
-      auth: null,
+      auth: auth, // Pass cookies if available
     });
 
     const jobId = result.jobId;

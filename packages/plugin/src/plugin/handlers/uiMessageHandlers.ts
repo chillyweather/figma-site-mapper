@@ -13,6 +13,56 @@ let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
 
 /**
+ * Store cookies for a specific domain
+ */
+async function storeDomainCookies(
+  domain: string,
+  cookies: Array<{ name: string; value: string; domain: string }>
+): Promise<void> {
+  try {
+    const domainCookies = await figma.clientStorage.getAsync("domainCookies") || {};
+    domainCookies[domain] = {
+      cookies,
+      timestamp: Date.now(),
+    };
+    await figma.clientStorage.setAsync("domainCookies", domainCookies);
+  } catch (error) {
+    console.error("Failed to store domain cookies:", error);
+  }
+}
+
+/**
+ * Load cookies for a specific domain
+ */
+export async function loadDomainCookies(
+  domain: string
+): Promise<Array<{ name: string; value: string }> | null> {
+  try {
+    const domainCookies = await figma.clientStorage.getAsync("domainCookies") || {};
+    const cookieData = domainCookies[domain];
+    
+    if (!cookieData) {
+      return null;
+    }
+
+    // Check if cookies are less than 24 hours old
+    const age = Date.now() - cookieData.timestamp;
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    
+    if (age > maxAge) {
+      console.log(`🍪 Cookies for ${domain} are stale (${Math.round(age / 1000 / 60)} minutes old), ignoring`);
+      return null;
+    }
+
+    console.log(`🍪 Found ${cookieData.cookies.length} cached cookies for ${domain}`);
+    return cookieData.cookies;
+  } catch (error) {
+    console.error("Failed to load domain cookies:", error);
+    return null;
+  }
+}
+
+/**
  * Handle start-crawl message from UI
  */
 export async function handleStartCrawl(msg: any): Promise<void> {
@@ -125,6 +175,18 @@ export async function handleGetStatus(msg: any): Promise<void> {
 
       const manifestData = await fetchManifest(result.result.manifestUrl);
       console.log("Successfully fetched manifest");
+
+      // Store cookies for this domain if available
+      if (manifestData.cookies && manifestData.cookies.length > 0) {
+        try {
+          const url = new URL(manifestData.startUrl);
+          const domain = url.hostname;
+          await storeDomainCookies(domain, manifestData.cookies);
+          console.log(`🍪 Stored ${manifestData.cookies.length} cookies for domain ${domain}`);
+        } catch (error) {
+          console.error("Failed to store domain cookies:", error);
+        }
+      }
 
       const detectInteractiveElements =
         result.result?.detectInteractiveElements !== false;

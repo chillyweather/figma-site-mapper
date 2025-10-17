@@ -10,7 +10,18 @@ const LANGUAGE_PATTERNS = [
     /[?&]locale=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?locale=en
     /[?&]l=(en|fr|de|es|it|pt|ru|ja|ko|zh)(&|$)/i, // ?l=en
 ];
-const COMMON_LANGUAGE_CODES = new Set(['en', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ja', 'ko', 'zh']);
+const COMMON_LANGUAGE_CODES = new Set([
+    "en",
+    "fr",
+    "de",
+    "es",
+    "it",
+    "pt",
+    "ru",
+    "ja",
+    "ko",
+    "zh",
+]);
 function detectLanguageFromUrl(url) {
     try {
         const urlObj = new URL(url);
@@ -29,7 +40,7 @@ function detectLanguageFromUrl(url) {
         }
         // Check subdomain patterns (en.example.com)
         const hostname = urlObj.hostname;
-        const parts = hostname.split('.');
+        const parts = hostname.split(".");
         if (parts.length >= 3) {
             const subdomain = parts[0]?.toLowerCase();
             if (subdomain && COMMON_LANGUAGE_CODES.has(subdomain)) {
@@ -48,7 +59,7 @@ function getDefaultLanguage(startUrl) {
     if (detected)
         return detected;
     // Default to 'en' if no language detected
-    return 'en';
+    return "en";
 }
 function shouldCrawlUrl(url, options) {
     // Check language filtering
@@ -61,7 +72,9 @@ function shouldCrawlUrl(url, options) {
         }
     }
     // Check depth filtering (0 or undefined means no limit)
-    if (options.maxDepth !== undefined && options.maxDepth > 0 && options.currentDepth !== undefined) {
+    if (options.maxDepth !== undefined &&
+        options.maxDepth > 0 &&
+        options.currentDepth !== undefined) {
         if (options.currentDepth > options.maxDepth) {
             return false;
         }
@@ -73,14 +86,14 @@ if (!fs.existsSync(screenshotDir)) {
     fs.mkdirSync(screenshotDir, { recursive: true });
 }
 function getSafeFilename(url) {
-    return url.replace(/[^a-zA-Z0-9]/g, '_');
+    return url.replace(/[^a-zA-Z0-9]/g, "_");
 }
 async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, overlap = 0) {
     try {
         const image = sharp(imageBuffer);
         const metadata = await image.metadata();
         if (!metadata.height || !metadata.width) {
-            throw new Error('Could not get image dimensions');
+            throw new Error("Could not get image dimensions");
         }
         const { width, height } = metadata;
         console.log(`📐 Original screenshot dimensions: ${width}x${height} for ${url}`);
@@ -144,7 +157,7 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
                     left: 0,
                     top: sliceTop,
                     width: width,
-                    height: sliceHeight
+                    height: sliceHeight,
                 })
                     .toFile(slicePath);
                 slices.push(`${publicUrl}/screenshots/${sliceFileName}`);
@@ -176,7 +189,9 @@ function buildTree(pages, startUrl) {
     // For single-page crawls, just return the first page
     if (pages.length === 1) {
         const page = pages[0];
-        const numberedTitle = page.crawlOrder ? `${page.crawlOrder}_${page.title}` : page.title;
+        const numberedTitle = page.crawlOrder
+            ? `${page.crawlOrder}_${page.title}`
+            : page.title;
         return { ...page, title: numberedTitle, children: [] };
     }
     const pageMap = new Map();
@@ -185,7 +200,9 @@ function buildTree(pages, startUrl) {
     // First pass: create nodes with numbered titles
     for (const page of pages) {
         const canonicalUrl = new URL(page.url).toString();
-        const numberedTitle = page.crawlOrder ? `${page.crawlOrder}_${page.title}` : page.title;
+        const numberedTitle = page.crawlOrder
+            ? `${page.crawlOrder}_${page.title}`
+            : page.title;
         pageMap.set(canonicalUrl, { ...page, title: numberedTitle, children: [] });
     }
     // Second pass: build parent-child relationships
@@ -196,15 +213,18 @@ function buildTree(pages, startUrl) {
             root = node;
             continue;
         }
-        let parentUrl = '';
+        let parentUrl = "";
         try {
             const urlObject = new URL(canonicalUrl);
-            if (urlObject.pathname !== '/') {
-                urlObject.pathname = urlObject.pathname.substring(0, urlObject.pathname.lastIndexOf('/')) || '/';
+            if (urlObject.pathname !== "/") {
+                urlObject.pathname =
+                    urlObject.pathname.substring(0, urlObject.pathname.lastIndexOf("/")) || "/";
                 parentUrl = urlObject.toString();
             }
         }
-        catch (e) { /* Ignore invalid URLs */ }
+        catch (e) {
+            /* Ignore invalid URLs */
+        }
         const parentNode = pageMap.get(parentUrl);
         if (parentNode) {
             parentNode.children.push(node);
@@ -220,25 +240,35 @@ function buildTree(pages, startUrl) {
     return root;
 }
 export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, auth) {
-    console.log('🚀 Starting the crawler with URL:', startUrl);
-    console.log('📊 Crawler settings:', { maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements });
+    console.log("🚀 Starting the crawler with URL:", startUrl);
+    console.log("📊 Crawler settings:", {
+        maxRequestsPerCrawl,
+        deviceScaleFactor,
+        delay,
+        requestDelay,
+        maxDepth,
+        defaultLanguageOnly,
+        sampleSize,
+        showBrowser,
+        detectInteractiveElements,
+    });
     // Use job-specific storage directory to avoid conflicts between concurrent jobs
     // This allows multiple crawls to run simultaneously without interfering with each other
     const storageDir = jobId
-        ? path.join(process.cwd(), 'storage', `job-${jobId}`)
-        : path.join(process.cwd(), 'storage', 'default');
+        ? path.join(process.cwd(), "storage", `job-${jobId}`)
+        : path.join(process.cwd(), "storage", "default");
     console.log(`📁 Using storage directory: ${storageDir}`);
     // List of realistic user agents to rotate
     const userAgents = [
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0'
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     ];
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     // Strip hash fragments from URL since they're client-side only
     const urlObj = new URL(startUrl);
-    urlObj.hash = '';
+    urlObj.hash = "";
     const canonicalStartUrl = urlObj.toString();
     const defaultLanguage = getDefaultLanguage(canonicalStartUrl);
     const crawledPages = [];
@@ -246,18 +276,25 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     let totalPages = 0;
     let isTerminating = false; // Flag to prevent multiple termination attempts
     let pageCounter = 1; // Counter to track crawl order for numbering
+    // Helper to decide if we reached or exceeded limit (excluding login/auth pages)
+    const shouldTerminate = () => !!(maxRequestsPerCrawl &&
+        maxRequestsPerCrawl > 0 &&
+        currentPage >= maxRequestsPerCrawl);
     // Handle authentication if provided
     let authSuccess = false;
     if (auth) {
         console.log(`🔐 Attempting authentication via ${auth.method}`);
         try {
-            if (auth.method === 'cookies' && auth.cookies) {
+            if (auth.method === "cookies" && auth.cookies) {
                 // Cookie-based authentication
                 console.log(`🍪 Setting ${auth.cookies.length} cookies for authentication`);
                 // Cookies will be set in the browser context before navigation
                 authSuccess = true;
             }
-            else if (auth.method === 'credentials' && auth.loginUrl && auth.username && auth.password) {
+            else if (auth.method === "credentials" &&
+                auth.loginUrl &&
+                auth.username &&
+                auth.password) {
                 // Credential-based authentication - will be handled in pre-navigation hooks
                 console.log(`🔑 Will attempt login at ${auth.loginUrl} for user ${auth.username}`);
                 authSuccess = true;
@@ -275,7 +312,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     function calculateUrlDepth(url) {
         try {
             const urlObj = new URL(url);
-            const pathSegments = urlObj.pathname.split('/').filter(segment => segment.length > 0);
+            const pathSegments = urlObj.pathname
+                .split("/")
+                .filter((segment) => segment.length > 0);
             return pathSegments.length;
         }
         catch {
@@ -286,18 +325,20 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     function getSectionKey(url) {
         try {
             const urlObj = new URL(url);
-            const pathSegments = urlObj.pathname.split('/').filter(segment => segment.length > 0);
+            const pathSegments = urlObj.pathname
+                .split("/")
+                .filter((segment) => segment.length > 0);
             if (pathSegments.length === 0)
-                return 'root';
+                return "root";
             // Use first path segment as section key, but ignore language codes
             const firstSegment = pathSegments[0];
             if (firstSegment && COMMON_LANGUAGE_CODES.has(firstSegment)) {
-                return pathSegments[1] || 'root';
+                return pathSegments[1] || "root";
             }
-            return firstSegment || 'root';
+            return firstSegment || "root";
         }
         catch {
-            return 'root';
+            return "root";
         }
     }
     // Track if we've already warned about progress updates to reduce spam
@@ -306,21 +347,23 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     const updateProgress = async (stage, currentPage, totalPages, currentUrl) => {
         if (jobId) {
             try {
-                const progress = totalPages && currentPage ? Math.round((currentPage / totalPages) * 100) : 0;
+                const progress = totalPages && currentPage
+                    ? Math.round((currentPage / totalPages) * 100)
+                    : 0;
                 // Add timeout to prevent long hangs
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
                 await fetch(`${publicUrl}/progress/${jobId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         stage,
                         currentPage,
                         totalPages,
                         currentUrl,
-                        progress
+                        progress,
                     }),
-                    signal: controller.signal
+                    signal: controller.signal,
                 });
                 clearTimeout(timeoutId);
             }
@@ -346,23 +389,23 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         launchContext: {
             launchOptions: {
                 args: [
-                    ...(deviceScaleFactor > 1 ? ['--device-scale-factor=2'] : []),
+                    ...(deviceScaleFactor > 1 ? ["--device-scale-factor=2"] : []),
                     // Disable automation banner that causes positioning issues
-                    '--disable-infobars',
-                    '--disable-extensions-except=',
-                    '--disable-extensions',
-                    '--no-first-run',
-                    '--disable-dev-shm-usage',
+                    "--disable-infobars",
+                    "--disable-extensions-except=",
+                    "--disable-extensions",
+                    "--no-first-run",
+                    "--disable-dev-shm-usage",
                     // Additional arguments for better compatibility
-                    '--disable-blink-features=AutomationControlled'
+                    "--disable-blink-features=AutomationControlled",
                 ],
                 // Add additional browser arguments for better compatibility
                 headless: !showBrowser, // Control browser visibility based on setting
                 slowMo: 100, // Small delay to allow pages to stabilize
-                devtools: false // Keep devtools closed to reduce resource usage
+                devtools: false, // Keep devtools closed to reduce resource usage
             },
             // Set custom user agent to appear more like real browser traffic
-            userAgent: randomUserAgent
+            userAgent: randomUserAgent,
         },
         // Wait for network idle before considering page loaded
         navigationTimeoutSecs: 30,
@@ -382,16 +425,18 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 return;
             }
             // Handle cookie authentication on first request
-            if (auth?.method === 'cookies' && auth.cookies && !authSuccess) {
+            if (auth?.method === "cookies" && auth.cookies && !authSuccess) {
                 try {
                     log.info(`🍪 Setting cookies for authentication`);
                     for (const cookie of auth.cookies) {
-                        await page.context().addCookies([{
+                        await page.context().addCookies([
+                            {
                                 name: cookie.name,
                                 value: cookie.value,
                                 url: canonicalStartUrl,
-                                domain: new URL(canonicalStartUrl).hostname
-                            }]);
+                                domain: new URL(canonicalStartUrl).hostname,
+                            },
+                        ]);
                     }
                     authSuccess = true;
                     log.info(`✅ Cookies set successfully`);
@@ -406,7 +451,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 startUrl: canonicalStartUrl,
                 defaultLanguageOnly,
                 maxDepth,
-                currentDepth
+                currentDepth,
             })) {
                 log.info(`Skipping ${request.url} due to language/depth filters`);
                 return;
@@ -425,15 +470,23 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
             // IMPORTANT: Don't terminate during login/authentication process
             // Check if this looks like a login page before applying limits
-            const isLikelyLoginPage = request.url.includes('/login') || request.url.includes('/signin') || request.url.includes('/auth');
+            const isLikelyLoginPage = request.url.includes("/login") ||
+                request.url.includes("/signin") ||
+                request.url.includes("/auth");
             // Check if we've reached the max requests limit (0 means no limit)
             log.info(`Current page: ${currentPage}, Max requests: ${maxRequestsPerCrawl}, Is login page: ${isLikelyLoginPage}`);
-            if (maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl && !isLikelyLoginPage) {
+            if (shouldTerminate() && !isLikelyLoginPage) {
                 log.info(`Skipping ${request.url} - reached max requests limit of ${maxRequestsPerCrawl}`);
-                // Mark as terminating to prevent new requests
-                if (currentPage >= maxRequestsPerCrawl && !isTerminating) {
+                if (!isTerminating) {
                     isTerminating = true;
-                    log.info(`🛑 Reached max requests limit of ${maxRequestsPerCrawl}, will terminate after current page`);
+                    log.info(`🛑 Reached max requests limit of ${maxRequestsPerCrawl}, initiating early shutdown`);
+                    try {
+                        // Abort autoscaled pool to prevent further task scheduling
+                        await crawler.autoscaledPool?.abort();
+                    }
+                    catch (e) {
+                        log.info(`Graceful abort failed: ${e instanceof Error ? e.message : String(e)}`);
+                    }
                 }
                 return;
             }
@@ -441,43 +494,57 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             crawledUrls.add(request.url);
             existingSectionUrls.push(request.url);
             sectionUrlMap.set(sectionKey, existingSectionUrls);
-            await updateProgress('crawling', currentPage, totalPages, request.url);
+            await updateProgress("crawling", currentPage, totalPages, request.url);
             // Set extra headers to appear more like real browser traffic
             await page.setExtraHTTPHeaders({
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                'Sec-Ch-Ua-Mobile': '?0',
-                'Sec-Ch-Ua-Platform': '"macOS"',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Upgrade-Insecure-Requests': '1'
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+                "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"macOS"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Upgrade-Insecure-Requests": "1",
             });
             // Wait for page to fully load and render dynamic content
-            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-                log.info('Network idle timeout, continuing anyway');
+            await page
+                .waitForLoadState("networkidle", { timeout: 10000 })
+                .catch(() => {
+                log.info("Network idle timeout, continuing anyway");
             });
             // CAPTCHA detection and handling
             const captchaIndicators = await page.evaluate(() => {
                 const captchaSelectors = [
-                    '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
-                    '[src*="shieldsquare"]', '[class*="shieldsquare"]',
-                    'iframe[src*="recaptcha"]', '.g-recaptcha',
-                    '[src*="hcaptcha"]', '.h-captcha',
-                    '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]' // Cloudflare
+                    '[src*="captcha"]',
+                    '[class*="captcha"]',
+                    '[id*="captcha"]',
+                    '[src*="shieldsquare"]',
+                    '[class*="shieldsquare"]',
+                    'iframe[src*="recaptcha"]',
+                    ".g-recaptcha",
+                    '[src*="hcaptcha"]',
+                    ".h-captcha",
+                    '[class*="cf-browser-verification"]',
+                    '[id*="cf-wrapper"]', // Cloudflare
                 ];
                 // Check for CAPTCHA elements
-                const hasElements = captchaSelectors.some(selector => document.querySelector(selector));
+                const hasElements = captchaSelectors.some((selector) => document.querySelector(selector));
                 // Check for CAPTCHA-related text in body
-                const bodyText = document.body.textContent?.toLowerCase() || '';
-                const captchaTexts = ['verify you are human', 'prove you are not a robot', 'captcha', 'shieldsquare', 'security check'];
-                const hasText = captchaTexts.some(text => bodyText.includes(text));
+                const bodyText = document.body.textContent?.toLowerCase() || "";
+                const captchaTexts = [
+                    "verify you are human",
+                    "prove you are not a robot",
+                    "captcha",
+                    "shieldsquare",
+                    "security check",
+                ];
+                const hasText = captchaTexts.some((text) => bodyText.includes(text));
                 // Check for CAPTCHA-related titles
                 const titleText = document.title.toLowerCase();
-                const hasCaptchaTitle = captchaTexts.some(text => titleText.includes(text));
+                const hasCaptchaTitle = captchaTexts.some((text) => titleText.includes(text));
                 return hasElements || hasText || hasCaptchaTitle;
             });
             if (captchaIndicators) {
@@ -489,19 +556,29 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         page.waitForNavigation({ timeout: 120000 }),
                         page.waitForFunction(() => {
                             const captchaElements = document.querySelectorAll([
-                                '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
-                                '[src*="shieldsquare"]', '[class*="shieldsquare"]',
-                                'iframe[src*="recaptcha"]', '.g-recaptcha',
-                                '[src*="hcaptcha"]', '.h-captcha',
-                                '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]'
-                            ].join(', '));
+                                '[src*="captcha"]',
+                                '[class*="captcha"]',
+                                '[id*="captcha"]',
+                                '[src*="shieldsquare"]',
+                                '[class*="shieldsquare"]',
+                                'iframe[src*="recaptcha"]',
+                                ".g-recaptcha",
+                                '[src*="hcaptcha"]',
+                                ".h-captcha",
+                                '[class*="cf-browser-verification"]',
+                                '[id*="cf-wrapper"]',
+                            ].join(", "));
                             // Also check if body text no longer contains CAPTCHA indicators
-                            const bodyText = document.body.textContent?.toLowerCase() || '';
-                            const captchaTexts = ['verify you are human', 'prove you are not a robot', 'security check'];
-                            const stillHasText = captchaTexts.some(text => bodyText.includes(text));
+                            const bodyText = document.body.textContent?.toLowerCase() || "";
+                            const captchaTexts = [
+                                "verify you are human",
+                                "prove you are not a robot",
+                                "security check",
+                            ];
+                            const stillHasText = captchaTexts.some((text) => bodyText.includes(text));
                             return captchaElements.length === 0 && !stillHasText;
                         }, { timeout: 120000 }),
-                        page.waitForTimeout(120000) // 2 minute max wait
+                        page.waitForTimeout(120000), // 2 minute max wait
                     ]);
                     log.info(`✅ CAPTCHA appears to be resolved, continuing with ${request.url}`);
                     await page.waitForTimeout(2000); // Let page stabilize after CAPTCHA resolution
@@ -525,13 +602,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     // Hide potential sticky/fixed elements that might overlap navigation
                     const stickyElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"], .sticky, .fixed');
                     stickyElements.forEach((el, index) => {
-                        if (index > 0) { // Keep first sticky element (likely main nav)
-                            el.style.display = 'none';
+                        if (index > 0) {
+                            // Keep first sticky element (likely main nav)
+                            el.style.display = "none";
                         }
                     });
                     // Remove any transform that might affect positioning
-                    document.documentElement.style.transform = 'none';
-                    document.body.style.transform = 'none';
+                    document.documentElement.style.transform = "none";
+                    document.body.style.transform = "none";
                 });
             }
             catch (error) {
@@ -546,7 +624,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     while (currentPosition < scrollHeight) {
                         currentPosition += viewportHeight;
                         window.scrollTo(0, currentPosition);
-                        await new Promise(resolve => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
+                        await new Promise((resolve) => setTimeout(resolve, Math.min(500, delay > 0 ? delay / 4 : 500)));
                     }
                     // Scroll back to top - ENSURE we're at the very top
                     window.scrollTo(0, 0);
@@ -563,13 +641,13 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
             const title = await page.title();
             log.info(`Crawled ${request.url} - Title: ${title}`);
-            await updateProgress('screenshot', currentPage, totalPages, request.url);
+            await updateProgress("screenshot", currentPage, totalPages, request.url);
             // CRITICAL FIX: Ensure page is scrolled to very top before screenshot
             // This fixes navigation bar positioning issues
             try {
                 await page.evaluate(() => {
                     // Multiple methods to ensure we're at the very top
-                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    window.scrollTo({ top: 0, behavior: "instant" });
                     document.documentElement.scrollTop = 0;
                     document.body.scrollTop = 0;
                     if (document.scrollingElement) {
@@ -582,9 +660,11 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 const scrollPosition = await page.evaluate(() => ({
                     window: window.scrollY,
                     document: document.documentElement.scrollTop,
-                    body: document.body.scrollTop
+                    body: document.body.scrollTop,
                 }));
-                if (scrollPosition.window > 0 || scrollPosition.document > 0 || scrollPosition.body > 0) {
+                if (scrollPosition.window > 0 ||
+                    scrollPosition.document > 0 ||
+                    scrollPosition.body > 0) {
                     log.info(`⚠️ Page still scrolled after reset: ${JSON.stringify(scrollPosition)}`);
                 }
                 else {
@@ -602,34 +682,35 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 interactiveElements = await page.evaluate(() => {
                     const elements = [];
                     // Find all links with hrefs
-                    const links = document.querySelectorAll('a[href]');
+                    const links = document.querySelectorAll("a[href]");
                     links.forEach((link) => {
                         const rect = link.getBoundingClientRect();
-                        const href = link.getAttribute('href') || '';
-                        const id = link.getAttribute('id') || '';
+                        const href = link.getAttribute("href") || "";
+                        const id = link.getAttribute("id") || "";
                         // Filter out unwanted links
                         const shouldSkip = 
                         // Skip docusaurus skip link
-                        id === '__docusaurus_skipToContent_fallback' ||
+                        id === "__docusaurus_skipToContent_fallback" ||
                             // Skip empty or javascript links
                             !href ||
-                            href === '#' ||
-                            href.startsWith('javascript:') ||
+                            href === "#" ||
+                            href.startsWith("javascript:") ||
                             // Skip very small elements (likely decorative)
                             rect.width < 10 ||
                             rect.height < 10;
                         if (shouldSkip) {
                             return;
                         }
-                        if (rect.width > 0 && rect.height > 0) { // Only visible elements
+                        if (rect.width > 0 && rect.height > 0) {
+                            // Only visible elements
                             elements.push({
-                                type: 'link',
+                                type: "link",
                                 x: rect.left + window.scrollX,
                                 y: rect.top + window.scrollY,
                                 width: rect.width,
                                 height: rect.height,
                                 href: href || undefined,
-                                text: link.textContent?.trim().substring(0, 100) || undefined
+                                text: link.textContent?.trim().substring(0, 100) || undefined,
                             });
                         }
                     });
@@ -637,15 +718,18 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
                     buttons.forEach((button) => {
                         const rect = button.getBoundingClientRect();
-                        if (rect.width > 0 && rect.height > 0) { // Only visible elements
+                        if (rect.width > 0 && rect.height > 0) {
+                            // Only visible elements
                             elements.push({
-                                type: 'button',
+                                type: "button",
                                 x: rect.left + window.scrollX,
                                 y: rect.top + window.scrollY,
                                 width: rect.width,
                                 height: rect.height,
                                 href: undefined,
-                                text: button.textContent?.trim().substring(0, 100) || button.value?.substring(0, 100) || undefined
+                                text: button.textContent?.trim().substring(0, 100) ||
+                                    button.value?.substring(0, 100) ||
+                                    undefined,
                             });
                         }
                     });
@@ -658,7 +742,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             }
             const fullPageBuffer = await page.screenshot({ fullPage: true });
             // Slice the screenshot into manageable pieces
-            await updateProgress('processing', currentPage, totalPages, request.url);
+            await updateProgress("processing", currentPage, totalPages, request.url);
             const screenshotSlices = await sliceScreenshot(fullPageBuffer, request.url, publicUrl);
             log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${request.url}`);
             crawledPages.push({
@@ -671,49 +755,59 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             // Log discovered links for debugging
             try {
                 const links = await page.evaluate(() => {
-                    const anchors = document.querySelectorAll('a[href]');
-                    return Array.from(anchors).map(a => ({
-                        href: a.getAttribute('href'),
-                        text: a.textContent?.trim().substring(0, 50)
-                    })).slice(0, 10); // Log first 10 links
+                    const anchors = document.querySelectorAll("a[href]");
+                    return Array.from(anchors)
+                        .map((a) => ({
+                        href: a.getAttribute("href"),
+                        text: a.textContent?.trim().substring(0, 50),
+                    }))
+                        .slice(0, 10); // Log first 10 links
                 });
-                log.info(`Found ${links.length} links on ${request.url}: ${links.map(l => l.href).join(', ')}`);
+                log.info(`Found ${links.length} links on ${request.url}: ${links.map((l) => l.href).join(", ")}`);
             }
             catch (error) {
                 log.info(`Could not extract links for debugging from ${request.url}`);
             }
             // Enhanced link discovery with multiple strategies
-            try {
-                // Wait a bit more for any lazy-loaded links
-                await page.waitForTimeout(1000);
-                // Enqueue links with same hostname strategy
-                await enqueueLinks({
-                    strategy: "same-hostname",
-                    transformRequestFunction: (request) => {
-                        // Filter out common non-content URLs
-                        const url = new URL(request.url);
-                        const blockedPatterns = [
-                            /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar)$/i,
-                            /\/api\//i,
-                            /\/assets\//i,
-                            /\/images\//i,
-                            /\/css\//i,
-                            /\/js\//i,
-                            /\#.*$/,
-                            /\?.*$/
-                        ];
-                        const shouldBlock = blockedPatterns.some(pattern => pattern.test(url.pathname));
-                        if (shouldBlock) {
-                            log.info(`Skipping URL due to blocked pattern: ${request.url}`);
-                            return false;
-                        }
-                        return request;
-                    }
-                });
-                log.info(`Successfully enqueued links from ${request.url}`);
+            // Skip if we're only crawling a single page (maxRequestsPerCrawl === 1)
+            // Avoid enqueueing links if we're at or about to hit the limit
+            const nearLimit = maxRequestsPerCrawl &&
+                maxRequestsPerCrawl > 0 &&
+                currentPage >= maxRequestsPerCrawl - 1;
+            if (!shouldTerminate() &&
+                !nearLimit &&
+                (!maxRequestsPerCrawl || maxRequestsPerCrawl > 1)) {
+                try {
+                    await page.waitForTimeout(500); // shorter wait; we are rate-limited anyway
+                    await enqueueLinks({
+                        strategy: "same-hostname",
+                        transformRequestFunction: (request) => {
+                            const url = new URL(request.url);
+                            const blockedPatterns = [
+                                /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar)$/i,
+                                /\/api\//i,
+                                /\/assets\//i,
+                                /\/images\//i,
+                                /\/css\//i,
+                                /\/js\//i,
+                                /\#.*$/,
+                                /\?.*$/,
+                            ];
+                            if (blockedPatterns.some((p) => p.test(url.pathname))) {
+                                log.info(`Skipping URL due to blocked pattern: ${request.url}`);
+                                return false;
+                            }
+                            return request;
+                        },
+                    });
+                    log.info(`Successfully enqueued links from ${request.url}`);
+                }
+                catch (error) {
+                    log.error(`Failed to enqueue links from ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+                }
             }
-            catch (error) {
-                log.error(`Failed to enqueue links from ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+            else {
+                log.info(`Not enqueueing further links (limit reached or near limit)`);
             }
         },
         failedRequestHandler({ request, log }) {
@@ -722,8 +816,28 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         // Add pre-navigation hooks for random delays and better request spacing
         preNavigationHooks: [
             async ({ request, page, log }) => {
+                // Fast path: skip delay/navigation if termination condition met
+                if (isTerminating || shouldTerminate()) {
+                    if (!isTerminating) {
+                        isTerminating = true;
+                        log.info(`🛑 Early termination engaged before navigating to ${request.url}`);
+                        try {
+                            await crawler.autoscaledPool?.abort();
+                        }
+                        catch (e) {
+                            log.info(`Abort in preNavigation failed: ${e instanceof Error ? e.message : String(e)}`);
+                        }
+                    }
+                    else {
+                        log.info(`Skipping (pre-nav) ${request.url} - terminating`);
+                    }
+                    return; // Do not delay or navigate
+                }
                 // Handle credential-based authentication
-                if (auth?.method === 'credentials' && auth.loginUrl && auth.username && auth.password) {
+                if (auth?.method === "credentials" &&
+                    auth.loginUrl &&
+                    auth.username &&
+                    auth.password) {
                     const loginUrlNormalized = new URL(auth.loginUrl).toString();
                     const currentUrlNormalized = new URL(request.url).toString();
                     // Only attempt login when navigating to the login page
@@ -731,20 +845,30 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         log.info(`🔑 Attempting login at ${auth.loginUrl}`);
                         try {
                             // Navigate to login page
-                            await page.goto(auth.loginUrl, { waitUntil: 'networkidle' });
+                            await page.goto(auth.loginUrl, { waitUntil: "networkidle" });
                             // Find and fill login form
-                            const usernameSelector = await page.locator('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], #username, #email').first();
-                            const passwordSelector = await page.locator('input[type="password"], input[name*="pass"], #password').first();
-                            const submitSelector = await page.locator('button[type="submit"], input[type="submit"], button:has-text("login"), button:has-text("sign in")').first();
+                            const usernameSelector = await page
+                                .locator('input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], #username, #email')
+                                .first();
+                            const passwordSelector = await page
+                                .locator('input[type="password"], input[name*="pass"], #password')
+                                .first();
+                            const submitSelector = await page
+                                .locator('button[type="submit"], input[type="submit"], button:has-text("login"), button:has-text("sign in")')
+                                .first();
                             if (usernameSelector && passwordSelector) {
                                 await usernameSelector.fill(auth.username);
                                 await passwordSelector.fill(auth.password);
                                 if (submitSelector) {
                                     await submitSelector.click();
                                     // Wait for navigation after login
-                                    await page.waitForLoadState('networkidle', { timeout: 10000 });
+                                    await page.waitForLoadState("networkidle", {
+                                        timeout: 10000,
+                                    });
                                     // Check if login was successful by looking for common success indicators
-                                    const successIndicators = await page.locator('a[href*="logout"], button:has-text("logout"), .user-menu, .profile, [data-testid*="user"]').count();
+                                    const successIndicators = await page
+                                        .locator('a[href*="logout"], button:has-text("logout"), .user-menu, .profile, [data-testid*="user"]')
+                                        .count();
                                     if (successIndicators > 0) {
                                         log.info(`✅ Login successful`);
                                         authSuccess = true;
@@ -767,38 +891,66 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     }
                 }
                 // Use configured request delay with some randomization to avoid rate limiting
-                const baseDelay = requestDelay;
+                // If crawl is very small, skip artificial delay for snappier UX
+                const baseDelay = maxRequestsPerCrawl && maxRequestsPerCrawl <= 3 ? 0 : requestDelay;
                 const randomVariation = Math.floor(Math.random() * 500) - 250; // ±250ms variation
                 const totalDelay = Math.max(0, baseDelay + randomVariation);
-                log.info(`Adding ${totalDelay}ms delay before navigating to ${request.url}`);
-                await new Promise(resolve => setTimeout(resolve, totalDelay));
-            }
+                if (totalDelay > 0) {
+                    log.info(`Adding ${totalDelay}ms delay before navigating to ${request.url}`);
+                }
+                await new Promise((resolve) => setTimeout(resolve, totalDelay));
+            },
         ],
     }, crawlerConfig);
     // Get total pages count before starting
     totalPages = maxRequestsPerCrawl || 100; // Default to 100 if no limit
-    await updateProgress('starting', 0, totalPages, canonicalStartUrl);
+    await updateProgress("starting", 0, totalPages, canonicalStartUrl);
     await crawler.run([canonicalStartUrl]);
+    // Capture cookies from browser context BEFORE teardown
+    let capturedCookies = [];
+    try {
+        // Access the browser pool to get cookies before closing
+        const browserPool = crawler.browserPool;
+        if (browserPool && browserPool.activeBrowsers && browserPool.activeBrowsers.size > 0) {
+            const browserController = Array.from(browserPool.activeBrowsers.values())[0];
+            if (browserController && browserController.browser) {
+                const contexts = browserController.browser.contexts();
+                if (contexts && contexts.length > 0) {
+                    const allCookies = await contexts[0].cookies();
+                    capturedCookies = allCookies.map((cookie) => ({
+                        name: cookie.name,
+                        value: cookie.value,
+                        domain: cookie.domain,
+                    }));
+                    console.log(`🍪 Captured ${capturedCookies.length} cookies from browser session`);
+                }
+            }
+        }
+    }
+    catch (error) {
+        console.log(`Could not capture cookies: ${error instanceof Error ? error.message : String(error)}`);
+    }
     // Ensure proper cleanup
     try {
         await crawler.teardown();
-        console.log('✅ Crawler cleaned up successfully');
+        console.log("✅ Crawler cleaned up successfully");
     }
     catch (error) {
         console.error(`❌ Error cleaning up crawler: ${error instanceof Error ? error.message : String(error)}`);
     }
     console.log(`📊 Total pages crawled: ${crawledPages.length}`);
-    console.log('📄 Crawled pages:', crawledPages.map(p => p.url));
+    console.log("📄 Crawled pages:", crawledPages.map((p) => p.url));
     const siteTree = buildTree(crawledPages, canonicalStartUrl);
     console.log(`🌲 Tree built with ${siteTree ? countTreeNodes(siteTree) : 0} nodes`);
     const manifest = {
         startUrl: canonicalStartUrl,
         crawlDate: new Date().toISOString(),
         tree: siteTree,
+        cookies: capturedCookies.length > 0 ? capturedCookies : undefined,
     };
     const manifestFilename = jobId ? `manifest-${jobId}.json` : "manifest.json";
     const manifestPath = path.join(screenshotDir, manifestFilename);
-    console.log('📄 Saving manifest to:', manifestPath);
+    console.log("📄 Saving manifest to:", manifestPath);
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     console.log(`✅ Crawler finished and ${manifestFilename} created.`);
 }

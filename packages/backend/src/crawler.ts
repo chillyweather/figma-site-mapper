@@ -1236,6 +1236,30 @@ export async function runCrawler(
 
   await crawler.run([canonicalStartUrl]);
 
+  // Capture cookies from browser context BEFORE teardown
+  let capturedCookies: Array<{ name: string; value: string; domain: string }> = [];
+  try {
+    // Access the browser pool to get cookies before closing
+    const browserPool = (crawler as any).browserPool;
+    if (browserPool && browserPool.activeBrowsers && browserPool.activeBrowsers.size > 0) {
+      const browserController = Array.from(browserPool.activeBrowsers.values())[0] as any;
+      if (browserController && browserController.browser) {
+        const contexts = browserController.browser.contexts();
+        if (contexts && contexts.length > 0) {
+          const allCookies = await contexts[0].cookies();
+          capturedCookies = allCookies.map((cookie: any) => ({
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+          }));
+          console.log(`🍪 Captured ${capturedCookies.length} cookies from browser session`);
+        }
+      }
+    }
+  } catch (error) {
+    console.log(`Could not capture cookies: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   // Ensure proper cleanup
   try {
     await crawler.teardown();
@@ -1262,6 +1286,7 @@ export async function runCrawler(
     startUrl: canonicalStartUrl,
     crawlDate: new Date().toISOString(),
     tree: siteTree,
+    cookies: capturedCookies.length > 0 ? capturedCookies : undefined,
   };
 
   const manifestFilename = jobId ? `manifest-${jobId}.json` : "manifest.json";
