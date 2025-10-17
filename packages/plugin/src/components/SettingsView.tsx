@@ -25,6 +25,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleShowBrowserChange,
   detectInteractiveElements,
   handleDetectInteractiveElementsChange,
+  captureOnlyVisibleElements,
+  handleCaptureOnlyVisibleElementsChange,
   authMethod,
   handleAuthMethodChange,
   loginUrl,
@@ -306,6 +308,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </label>
       <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
         Add numbered frames around links and buttons for user journey mapping
+      </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          cursor: "pointer",
+          marginTop: "8px",
+          marginLeft: "24px",
+        }}
+      >
+        <input
+          id="capture-only-visible-elements-checkbox"
+          type="checkbox"
+          checked={captureOnlyVisibleElements}
+          onChange={handleCaptureOnlyVisibleElementsChange}
+          disabled={isLoading || !!jobId || !detectInteractiveElements}
+          style={{ marginRight: "8px" }}
+        />
+        Capture only initially visible elements
+      </label>
+      <div
+        style={{
+          fontSize: "10px",
+          color: "#666",
+          marginTop: "2px",
+          marginLeft: "24px",
+        }}
+      >
+        Don't include elements from dropdowns/menus that open during scroll
       </div>
     </div>
 

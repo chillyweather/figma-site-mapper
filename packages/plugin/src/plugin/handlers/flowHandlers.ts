@@ -897,6 +897,8 @@ async function fetchAndRenderTargetPage(
     // Load settings to get user preferences
     const settings = await loadSettings();
     const showBrowser = settings.showBrowser || false;
+    const captureOnlyVisibleElements =
+      settings.captureOnlyVisibleElements !== false;
 
     // Try to load cached cookies for this domain
     let domainCookies = null;
@@ -933,6 +935,7 @@ async function fetchAndRenderTargetPage(
       sampleSize: 1,
       showBrowser: showBrowser, // Use setting from storage
       detectInteractiveElements: true,
+      captureOnlyVisibleElements: captureOnlyVisibleElements, // Use setting from storage
       auth: auth, // Pass cookies if available
     });
 

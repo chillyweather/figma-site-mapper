@@ -104,6 +104,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    captureOnlyVisibleElements,
     auth,
   } = msg;
 
@@ -125,6 +126,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
       sampleSize,
       showBrowser,
       detectInteractiveElements,
+      captureOnlyVisibleElements,
       auth,
     });
 

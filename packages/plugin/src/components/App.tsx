@@ -113,6 +113,13 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleCaptureOnlyVisibleElementsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateSetting("captureOnlyVisibleElements", e.target.checked);
+    },
+    [updateSetting]
+  );
+
   const handleAuthMethodChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSetting(
@@ -174,6 +181,10 @@ export const App: React.FC = () => {
       detectInteractiveElements={settings.detectInteractiveElements}
       handleDetectInteractiveElementsChange={
         handleDetectInteractiveElementsChange
+      }
+      captureOnlyVisibleElements={settings.captureOnlyVisibleElements}
+      handleCaptureOnlyVisibleElementsChange={
+        handleCaptureOnlyVisibleElementsChange
       }
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}

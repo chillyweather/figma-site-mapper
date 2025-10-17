@@ -239,7 +239,70 @@ function buildTree(pages, startUrl) {
     }
     return root;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, auth) {
+/**
+ * Detect interactive elements on the page
+ */
+async function detectInteractiveElementsOnPage(page, log) {
+    const elements = await page.evaluate(() => {
+        const elements = [];
+        // Find all links with hrefs
+        const links = document.querySelectorAll("a[href]");
+        links.forEach((link) => {
+            const rect = link.getBoundingClientRect();
+            const href = link.getAttribute("href") || "";
+            const id = link.getAttribute("id") || "";
+            // Filter out unwanted links
+            const shouldSkip = 
+            // Skip docusaurus skip link
+            id === "__docusaurus_skipToContent_fallback" ||
+                // Skip empty or javascript links
+                !href ||
+                href === "#" ||
+                href.startsWith("javascript:") ||
+                // Skip very small elements (likely decorative)
+                rect.width < 10 ||
+                rect.height < 10;
+            if (shouldSkip) {
+                return;
+            }
+            if (rect.width > 0 && rect.height > 0) {
+                // Only visible elements
+                elements.push({
+                    type: "link",
+                    x: rect.left + window.scrollX,
+                    y: rect.top + window.scrollY,
+                    width: rect.width,
+                    height: rect.height,
+                    href: href || undefined,
+                    text: link.textContent?.trim().substring(0, 100) || undefined,
+                });
+            }
+        });
+        // Find all buttons
+        const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
+        buttons.forEach((button) => {
+            const rect = button.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                // Only visible elements
+                elements.push({
+                    type: "button",
+                    x: rect.left + window.scrollX,
+                    y: rect.top + window.scrollY,
+                    width: rect.width,
+                    height: rect.height,
+                    href: undefined,
+                    text: button.textContent?.trim().substring(0, 100) ||
+                        button.value?.substring(0, 100) ||
+                        undefined,
+                });
+            }
+        });
+        return elements;
+    });
+    log.info(`Found ${elements.length} interactive elements`);
+    return elements;
+}
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, auth) {
     console.log("🚀 Starting the crawler with URL:", startUrl);
     console.log("📊 Crawler settings:", {
         maxRequestsPerCrawl,
@@ -251,6 +314,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         sampleSize,
         showBrowser,
         detectInteractiveElements,
+        captureOnlyVisibleElements,
     });
     // Use job-specific storage directory to avoid conflicts between concurrent jobs
     // This allows multiple crawls to run simultaneously without interfering with each other
@@ -615,6 +679,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             catch (error) {
                 log.info(`Could not handle sticky elements for ${request.url}`);
             }
+            // Find interactive elements (links and buttons) with their bounding boxes (if enabled)
+            // CRITICAL: Timing depends on captureOnlyVisibleElements setting
+            let interactiveElements = [];
+            if (detectInteractiveElements && captureOnlyVisibleElements) {
+                // Capture elements BEFORE scrolling to avoid dropdown/menu items
+                log.info(`Finding initially visible interactive elements on ${request.url}`);
+                interactiveElements = await detectInteractiveElementsOnPage(page, log);
+            }
             // Scroll through page to trigger lazy loading
             try {
                 await page.evaluate(async () => {
@@ -674,68 +746,15 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             catch (error) {
                 log.info(`⚠️ Could not ensure top position for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
             }
-            // Find interactive elements (links and buttons) with their bounding boxes (if enabled)
+            // Find interactive elements (AFTER scrolling if not already captured)
             // IMPORTANT: This must happen AFTER final scroll positioning to ensure accurate coordinates
-            let interactiveElements = [];
             if (detectInteractiveElements) {
-                log.info(`Finding interactive elements on ${request.url}`);
-                interactiveElements = await page.evaluate(() => {
-                    const elements = [];
-                    // Find all links with hrefs
-                    const links = document.querySelectorAll("a[href]");
-                    links.forEach((link) => {
-                        const rect = link.getBoundingClientRect();
-                        const href = link.getAttribute("href") || "";
-                        const id = link.getAttribute("id") || "";
-                        // Filter out unwanted links
-                        const shouldSkip = 
-                        // Skip docusaurus skip link
-                        id === "__docusaurus_skipToContent_fallback" ||
-                            // Skip empty or javascript links
-                            !href ||
-                            href === "#" ||
-                            href.startsWith("javascript:") ||
-                            // Skip very small elements (likely decorative)
-                            rect.width < 10 ||
-                            rect.height < 10;
-                        if (shouldSkip) {
-                            return;
-                        }
-                        if (rect.width > 0 && rect.height > 0) {
-                            // Only visible elements
-                            elements.push({
-                                type: "link",
-                                x: rect.left + window.scrollX,
-                                y: rect.top + window.scrollY,
-                                width: rect.width,
-                                height: rect.height,
-                                href: href || undefined,
-                                text: link.textContent?.trim().substring(0, 100) || undefined,
-                            });
-                        }
-                    });
-                    // Find all buttons
-                    const buttons = document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]');
-                    buttons.forEach((button) => {
-                        const rect = button.getBoundingClientRect();
-                        if (rect.width > 0 && rect.height > 0) {
-                            // Only visible elements
-                            elements.push({
-                                type: "button",
-                                x: rect.left + window.scrollX,
-                                y: rect.top + window.scrollY,
-                                width: rect.width,
-                                height: rect.height,
-                                href: undefined,
-                                text: button.textContent?.trim().substring(0, 100) ||
-                                    button.value?.substring(0, 100) ||
-                                    undefined,
-                            });
-                        }
-                    });
-                    return elements;
-                });
-                log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+                if (!captureOnlyVisibleElements) {
+                    // Capture all elements AFTER scrolling (includes dropdown/menu items)
+                    log.info(`Finding all interactive elements on ${request.url}`);
+                    interactiveElements = await detectInteractiveElementsOnPage(page, log);
+                }
+                // If captureOnlyVisibleElements=true, we already captured them before scrolling
             }
             else {
                 log.info(`Skipping interactive elements detection (disabled)`);
@@ -911,7 +930,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     try {
         // Access the browser pool to get cookies before closing
         const browserPool = crawler.browserPool;
-        if (browserPool && browserPool.activeBrowsers && browserPool.activeBrowsers.size > 0) {
+        if (browserPool &&
+            browserPool.activeBrowsers &&
+            browserPool.activeBrowsers.size > 0) {
             const browserController = Array.from(browserPool.activeBrowsers.values())[0];
             if (browserController && browserController.browser) {
                 const contexts = browserController.browser.contexts();

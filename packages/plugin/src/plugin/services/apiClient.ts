@@ -24,6 +24,7 @@ export async function startCrawl(
       requestDelay: params.requestDelay || 1000,
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
       detectInteractiveElements: params.detectInteractiveElements !== false,
+      captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
     }),
   });
 

@@ -23,6 +23,7 @@ export interface CrawlStartMessage {
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
+  captureOnlyVisibleElements: boolean;
   auth: AuthData | null;
 }
 

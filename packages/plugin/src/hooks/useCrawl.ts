@@ -68,6 +68,7 @@ export function useCrawl() {
               sampleSize: parseSampleSize(settings.sampleSize),
               showBrowser: settings.showBrowser,
               detectInteractiveElements: settings.detectInteractiveElements,
+              captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
             },
           },

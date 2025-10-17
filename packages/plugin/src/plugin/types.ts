@@ -43,5 +43,6 @@ export interface CrawlParams {
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
+  captureOnlyVisibleElements: boolean;
   auth: any;
 }
