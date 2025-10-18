@@ -3,6 +3,7 @@ import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { MappingTab } from "./MappingTab";
+import { StylingTab } from "./StylingTab";
 
 export const MainView: React.FC<MainViewProps> = ({
   url,
@@ -13,7 +14,6 @@ export const MainView: React.FC<MainViewProps> = ({
   status,
   handleClose,
   switchToSettings,
-  switchToStyling,
   badgeLinks,
   checkedLinks,
   handleLinkCheck,
@@ -21,9 +21,9 @@ export const MainView: React.FC<MainViewProps> = ({
   flowProgress,
   crawlProgress,
 }) => {
-  const [activeTab, setActiveTab] = useState<"crawling" | "mapping">(
-    "crawling"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "crawling" | "mapping" | "styling"
+  >("crawling");
 
   return (
     <div id="main-view" style={{ fontFamily: "Inter, sans-serif" }}>
@@ -43,36 +43,20 @@ export const MainView: React.FC<MainViewProps> = ({
         >
           Figma Site Mapper
         </h3>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            id="main-styling-button"
-            onClick={switchToStyling}
-            style={{
-              background: "none",
-              border: "1px solid #ccc",
-              padding: "4px 12px",
-              cursor: "pointer",
-              fontSize: "12px",
-              borderRadius: "3px",
-            }}
-          >
-            Styling
-          </button>
-          <button
-            id="main-settings-button"
-            onClick={switchToSettings}
-            style={{
-              background: "none",
-              border: "1px solid #ccc",
-              padding: "4px 8px",
-              cursor: "pointer",
-              fontSize: "12px",
-              borderRadius: "3px",
-            }}
-          >
-            <IconSettings size={16} />
-          </button>
-        </div>
+        <button
+          id="main-settings-button"
+          onClick={switchToSettings}
+          style={{
+            background: "none",
+            border: "1px solid #ccc",
+            padding: "4px 8px",
+            cursor: "pointer",
+            fontSize: "12px",
+            borderRadius: "3px",
+          }}
+        >
+          <IconSettings size={16} />
+        </button>
       </div>
 
       {/* Tab Navigation */}
@@ -123,6 +107,25 @@ export const MainView: React.FC<MainViewProps> = ({
         >
           Flows
         </button>
+        <button
+          id="styling-tab-button"
+          onClick={() => setActiveTab("styling")}
+          style={{
+            background: "none",
+            border: "none",
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: activeTab === "styling" ? "600" : "400",
+            color: activeTab === "styling" ? "#000" : "#666",
+            borderBottom:
+              activeTab === "styling"
+                ? "2px solid #0066cc"
+                : "2px solid transparent",
+          }}
+        >
+          Styling
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -148,6 +151,8 @@ export const MainView: React.FC<MainViewProps> = ({
           flowProgress={flowProgress}
         />
       )}
+
+      {activeTab === "styling" && <StylingTab />}
     </div>
   );
 };

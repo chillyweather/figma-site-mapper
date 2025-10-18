@@ -31,10 +31,6 @@ export const App: React.FC = () => {
     () => setCurrentView("settings"),
     [setCurrentView]
   );
-  const switchToStyling = useCallback(
-    () => setCurrentView("styling"),
-    [setCurrentView]
-  );
 
   // Handle close
   const handleClose = useCallback(() => {
@@ -360,7 +356,6 @@ export const App: React.FC = () => {
       status={status}
       handleClose={handleClose}
       switchToSettings={switchToSettings}
-      switchToStyling={switchToStyling}
       badgeLinks={badgeLinks}
       checkedLinks={checkedLinks}
       handleLinkCheck={handleLinkCheck}
