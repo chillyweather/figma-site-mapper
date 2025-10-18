@@ -271,6 +271,14 @@ export async function handleGetStatus(msg: any): Promise<void> {
       const manifestData = await fetchManifest(result.result.manifestUrl);
       console.log("Successfully fetched manifest");
 
+      // Store manifest URL in clientStorage for persistence
+      await figma.clientStorage.setAsync(
+        "lastManifestUrl",
+        result.result.manifestUrl
+      );
+      await figma.clientStorage.setAsync("lastJobId", jobId);
+      console.log("💾 Stored manifest URL in clientStorage");
+
       // Send manifest data to UI for storage
       figma.ui.postMessage({
         type: "manifest-data",
@@ -417,6 +425,30 @@ export async function handleOpenAuthSession(msg: any): Promise<void> {
 }
 
 /**
+ * Handle loading last manifest URL from storage
+ */
+async function handleGetLastManifest(): Promise<void> {
+  try {
+    const lastManifestUrl =
+      await figma.clientStorage.getAsync("lastManifestUrl");
+    const lastJobId = await figma.clientStorage.getAsync("lastJobId");
+
+    figma.ui.postMessage({
+      type: "last-manifest-url",
+      manifestUrl: lastManifestUrl || null,
+      jobId: lastJobId || null,
+    });
+  } catch (error) {
+    console.error("Failed to get last manifest URL:", error);
+    figma.ui.postMessage({
+      type: "last-manifest-url",
+      manifestUrl: null,
+      jobId: null,
+    });
+  }
+}
+
+/**
  * Main message router for UI messages
  */
 export async function handleUIMessage(msg: any): Promise<void> {
@@ -443,6 +475,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "open-auth-session":
       await handleOpenAuthSession(msg);
+      break;
+
+    case "get-last-manifest":
+      await handleGetLastManifest();
       break;
 
     case "close":
