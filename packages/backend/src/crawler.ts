@@ -389,14 +389,62 @@ async function extractStyleData(
     const elements: ExtractedElementInner[] = [];
     const cssVariables: Record<string, string> = {};
 
-    // Extract CSS variables from :root
-    const rootStyle = getComputedStyle(document.documentElement);
-    const rootStyleDeclaration = document.documentElement.style;
-    for (let i = 0; i < rootStyleDeclaration.length; i++) {
-      const propName = rootStyleDeclaration[i];
-      if (propName?.startsWith("--")) {
-        cssVariables[propName] = rootStyle.getPropertyValue(propName).trim();
+    // Extract CSS variables from all stylesheets and :root computed styles
+    try {
+      // First, get computed CSS variables from :root
+      const rootStyle = getComputedStyle(document.documentElement);
+
+      // Get all CSS property names from computed style (including custom properties)
+      for (let i = 0; i < rootStyle.length; i++) {
+        const propName = rootStyle[i];
+        if (propName?.startsWith("--")) {
+          const value = rootStyle.getPropertyValue(propName).trim();
+          if (value) {
+            cssVariables[propName] = value;
+          }
+        }
       }
+
+      // Also check inline styles on :root
+      const rootInlineStyle = document.documentElement.style;
+      for (let i = 0; i < rootInlineStyle.length; i++) {
+        const propName = rootInlineStyle[i];
+        if (propName?.startsWith("--")) {
+          const value = rootStyle.getPropertyValue(propName).trim();
+          if (value) {
+            cssVariables[propName] = value;
+          }
+        }
+      }
+
+      // Extract CSS variables from stylesheets (where they're usually defined)
+      Array.from(document.styleSheets).forEach((sheet) => {
+        try {
+          // Skip stylesheets from different origins (CORS)
+          if (!sheet.cssRules) return;
+
+          Array.from(sheet.cssRules).forEach((rule) => {
+            // Check :root rules
+            if (rule instanceof CSSStyleRule && rule.selectorText === ":root") {
+              const style = rule.style;
+              for (let i = 0; i < style.length; i++) {
+                const propName = style[i];
+                if (propName?.startsWith("--")) {
+                  const value = style.getPropertyValue(propName).trim();
+                  if (value) {
+                    cssVariables[propName] = value;
+                  }
+                }
+              }
+            }
+          });
+        } catch (e) {
+          // Ignore CORS errors for external stylesheets
+          console.log("Could not access stylesheet:", e);
+        }
+      });
+    } catch (e) {
+      console.error("Error extracting CSS variables:", e);
     }
 
     // Build selector for each element type
