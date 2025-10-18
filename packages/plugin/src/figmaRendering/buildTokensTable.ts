@@ -302,8 +302,9 @@ export async function buildTokensTable(
 
   console.log("✅ Main tokens frame created");
 
-  // Add page URL as title
-  const pageTitle = createTextNode(pageUrl, 16, "Bold");
+  // Add page path as title
+  const pagePath = getPathFromUrl(pageUrl);
+  const pageTitle = createTextNode(pagePath, 16, "Bold");
   pageTitle.layoutGrow = 0;
   pageTitle.layoutAlign = "MIN";
   pageTitle.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
@@ -386,9 +387,33 @@ export async function buildTokensTable(
     console.log("🔧 enforced hug height on token frame", f.name, f.height);
   });
 
-  // Position near viewport center
-  tokensFrame.x = figma.viewport.center.x - tokensFrame.width / 2;
-  tokensFrame.y = figma.viewport.center.y - tokensFrame.height / 2;
+  // Position to the right of the rightmost element on the page
+  const allNodes = figma.currentPage.children.filter(
+    (n) => n.id !== tokensFrame.id
+  );
+  let rightmostX = 0;
+  let topmostY = 0;
+
+  if (allNodes.length > 0) {
+    // Find the rightmost edge and topmost position
+    allNodes.forEach((node) => {
+      const nodeRight = node.x + node.width;
+      if (nodeRight > rightmostX) {
+        rightmostX = nodeRight;
+      }
+      if (node.y < topmostY || topmostY === 0) {
+        topmostY = node.y;
+      }
+    });
+
+    // Position 200px to the right of the rightmost element, top-aligned
+    tokensFrame.x = rightmostX + 200;
+    tokensFrame.y = topmostY;
+  } else {
+    // If no other elements, place near viewport center
+    tokensFrame.x = figma.viewport.center.x - tokensFrame.width / 2;
+    tokensFrame.y = figma.viewport.center.y - tokensFrame.height / 2;
+  }
 
   // Select and zoom to the frame
   figma.currentPage.selection = [tokensFrame];
