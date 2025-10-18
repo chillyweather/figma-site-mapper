@@ -13,6 +13,7 @@ export const MainView: React.FC<MainViewProps> = ({
   status,
   handleClose,
   switchToSettings,
+  switchToStyling,
   badgeLinks,
   checkedLinks,
   handleLinkCheck,
@@ -42,20 +43,36 @@ export const MainView: React.FC<MainViewProps> = ({
         >
           Figma Site Mapper
         </h3>
-        <button
-          id="main-settings-button"
-          onClick={switchToSettings}
-          style={{
-            background: "none",
-            border: "1px solid #ccc",
-            padding: "4px 8px",
-            cursor: "pointer",
-            fontSize: "12px",
-            borderRadius: "3px",
-          }}
-        >
-          <IconSettings size={16} />
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            id="main-styling-button"
+            onClick={switchToStyling}
+            style={{
+              background: "none",
+              border: "1px solid #ccc",
+              padding: "4px 12px",
+              cursor: "pointer",
+              fontSize: "12px",
+              borderRadius: "3px",
+            }}
+          >
+            Styling
+          </button>
+          <button
+            id="main-settings-button"
+            onClick={switchToSettings}
+            style={{
+              background: "none",
+              border: "1px solid #ccc",
+              padding: "4px 8px",
+              cursor: "pointer",
+              fontSize: "12px",
+              borderRadius: "3px",
+            }}
+          >
+            <IconSettings size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Tab Navigation */}

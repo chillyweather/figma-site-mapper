@@ -1,4 +1,4 @@
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
 import {
   isLoadingAtom,
@@ -6,6 +6,7 @@ import {
   jobIdAtom,
   authStatusAtom,
   crawlProgressAtom,
+  manifestDataAtom,
 } from "../store/atoms";
 import { useSettings } from "./useSettings";
 import { startCrawl } from "../utils/api";
@@ -27,6 +28,7 @@ export function useCrawl() {
   const [jobId, setJobId] = useAtom(jobIdAtom);
   const [authStatus, setAuthStatus] = useAtom(authStatusAtom);
   const [crawlProgress, setCrawlProgress] = useAtom(crawlProgressAtom);
+  const setManifestData = useSetAtom(manifestDataAtom);
   const intervalRef = useRef<number | null>(null);
 
   const handleSubmit = useCallback(
@@ -199,11 +201,16 @@ export function useCrawl() {
           setTimeout(() => setAuthStatus(null), 5000);
         }
       }
+
+      if (msg.type === "manifest-data") {
+        console.log("Received manifest data:", msg.manifestData);
+        setManifestData(msg.manifestData);
+      }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setStatus, setJobId, setIsLoading, setCrawlProgress]);
+  }, [setStatus, setJobId, setIsLoading, setCrawlProgress, setManifestData]);
 
   // Start polling when jobId is set
   useEffect(() => {

@@ -173,6 +173,7 @@ export interface MainViewProps {
   status: string;
   handleClose: () => void;
   switchToSettings: () => void;
+  switchToStyling: () => void;
   badgeLinks: BadgeLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;

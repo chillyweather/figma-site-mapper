@@ -6,6 +6,7 @@ import { useCrawl } from "../hooks/useCrawl";
 import { useFlowMapping } from "../hooks/useFlowMapping";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
+import { StylingView } from "./StylingView";
 import { getPresetConfig } from "../utils/stylePresets";
 
 export const App: React.FC = () => {
@@ -28,6 +29,10 @@ export const App: React.FC = () => {
   );
   const switchToSettings = useCallback(
     () => setCurrentView("settings"),
+    [setCurrentView]
+  );
+  const switchToStyling = useCallback(
+    () => setCurrentView("styling"),
     [setCurrentView]
   );
 
@@ -271,7 +276,9 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
-  return currentView === "settings" ? (
+  return currentView === "styling" ? (
+    <StylingView onBack={switchToMain} />
+  ) : currentView === "settings" ? (
     <SettingsView
       url={settings.url}
       screenshotWidth={settings.screenshotWidth}
@@ -353,6 +360,7 @@ export const App: React.FC = () => {
       status={status}
       handleClose={handleClose}
       switchToSettings={switchToSettings}
+      switchToStyling={switchToStyling}
       badgeLinks={badgeLinks}
       checkedLinks={checkedLinks}
       handleLinkCheck={handleLinkCheck}

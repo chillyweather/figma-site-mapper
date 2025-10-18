@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from "../constants";
 
 // Settings atoms
 export const settingsAtom = atom<PluginSettings>(DEFAULT_SETTINGS);
-export const currentViewAtom = atom<"main" | "settings">("main");
+export const currentViewAtom = atom<"main" | "settings" | "styling">("main");
 
 // Crawl state atoms
 export const isLoadingAtom = atom(false);
@@ -41,3 +41,6 @@ export const flowProgressAtom = atom<FlowProgress>({
     { name: "Create arrows", status: "pending" },
   ],
 });
+
+// Manifest data atom
+export const manifestDataAtom = atom<any>(null);

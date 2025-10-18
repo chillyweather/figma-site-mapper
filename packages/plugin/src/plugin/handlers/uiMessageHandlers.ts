@@ -271,6 +271,12 @@ export async function handleGetStatus(msg: any): Promise<void> {
       const manifestData = await fetchManifest(result.result.manifestUrl);
       console.log("Successfully fetched manifest");
 
+      // Send manifest data to UI for storage
+      figma.ui.postMessage({
+        type: "manifest-data",
+        manifestData,
+      });
+
       // Store cookies for this domain if available
       if (manifestData.cookies && manifestData.cookies.length > 0) {
         try {
