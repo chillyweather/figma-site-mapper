@@ -49,9 +49,40 @@ interface ExtractedElement {
   role?: string;
 }
 
+interface CSSVariablesByCategory {
+  colors: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  spacing: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  typography: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  sizing: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  borders: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  shadows: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+  other: {
+    primitives: Record<string, string>;
+    aliases: Record<string, string>;
+  };
+}
+
 interface StyleData {
   elements: ExtractedElement[];
-  cssVariables?: Record<string, string>;
+  cssVariables?: CSSVariablesByCategory;
 }
 
 interface PageData {
@@ -387,64 +418,135 @@ async function extractStyleData(
     }
 
     const elements: ExtractedElementInner[] = [];
-    const cssVariables: Record<string, string> = {};
+    const rawCssVariables: Record<string, string> = {};
 
     // Extract CSS variables from all stylesheets and :root computed styles
     try {
-      // First, get computed CSS variables from :root
-      const rootStyle = getComputedStyle(document.documentElement);
-
-      // Get all CSS property names from computed style (including custom properties)
-      for (let i = 0; i < rootStyle.length; i++) {
-        const propName = rootStyle[i];
-        if (propName?.startsWith("--")) {
-          const value = rootStyle.getPropertyValue(propName).trim();
-          if (value) {
-            cssVariables[propName] = value;
-          }
-        }
-      }
-
-      // Also check inline styles on :root
-      const rootInlineStyle = document.documentElement.style;
-      for (let i = 0; i < rootInlineStyle.length; i++) {
-        const propName = rootInlineStyle[i];
-        if (propName?.startsWith("--")) {
-          const value = rootStyle.getPropertyValue(propName).trim();
-          if (value) {
-            cssVariables[propName] = value;
-          }
-        }
-      }
-
       // Extract CSS variables from stylesheets (where they're usually defined)
-      Array.from(document.styleSheets).forEach((sheet) => {
+      const stylesheets = document.styleSheets;
+      for (let s = 0; s < stylesheets.length; s++) {
+        const sheet = stylesheets[s];
         try {
           // Skip stylesheets from different origins (CORS)
-          if (!sheet.cssRules) return;
+          if (!sheet || !sheet.cssRules) continue;
 
-          Array.from(sheet.cssRules).forEach((rule) => {
+          const rules = sheet.cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r];
             // Check :root rules
             if (rule instanceof CSSStyleRule && rule.selectorText === ":root") {
               const style = rule.style;
               for (let i = 0; i < style.length; i++) {
                 const propName = style[i];
-                if (propName?.startsWith("--")) {
+                if (propName && propName.indexOf("--") === 0) {
                   const value = style.getPropertyValue(propName).trim();
                   if (value) {
-                    cssVariables[propName] = value;
+                    rawCssVariables[propName] = value;
                   }
                 }
               }
             }
-          });
+          }
         } catch (e) {
           // Ignore CORS errors for external stylesheets
           console.log("Could not access stylesheet:", e);
         }
-      });
+      }
+
+      // Also get computed CSS variables from :root (fallback)
+      const rootStyle = getComputedStyle(document.documentElement);
+      for (let i = 0; i < rootStyle.length; i++) {
+        const propName = rootStyle[i];
+        if (propName && propName.indexOf("--") === 0) {
+          // Only add if not already found in stylesheets
+          if (!rawCssVariables[propName]) {
+            const value = rootStyle.getPropertyValue(propName).trim();
+            if (value) {
+              rawCssVariables[propName] = value;
+            }
+          }
+        }
+      }
     } catch (e) {
       console.error("Error extracting CSS variables:", e);
+    }
+
+    // Categorize CSS variables by type and separate primitives from aliases
+    interface CategorizedVariables {
+      colors: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      spacing: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      typography: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      sizing: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      borders: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      shadows: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+      other: {
+        primitives: Record<string, string>;
+        aliases: Record<string, string>;
+      };
+    }
+
+    const cssVariables: CategorizedVariables = {
+      colors: { primitives: {}, aliases: {} },
+      spacing: { primitives: {}, aliases: {} },
+      typography: { primitives: {}, aliases: {} },
+      sizing: { primitives: {}, aliases: {} },
+      borders: { primitives: {}, aliases: {} },
+      shadows: { primitives: {}, aliases: {} },
+      other: { primitives: {}, aliases: {} },
+    };
+
+    // Categorization patterns
+    const colorPatterns = /color|background|bg|fill|stroke|border-color|text/i;
+    const spacingPatterns = /spacing|padding|margin|gap|inset/i;
+    const typographyPatterns = /font|text-|letter|line-height|heading/i;
+    const sizingPatterns = /width|height|size|scale|dimension/i;
+    const borderPatterns = /border|outline|radius/i;
+    const shadowPatterns = /shadow|elevation/i;
+
+    // Categorize each variable - use plain for loop to avoid TypeScript helpers
+    const varNames = Object.keys(rawCssVariables);
+    for (let i = 0; i < varNames.length; i++) {
+      const name = varNames[i];
+      const value = rawCssVariables[name];
+      if (!name || !value) continue;
+
+      // Check if value is an alias (references another variable)
+      const isAliasValue = value.indexOf("var(--") !== -1;
+      const targetBucket = isAliasValue ? "aliases" : "primitives";
+
+      if (colorPatterns.test(name)) {
+        cssVariables.colors[targetBucket][name] = value;
+      } else if (spacingPatterns.test(name)) {
+        cssVariables.spacing[targetBucket][name] = value;
+      } else if (typographyPatterns.test(name)) {
+        cssVariables.typography[targetBucket][name] = value;
+      } else if (sizingPatterns.test(name)) {
+        cssVariables.sizing[targetBucket][name] = value;
+      } else if (borderPatterns.test(name) && !colorPatterns.test(name)) {
+        cssVariables.borders[targetBucket][name] = value;
+      } else if (shadowPatterns.test(name)) {
+        cssVariables.shadows[targetBucket][name] = value;
+      } else {
+        cssVariables.other[targetBucket][name] = value;
+      }
     }
 
     // Build selector for each element type
