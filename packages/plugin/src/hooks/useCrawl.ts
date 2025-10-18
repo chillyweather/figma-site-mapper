@@ -70,6 +70,21 @@ export function useCrawl() {
               detectInteractiveElements: settings.detectInteractiveElements,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
+              extractStyles: settings.extractStyles,
+              styleExtractionPreset: settings.styleExtractionPreset,
+              // Map frontend field names to backend field names
+              extractInteractiveElements: settings.extractInteractive,
+              extractStructuralElements: settings.extractStructural,
+              extractTextElements: settings.extractContentBlocks,
+              extractFormElements: settings.extractFormElements,
+              extractMediaElements: settings.extractCustomComponents,
+              extractColors: settings.extractColors,
+              extractTypography: settings.extractTypography,
+              extractSpacing: settings.extractSpacing,
+              extractLayout: settings.extractLayout,
+              extractBorders: settings.extractBorders,
+              includeSelectors: settings.detectPatterns, // using detectPatterns as includeSelectors
+              includeComputedStyles: true, // always include computed styles when enabled
             },
           },
           "*"

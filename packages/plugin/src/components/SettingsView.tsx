@@ -1,8 +1,19 @@
 import React from "react";
-import { IconSettings, IconKey, IconCheck, IconX } from "@tabler/icons-react";
+import {
+  IconSettings,
+  IconKey,
+  IconCheck,
+  IconX,
+  IconInfoCircle,
+} from "@tabler/icons-react";
 import { SettingsViewProps } from "../types/index";
 import { FocusedInput } from "./common/FocusedInput";
 import { FocusedTextarea } from "./common/FocusedTextarea";
+import {
+  estimateDataSize,
+  getPresetConfig,
+  STYLE_PRESETS,
+} from "../utils/stylePresets";
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   url,
@@ -42,6 +53,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   isLoading,
   jobId,
   switchToMain,
+  extractStyles,
+  handleExtractStylesChange,
+  styleExtractionPreset,
+  handleStyleExtractionPresetChange,
+  extractInteractive,
+  handleExtractInteractiveChange,
+  extractStructural,
+  handleExtractStructuralChange,
+  extractContentBlocks,
+  handleExtractContentBlocksChange,
+  extractFormElements,
+  handleExtractFormElementsChange,
+  extractCustomComponents,
+  handleExtractCustomComponentsChange,
+  extractColors,
+  handleExtractColorsChange,
+  extractTypography,
+  handleExtractTypographyChange,
+  extractSpacing,
+  handleExtractSpacingChange,
+  extractBorders,
+  handleExtractBordersChange,
+  extractLayout,
+  handleExtractLayoutChange,
+  extractCSSVariables,
+  handleExtractCSSVariablesChange,
+  detectPatterns,
+  handleDetectPatternsChange,
 }) => (
   <div
     id="settings-view"
@@ -533,6 +572,412 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <IconX size={12} />
           Authentication failed - will crawl public pages only
+        </div>
+      )}
+    </div>
+
+    {/* Style Extraction Section */}
+    <div
+      id="style-extraction-section"
+      style={{ marginBottom: "16px", marginTop: "24px" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "12px",
+        }}
+      >
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={extractStyles}
+            onChange={handleExtractStylesChange}
+            disabled={isLoading || !!jobId}
+            style={{ cursor: isLoading || !!jobId ? "not-allowed" : "pointer" }}
+          />
+          Extract DOM & Style Data
+        </label>
+        <div
+          style={{
+            position: "relative",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+        >
+          <IconInfoCircle
+            size={14}
+            style={{ color: "#666", cursor: "help" }}
+            title="Extracts structural and styling information from pages for design token generation and component analysis"
+          />
+        </div>
+      </div>
+
+      {extractStyles && (
+        <div
+          style={{
+            marginLeft: "24px",
+            padding: "12px",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "6px",
+            border: "1px solid #e9ecef",
+          }}
+        >
+          {/* Preset Selector */}
+          <div style={{ marginBottom: "12px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "11px",
+                marginBottom: "4px",
+                fontWeight: "500",
+                color: "#495057",
+              }}
+            >
+              Extraction Preset
+            </label>
+            <select
+              value={styleExtractionPreset}
+              onChange={handleStyleExtractionPresetChange}
+              disabled={isLoading || !!jobId}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                boxSizing: "border-box",
+                fontSize: "11px",
+                borderRadius: "4px",
+                border: "1px solid #ced4da",
+                backgroundColor: "white",
+              }}
+            >
+              <option value="smart">Smart (Recommended)</option>
+              <option value="minimal">Minimal (Smallest)</option>
+              <option value="complete">Complete (Largest)</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <div style={{ fontSize: "10px", color: "#666", marginTop: "4px" }}>
+              {styleExtractionPreset === "smart" &&
+                "Interactive + structural + styled elements"}
+              {styleExtractionPreset === "minimal" &&
+                "Interactive elements only"}
+              {styleExtractionPreset === "complete" && "All visible elements"}
+              {styleExtractionPreset === "custom" && "Configure options below"}
+            </div>
+          </div>
+
+          {/* Custom Options */}
+          {styleExtractionPreset === "custom" && (
+            <div style={{ marginTop: "12px" }}>
+              {/* Element Types */}
+              <div style={{ marginBottom: "12px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    marginBottom: "6px",
+                    color: "#212529",
+                  }}
+                >
+                  Element Types
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractInteractive}
+                      onChange={handleExtractInteractiveChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Interactive elements (buttons, links, inputs)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractStructural}
+                      onChange={handleExtractStructuralChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Structural components (header, nav, footer)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractContentBlocks}
+                      onChange={handleExtractContentBlocksChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Content blocks (cards, articles, lists)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractFormElements}
+                      onChange={handleExtractFormElementsChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Form elements (forms, labels, fieldsets)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractCustomComponents}
+                      onChange={handleExtractCustomComponentsChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Custom components (experimental)
+                  </label>
+                </div>
+              </div>
+
+              {/* Style Properties */}
+              <div style={{ marginBottom: "12px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    marginBottom: "6px",
+                    color: "#212529",
+                  }}
+                >
+                  Style Properties
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractColors}
+                      onChange={handleExtractColorsChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Colors & backgrounds
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractTypography}
+                      onChange={handleExtractTypographyChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Typography (font, size, weight)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractSpacing}
+                      onChange={handleExtractSpacingChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Spacing (margin, padding)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractBorders}
+                      onChange={handleExtractBordersChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Borders & effects (shadows, radius)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractLayout}
+                      onChange={handleExtractLayoutChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Layout properties (display, flex, grid)
+                  </label>
+                </div>
+              </div>
+
+              {/* Additional Options */}
+              <div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    marginBottom: "6px",
+                    color: "#212529",
+                  }}
+                >
+                  Additional Options
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={extractCSSVariables}
+                      onChange={handleExtractCSSVariablesChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Extract CSS variables (custom properties)
+                  </label>
+                  <label
+                    style={{
+                      fontSize: "11px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={detectPatterns}
+                      onChange={handleDetectPatternsChange}
+                      disabled={isLoading || !!jobId}
+                    />
+                    Detect design patterns (auto-identify components)
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Data Size Estimate */}
+          <div
+            style={{
+              marginTop: "12px",
+              padding: "8px",
+              backgroundColor: "#e7f3ff",
+              borderRadius: "4px",
+              fontSize: "10px",
+              color: "#004085",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <IconInfoCircle size={12} />
+            <span>
+              Estimated data:{" "}
+              {estimateDataSize(
+                styleExtractionPreset === "custom"
+                  ? {
+                      extractInteractive,
+                      extractStructural,
+                      extractContentBlocks,
+                      extractFormElements,
+                      extractCustomComponents,
+                      extractColors,
+                      extractTypography,
+                      extractSpacing,
+                      extractBorders,
+                      extractLayout,
+                      extractCSSVariables,
+                      detectPatterns,
+                    }
+                  : getPresetConfig(styleExtractionPreset as any) ||
+                      STYLE_PRESETS.smart,
+                parseInt(maxRequests) || 10
+              )}{" "}
+              for {maxRequests || 10} pages
+            </span>
+          </div>
         </div>
       )}
     </div>

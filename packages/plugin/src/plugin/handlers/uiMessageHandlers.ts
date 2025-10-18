@@ -111,6 +111,20 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     detectInteractiveElements,
     captureOnlyVisibleElements,
     auth,
+    extractStyles,
+    styleExtractionPreset,
+    extractInteractiveElements,
+    extractStructuralElements,
+    extractTextElements,
+    extractFormElements,
+    extractMediaElements,
+    extractColors,
+    extractTypography,
+    extractSpacing,
+    extractLayout,
+    extractBorders,
+    includeSelectors,
+    includeComputedStyles,
   } = msg;
 
   console.log("📡 Received crawl request for URL:", url);
@@ -146,6 +160,26 @@ export async function handleStartCrawl(msg: any): Promise<void> {
       }
     }
 
+    // Build style extraction settings if enabled
+    const styleExtraction = extractStyles
+      ? {
+          enabled: true,
+          preset: styleExtractionPreset,
+          extractInteractiveElements,
+          extractStructuralElements,
+          extractTextElements,
+          extractFormElements,
+          extractMediaElements,
+          extractColors,
+          extractTypography,
+          extractSpacing,
+          extractLayout,
+          extractBorders,
+          includeSelectors,
+          includeComputedStyles,
+        }
+      : undefined;
+
     const result = await startCrawl({
       url,
       maxRequestsPerCrawl,
@@ -160,6 +194,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
       detectInteractiveElements,
       captureOnlyVisibleElements,
       auth: authData,
+      styleExtraction,
     });
 
     figma.ui.postMessage({

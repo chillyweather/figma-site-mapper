@@ -11,6 +11,23 @@ export type PluginMessageType =
   | "badge-links-update"
   | "open-auth-session";
 
+export interface StyleExtractionSettings {
+  enabled: boolean;
+  preset: "smart" | "minimal" | "complete" | "custom";
+  extractInteractiveElements: boolean;
+  extractStructuralElements: boolean;
+  extractTextElements: boolean;
+  extractFormElements: boolean;
+  extractMediaElements: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractLayout: boolean;
+  extractBorders: boolean;
+  includeSelectors: boolean;
+  includeComputedStyles: boolean;
+}
+
 export interface CrawlStartMessage {
   type: "start-crawl";
   url: string;
@@ -26,6 +43,7 @@ export interface CrawlStartMessage {
   detectInteractiveElements: boolean;
   captureOnlyVisibleElements: boolean;
   auth: AuthData | null;
+  styleExtraction?: StyleExtractionSettings;
 }
 
 export interface AuthData {

@@ -13,11 +13,53 @@ interface InteractiveElement {
   text?: string;
 }
 
+interface ExtractedElement {
+  selector: string;
+  tagName: string;
+  type: string;
+  classes: string[];
+  id?: string;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  styles?: {
+    color?: string;
+    backgroundColor?: string;
+    fontSize?: string;
+    fontFamily?: string;
+    fontWeight?: string;
+    lineHeight?: string;
+    padding?: string;
+    margin?: string;
+    borderRadius?: string;
+    borderWidth?: string;
+    borderColor?: string;
+    borderStyle?: string;
+    display?: string;
+    position?: string;
+    width?: string;
+    height?: string;
+  };
+  text?: string;
+  href?: string;
+  ariaLabel?: string;
+  role?: string;
+}
+
+interface StyleData {
+  elements: ExtractedElement[];
+  cssVariables?: Record<string, string>;
+}
+
 interface PageData {
   url: string;
   title: string;
   screenshot: string[];
   interactiveElements?: InteractiveElement[];
+  styleData?: StyleData;
   crawlOrder?: number; // Track the order in which pages were crawled
 }
 
@@ -285,6 +327,214 @@ function countTreeNodes(node: PageData & { children: PageData[] }): number {
   return count;
 }
 
+interface StyleExtractionConfig {
+  extractInteractiveElements: boolean;
+  extractStructuralElements: boolean;
+  extractTextElements: boolean;
+  extractFormElements: boolean;
+  extractMediaElements: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractLayout: boolean;
+  extractBorders: boolean;
+  includeSelectors: boolean;
+  includeComputedStyles: boolean;
+}
+
+/**
+ * Extract DOM structure and computed styles from a page
+ */
+async function extractStyleData(
+  page: any,
+  config: StyleExtractionConfig
+): Promise<StyleData> {
+  return await page.evaluate((config: StyleExtractionConfig) => {
+    interface ExtractedElementInner {
+      selector: string;
+      tagName: string;
+      type: string;
+      classes: string[];
+      id?: string;
+      boundingBox: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      styles?: {
+        color?: string;
+        backgroundColor?: string;
+        fontSize?: string;
+        fontFamily?: string;
+        fontWeight?: string;
+        lineHeight?: string;
+        padding?: string;
+        margin?: string;
+        borderRadius?: string;
+        borderWidth?: string;
+        borderColor?: string;
+        borderStyle?: string;
+        display?: string;
+        position?: string;
+        width?: string;
+        height?: string;
+      };
+      text?: string;
+      href?: string;
+      ariaLabel?: string;
+      role?: string;
+    }
+
+    const elements: ExtractedElementInner[] = [];
+    const cssVariables: Record<string, string> = {};
+
+    // Extract CSS variables from :root
+    const rootStyle = getComputedStyle(document.documentElement);
+    const rootStyleDeclaration = document.documentElement.style;
+    for (let i = 0; i < rootStyleDeclaration.length; i++) {
+      const propName = rootStyleDeclaration[i];
+      if (propName?.startsWith("--")) {
+        cssVariables[propName] = rootStyle.getPropertyValue(propName).trim();
+      }
+    }
+
+    // Build selector for each element type
+    const selectors: string[] = [];
+
+    if (config.extractInteractiveElements) {
+      selectors.push("a", "button", '[role="button"]', "[onclick]");
+    }
+    if (config.extractStructuralElements) {
+      selectors.push(
+        "header",
+        "nav",
+        "main",
+        "section",
+        "article",
+        "aside",
+        "footer",
+        "div[class]",
+        "div[id]"
+      );
+    }
+    if (config.extractTextElements) {
+      selectors.push("h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "label");
+    }
+    if (config.extractFormElements) {
+      selectors.push("form", "input", "textarea", "select", "option");
+    }
+    if (config.extractMediaElements) {
+      selectors.push("img", "picture", "svg", "video", "canvas");
+    }
+
+    // If no selectors specified, return early
+    if (selectors.length === 0) {
+      console.log("No element types selected for extraction");
+      return { elements, cssVariables };
+    }
+
+    // Collect all matching elements
+    const allElements = document.querySelectorAll(selectors.join(", "));
+
+    // Limit to first 500 elements to prevent massive payloads
+    const maxElements = Math.min(allElements.length, 500);
+
+    for (let i = 0; i < maxElements; i++) {
+      const el = allElements[i] as HTMLElement;
+      if (!el) continue;
+
+      // Skip hidden elements
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+
+      // Build unique selector
+      let selector = el.tagName.toLowerCase();
+      if (config.includeSelectors) {
+        if (el.id) {
+          selector = `#${el.id}`;
+        } else if (el.className && typeof el.className === "string") {
+          const classes = el.className.trim().split(/\s+/).filter(Boolean);
+          if (classes.length > 0) {
+            selector = `${el.tagName.toLowerCase()}.${classes.join(".")}`;
+          }
+        }
+      }
+
+      const extractedElement: ExtractedElementInner = {
+        selector,
+        tagName: el.tagName.toLowerCase(),
+        type: (el as HTMLInputElement).type || el.tagName.toLowerCase(),
+        classes:
+          el.className && typeof el.className === "string"
+            ? el.className.trim().split(/\s+/).filter(Boolean)
+            : [],
+        id: el.id || undefined,
+        boundingBox: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        },
+      };
+
+      // Extract computed styles if requested
+      if (config.includeComputedStyles) {
+        const computed = getComputedStyle(el);
+        const styles: ExtractedElementInner["styles"] = {};
+
+        if (config.extractColors) {
+          styles.color = computed.color;
+          styles.backgroundColor = computed.backgroundColor;
+        }
+        if (config.extractTypography) {
+          styles.fontSize = computed.fontSize;
+          styles.fontFamily = computed.fontFamily;
+          styles.fontWeight = computed.fontWeight;
+          styles.lineHeight = computed.lineHeight;
+        }
+        if (config.extractSpacing) {
+          styles.padding = computed.padding;
+          styles.margin = computed.margin;
+        }
+        if (config.extractLayout) {
+          styles.display = computed.display;
+          styles.position = computed.position;
+          styles.width = computed.width;
+          styles.height = computed.height;
+        }
+        if (config.extractBorders) {
+          styles.borderRadius = computed.borderRadius;
+          styles.borderWidth = computed.borderWidth;
+          styles.borderColor = computed.borderColor;
+          styles.borderStyle = computed.borderStyle;
+        }
+
+        extractedElement.styles = styles;
+      }
+
+      // Extract text content (first 100 chars)
+      const textContent = el.textContent?.trim();
+      if (textContent && textContent.length > 0) {
+        extractedElement.text = textContent.substring(0, 100);
+      }
+
+      // Extract href for links
+      if (el.tagName === "A") {
+        extractedElement.href = (el as HTMLAnchorElement).href;
+      }
+
+      // Extract ARIA attributes
+      extractedElement.ariaLabel = el.getAttribute("aria-label") || undefined;
+      extractedElement.role = el.getAttribute("role") || undefined;
+
+      elements.push(extractedElement);
+    }
+
+    return { elements, cssVariables };
+  }, config);
+}
+
 function buildTree(pages: PageData[], startUrl: string): PageData | null {
   if (pages.length === 0) {
     return null;
@@ -376,6 +626,22 @@ export async function runCrawler(
     username?: string;
     password?: string;
     cookies?: Array<{ name: string; value: string }>;
+  },
+  styleExtraction?: {
+    enabled: boolean;
+    preset: string;
+    extractInteractiveElements: boolean;
+    extractStructuralElements: boolean;
+    extractTextElements: boolean;
+    extractFormElements: boolean;
+    extractMediaElements: boolean;
+    extractColors: boolean;
+    extractTypography: boolean;
+    extractSpacing: boolean;
+    extractLayout: boolean;
+    extractBorders: boolean;
+    includeSelectors: boolean;
+    includeComputedStyles: boolean;
   }
 ) {
   console.log("🚀 Starting the crawler with URL:", startUrl);
@@ -389,6 +655,9 @@ export async function runCrawler(
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    styleExtraction: styleExtraction?.enabled
+      ? styleExtraction.preset
+      : "disabled",
   });
 
   // Use job-specific storage directory to avoid conflicts between concurrent jobs
@@ -1014,6 +1283,55 @@ export async function runCrawler(
           log.info(`Skipping interactive elements detection (disabled)`);
         }
 
+        // Extract style data if enabled
+        let styleData: StyleData | undefined;
+        if (styleExtraction?.enabled) {
+          log.info(
+            `Extracting style data on ${request.url} (preset: ${styleExtraction.preset})`
+          );
+          log.info(
+            `Style extraction config: ${JSON.stringify({
+              elements: {
+                interactive: styleExtraction.extractInteractiveElements,
+                structural: styleExtraction.extractStructuralElements,
+                text: styleExtraction.extractTextElements,
+                form: styleExtraction.extractFormElements,
+                media: styleExtraction.extractMediaElements,
+              },
+              styles: {
+                colors: styleExtraction.extractColors,
+                typography: styleExtraction.extractTypography,
+                spacing: styleExtraction.extractSpacing,
+                layout: styleExtraction.extractLayout,
+                borders: styleExtraction.extractBorders,
+              },
+              options: {
+                selectors: styleExtraction.includeSelectors,
+                computed: styleExtraction.includeComputedStyles,
+              },
+            })}`
+          );
+          styleData = await extractStyleData(page, {
+            extractInteractiveElements:
+              styleExtraction.extractInteractiveElements,
+            extractStructuralElements:
+              styleExtraction.extractStructuralElements,
+            extractTextElements: styleExtraction.extractTextElements,
+            extractFormElements: styleExtraction.extractFormElements,
+            extractMediaElements: styleExtraction.extractMediaElements,
+            extractColors: styleExtraction.extractColors,
+            extractTypography: styleExtraction.extractTypography,
+            extractSpacing: styleExtraction.extractSpacing,
+            extractLayout: styleExtraction.extractLayout,
+            extractBorders: styleExtraction.extractBorders,
+            includeSelectors: styleExtraction.includeSelectors,
+            includeComputedStyles: styleExtraction.includeComputedStyles,
+          });
+          log.info(
+            `Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables || {}).length} CSS variables from ${request.url}`
+          );
+        }
+
         const fullPageBuffer = await page.screenshot({ fullPage: true });
 
         // Slice the screenshot into manageable pieces
@@ -1037,6 +1355,7 @@ export async function runCrawler(
           title: title,
           screenshot: screenshotSlices,
           interactiveElements: interactiveElements,
+          styleData: styleData,
           crawlOrder: pageCounter++,
         });
 
@@ -1312,9 +1631,7 @@ export async function runCrawler(
  * Open a browser session for manual authentication (login/CAPTCHA)
  * User can interact with the browser, and cookies are captured when closed
  */
-export async function openAuthSession(
-  url: string
-): Promise<{
+export async function openAuthSession(url: string): Promise<{
   cookies: Array<{ name: string; value: string; domain: string }>;
 }> {
   console.log(`🔐 Opening authentication session for ${url}`);

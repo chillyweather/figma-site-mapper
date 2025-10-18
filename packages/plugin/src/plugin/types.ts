@@ -31,6 +31,23 @@ export interface InteractiveElement {
   text?: string;
 }
 
+export interface StyleExtractionSettings {
+  enabled: boolean;
+  preset: "smart" | "minimal" | "complete" | "custom";
+  extractInteractiveElements: boolean;
+  extractStructuralElements: boolean;
+  extractTextElements: boolean;
+  extractFormElements: boolean;
+  extractMediaElements: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractLayout: boolean;
+  extractBorders: boolean;
+  includeSelectors: boolean;
+  includeComputedStyles: boolean;
+}
+
 export interface CrawlParams {
   url: string;
   maxRequestsPerCrawl?: number;
@@ -44,4 +61,5 @@ export interface CrawlParams {
   showBrowser: boolean;
   detectInteractiveElements: boolean;
   auth: any;
+  styleExtraction?: StyleExtractionSettings;
 }

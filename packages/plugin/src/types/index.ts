@@ -16,6 +16,22 @@ export interface PluginSettings {
   username: string;
   password: string;
   cookies: string;
+  // Style Extraction Settings
+  extractStyles: boolean;
+  styleExtractionPreset: "smart" | "minimal" | "complete" | "custom";
+  // Custom options (when preset is "custom")
+  extractInteractive: boolean;
+  extractStructural: boolean;
+  extractContentBlocks: boolean;
+  extractFormElements: boolean;
+  extractCustomComponents: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractBorders: boolean;
+  extractLayout: boolean;
+  extractCSSVariables: boolean;
+  detectPatterns: boolean;
 }
 
 export interface BadgeLink {
@@ -100,6 +116,52 @@ export interface SettingsViewProps {
   isLoading: boolean;
   jobId: string | null;
   switchToMain: () => void;
+  // Style Extraction props
+  extractStyles: boolean;
+  handleExtractStylesChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  styleExtractionPreset: "smart" | "minimal" | "complete" | "custom";
+  handleStyleExtractionPresetChange: (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => void;
+  // Custom extraction options (visible when preset is "custom")
+  extractInteractive: boolean;
+  handleExtractInteractiveChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractStructural: boolean;
+  handleExtractStructuralChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractContentBlocks: boolean;
+  handleExtractContentBlocksChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractFormElements: boolean;
+  handleExtractFormElementsChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractCustomComponents: boolean;
+  handleExtractCustomComponentsChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractColors: boolean;
+  handleExtractColorsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  extractTypography: boolean;
+  handleExtractTypographyChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  extractSpacing: boolean;
+  handleExtractSpacingChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  extractBorders: boolean;
+  handleExtractBordersChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  extractLayout: boolean;
+  handleExtractLayoutChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  extractCSSVariables: boolean;
+  handleExtractCSSVariablesChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  detectPatterns: boolean;
+  handleDetectPatternsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export interface MainViewProps {

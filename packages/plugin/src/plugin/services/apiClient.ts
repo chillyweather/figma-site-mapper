@@ -24,6 +24,7 @@ export async function startCrawl(
       requestDelay: params.requestDelay || 1000,
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
       detectInteractiveElements: params.detectInteractiveElements !== false,
+      styleExtraction: params.styleExtraction,
     }),
   });
 
@@ -56,9 +57,7 @@ export async function fetchManifest(manifestUrl: string): Promise<any> {
 /**
  * Open authentication session for manual login/CAPTCHA
  */
-export async function openAuthSession(
-  url: string
-): Promise<{
+export async function openAuthSession(url: string): Promise<{
   cookies: Array<{ name: string; value: string; domain: string }>;
 }> {
   const response = await fetch(`${BACKEND_URL}/auth-session`, {

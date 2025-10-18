@@ -162,6 +162,7 @@ server.post("/crawl", async (request, reply) => {
     showBrowser,
     detectInteractiveElements,
     auth,
+    styleExtraction,
   } = request.body as {
     url: string;
     publicUrl: string;
@@ -180,6 +181,22 @@ server.post("/crawl", async (request, reply) => {
       username?: string;
       password?: string;
       cookies?: Array<{ name: string; value: string }>;
+    };
+    styleExtraction?: {
+      enabled: boolean;
+      preset: string;
+      extractInteractiveElements: boolean;
+      extractStructuralElements: boolean;
+      extractTextElements: boolean;
+      extractFormElements: boolean;
+      extractMediaElements: boolean;
+      extractColors: boolean;
+      extractTypography: boolean;
+      extractSpacing: boolean;
+      extractLayout: boolean;
+      extractBorders: boolean;
+      includeSelectors: boolean;
+      includeComputedStyles: boolean;
     };
   };
 
@@ -201,6 +218,7 @@ server.post("/crawl", async (request, reply) => {
     showBrowser: showBrowser !== false, // Default to false (headless)
     detectInteractiveElements: detectInteractiveElements !== false, // Default to true
     auth,
+    styleExtraction,
   });
 
   return { message: "Crawl job successfully queued.", jobId: job.id };
