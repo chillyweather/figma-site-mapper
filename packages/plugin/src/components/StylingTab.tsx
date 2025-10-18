@@ -72,27 +72,48 @@ export const StylingTab: React.FC = () => {
   };
 
   const handleBuildTokensTable = () => {
+    console.log("🔨 handleBuildTokensTable called");
+    console.log("📦 manifestData:", manifestData);
+
     if (!manifestData || !manifestData.tree) {
-      console.warn("No manifest data available");
+      console.warn("❌ No manifest data available");
       return;
     }
 
     const currentPage = manifestData.tree;
+    console.log("📄 currentPage:", currentPage);
+    console.log("📄 currentPage.styleData:", currentPage.styleData);
+    console.log(
+      "📄 currentPage.styleData.cssVariables:",
+      currentPage.styleData?.cssVariables
+    );
 
     if (currentPage.styleData && currentPage.styleData.cssVariables) {
+      const cssVars = currentPage.styleData.cssVariables;
+      console.log("✅ Found CSS variables");
+      console.log(
+        "🎨 cssVariables structure:",
+        JSON.stringify(cssVars, null, 2)
+      );
+      console.log("🎨 Sending to plugin:", {
+        type: "build-tokens-table",
+        cssVariables: cssVars,
+        pageUrl: currentPage.url,
+      });
+
       // Send message to plugin code to build the table
       parent.postMessage(
         {
           pluginMessage: {
             type: "build-tokens-table",
-            cssVariables: currentPage.styleData.cssVariables,
+            cssVariables: cssVars,
             pageUrl: currentPage.url,
           },
         },
         "*"
       );
     } else {
-      console.log("No CSS variables found in crawl data");
+      console.log("❌ No CSS variables found in crawl data");
       // Show notification - send to plugin to display
       parent.postMessage(
         {

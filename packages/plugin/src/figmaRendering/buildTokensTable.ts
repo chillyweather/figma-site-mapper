@@ -54,6 +54,10 @@ function createTextNode(
   const textNode = figma.createText();
   textNode.characters = text;
   textNode.fontSize = fontSize;
+  textNode.textAutoResize = "WIDTH_AND_HEIGHT"; // Allow hugging both dimensions
+  // Ensure it does not stretch horizontally inside auto-layout parent
+  textNode.layoutGrow = 0;
+  textNode.layoutAlign = "MIN";
 
   // Load font before setting weight
   figma.loadFontAsync({ family: "Inter", style: fontWeight }).then(() => {
@@ -73,10 +77,10 @@ function createTokenRow(
 ): FrameNode {
   const tokenFrame = figma.createFrame();
   tokenFrame.name = "token";
-  tokenFrame.resize(width, 48);
   tokenFrame.layoutMode = "HORIZONTAL";
-  tokenFrame.primaryAxisSizingMode = "FIXED";
-  tokenFrame.counterAxisSizingMode = "FIXED";
+  tokenFrame.primaryAxisSizingMode = "FIXED"; // Fixed width direction
+  tokenFrame.counterAxisSizingMode = "AUTO"; // Hug height vertically
+  tokenFrame.resize(width, tokenFrame.height); // Only fix width; height left to auto
   tokenFrame.paddingLeft = 12;
   tokenFrame.paddingRight = 12;
   tokenFrame.paddingTop = 12;
@@ -90,34 +94,38 @@ function createTokenRow(
   // Name field
   const nameContainer = figma.createFrame();
   nameContainer.name = "name";
-  nameContainer.resize((width - 24) / 2, 24);
   nameContainer.layoutMode = "HORIZONTAL";
-  nameContainer.primaryAxisSizingMode = "FIXED";
-  nameContainer.counterAxisSizingMode = "FIXED";
+  nameContainer.primaryAxisSizingMode = "AUTO"; // Hug contents horizontally
+  nameContainer.counterAxisSizingMode = "AUTO"; // Hug height
+  nameContainer.layoutGrow = 1;
   nameContainer.fills = [];
 
   const nameText = createTextNode(name, 12, "Medium");
-  nameText.layoutAlign = "STRETCH";
-  nameText.layoutGrow = 1;
   nameContainer.appendChild(nameText);
 
   // Value field
   const valueContainer = figma.createFrame();
   valueContainer.name = "value";
-  valueContainer.resize((width - 24) / 2, 24);
   valueContainer.layoutMode = "HORIZONTAL";
-  valueContainer.primaryAxisSizingMode = "FIXED";
-  valueContainer.counterAxisSizingMode = "FIXED";
+  valueContainer.primaryAxisSizingMode = "AUTO";
+  valueContainer.counterAxisSizingMode = "AUTO";
+  valueContainer.layoutGrow = 1;
   valueContainer.fills = [];
 
   const valueText = createTextNode(value, 12, "Regular");
-  valueText.layoutAlign = "STRETCH";
-  valueText.layoutGrow = 1;
   valueContainer.appendChild(valueText);
 
   tokenFrame.appendChild(nameContainer);
   tokenFrame.appendChild(valueContainer);
 
+  console.log(
+    "📐 tokenRow height after creation:",
+    tokenFrame.height,
+    "name height",
+    nameContainer.height,
+    "value height",
+    valueContainer.height
+  );
   return tokenFrame;
 }
 
@@ -134,10 +142,10 @@ function createTokenSection(
 
   const sectionFrame = figma.createFrame();
   sectionFrame.name = sectionName;
-  sectionFrame.resize(width + 24, 0); // Auto height
   sectionFrame.layoutMode = "VERTICAL";
-  sectionFrame.primaryAxisSizingMode = "FIXED";
-  sectionFrame.counterAxisSizingMode = "AUTO";
+  sectionFrame.primaryAxisSizingMode = "AUTO"; // Hug height
+  sectionFrame.counterAxisSizingMode = "FIXED"; // Fixed width
+  sectionFrame.resize(width + 24, sectionFrame.height);
   sectionFrame.paddingLeft = 12;
   sectionFrame.paddingRight = 12;
   sectionFrame.paddingTop = 12;
@@ -150,6 +158,8 @@ function createTokenSection(
 
   // Section title
   const titleText = createTextNode(sectionName, 14, "Bold");
+  titleText.layoutGrow = 0;
+  titleText.layoutAlign = "MIN";
   titleText.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
   sectionFrame.appendChild(titleText);
 
@@ -157,8 +167,19 @@ function createTokenSection(
   entries.forEach(([name, value]) => {
     const tokenRow = createTokenRow(name, value, width);
     sectionFrame.appendChild(tokenRow);
+    console.log(
+      "📐 Added token row to section",
+      sectionName,
+      "row height",
+      tokenRow.height
+    );
   });
 
+  console.log(
+    "📐 sectionFrame height after rows:",
+    sectionFrame.height,
+    sectionName
+  );
   return sectionFrame;
 }
 
@@ -181,10 +202,10 @@ function createCategoryFrame(
 
   const categoryFrame = figma.createFrame();
   categoryFrame.name = categoryName;
-  categoryFrame.resize(width, 0); // Auto height
   categoryFrame.layoutMode = "VERTICAL";
-  categoryFrame.primaryAxisSizingMode = "FIXED";
-  categoryFrame.counterAxisSizingMode = "AUTO";
+  categoryFrame.primaryAxisSizingMode = "AUTO"; // Hug height
+  categoryFrame.counterAxisSizingMode = "FIXED"; // Fixed width
+  categoryFrame.resize(width, categoryFrame.height);
   categoryFrame.paddingLeft = 12;
   categoryFrame.paddingRight = 12;
   categoryFrame.paddingTop = 12;
@@ -197,6 +218,8 @@ function createCategoryFrame(
 
   // Category title
   const titleText = createTextNode(categoryName, 18, "Bold");
+  titleText.layoutGrow = 0;
+  titleText.layoutAlign = "MIN";
   titleText.fills = [{ type: "SOLID", color: { r: 0.1, g: 0.1, b: 0.1 } }];
   categoryFrame.appendChild(titleText);
 
@@ -208,14 +231,21 @@ function createCategoryFrame(
   );
   if (primitivesSection) {
     categoryFrame.appendChild(primitivesSection);
+    console.log("📐 primitivesSection height", primitivesSection.height);
   }
 
   // Aliases section
   const aliasesSection = createTokenSection("Aliases", aliases, width - 24);
   if (aliasesSection) {
     categoryFrame.appendChild(aliasesSection);
+    console.log("📐 aliasesSection height", aliasesSection.height);
   }
 
+  console.log(
+    "📐 categoryFrame height after sections:",
+    categoryFrame.height,
+    categoryName
+  );
   return categoryFrame;
 }
 
@@ -245,6 +275,12 @@ export async function buildTokensTable(
   cssVariables: CSSVariablesByCategory,
   pageUrl: string
 ): Promise<void> {
+  console.log("🎨 buildTokensTable called");
+  console.log("📍 pageUrl:", pageUrl);
+  console.log("📦 cssVariables received:", cssVariables);
+  console.log("📊 cssVariables type:", typeof cssVariables);
+  console.log("📊 cssVariables keys:", Object.keys(cssVariables || {}));
+
   // Load Inter font
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   await figma.loadFontAsync({ family: "Inter", style: "Medium" });
@@ -253,10 +289,10 @@ export async function buildTokensTable(
   // Create main tokens frame
   const tokensFrame = figma.createFrame();
   tokensFrame.name = `Tokens - ${getPathFromUrl(pageUrl)}`;
-  tokensFrame.resize(738, 0); // Auto height
   tokensFrame.layoutMode = "VERTICAL";
-  tokensFrame.primaryAxisSizingMode = "FIXED";
-  tokensFrame.counterAxisSizingMode = "AUTO";
+  tokensFrame.primaryAxisSizingMode = "AUTO"; // Hug height
+  tokensFrame.counterAxisSizingMode = "FIXED"; // Fixed width
+  tokensFrame.resize(738, tokensFrame.height);
   tokensFrame.paddingLeft = 12;
   tokensFrame.paddingRight = 12;
   tokensFrame.paddingTop = 12;
@@ -264,10 +300,16 @@ export async function buildTokensTable(
   tokensFrame.itemSpacing = 20;
   tokensFrame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
 
+  console.log("✅ Main tokens frame created");
+
   // Add page URL as title
   const pageTitle = createTextNode(pageUrl, 16, "Bold");
+  pageTitle.layoutGrow = 0;
+  pageTitle.layoutAlign = "MIN";
   pageTitle.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
   tokensFrame.appendChild(pageTitle);
+
+  console.log("✅ Page title added");
 
   // Create category frames
   const categories: Array<keyof CSSVariablesByCategory> = [
@@ -282,19 +324,38 @@ export async function buildTokensTable(
 
   let hasContent = false;
   for (const category of categories) {
+    console.log(`\n🔍 Processing category: ${category}`);
     const categoryData = cssVariables[category];
-    if (!categoryData) continue;
+    console.log(`  categoryData:`, categoryData);
+    console.log(`  categoryData type:`, typeof categoryData);
+
+    if (!categoryData) {
+      console.log(`  ⏭️  Skipping ${category} - no data`);
+      continue;
+    }
+
+    const primitives = categoryData.primitives || {};
+    const aliases = categoryData.aliases || {};
+
+    console.log(`  primitives keys:`, Object.keys(primitives));
+    console.log(`  primitives count:`, Object.keys(primitives).length);
+    console.log(`  aliases keys:`, Object.keys(aliases));
+    console.log(`  aliases count:`, Object.keys(aliases).length);
 
     const categoryFrame = createCategoryFrame(
       CATEGORY_NAMES[category],
-      categoryData.primitives || {},
-      categoryData.aliases || {},
+      primitives,
+      aliases,
       714
     );
 
     if (categoryFrame) {
+      console.log(`  ✅ Created frame for ${category}`);
       tokensFrame.appendChild(categoryFrame);
       hasContent = true;
+      console.log("📐 categoryFrame appended height", categoryFrame.height);
+    } else {
+      console.log(`  ⚠️  No frame created for ${category} (empty)`);
     }
   }
 
@@ -311,6 +372,19 @@ export async function buildTokensTable(
 
   // Add to current page
   figma.currentPage.appendChild(tokensFrame);
+  console.log("📐 tokensFrame final height", tokensFrame.height);
+
+  // Enforce HUG height for all token frames (in case any defaulted to 100px)
+  const allTokenFrames = tokensFrame.findAll(
+    (n) => n.type === "FRAME" && n.name === "token"
+  ) as FrameNode[];
+  allTokenFrames.forEach((f) => {
+    f.counterAxisSizingMode = "AUTO"; // ensure hug height
+    // Optional: clear any explicit height
+    // Trigger a layout update by briefly resizing width only
+    f.resize(f.width, f.height);
+    console.log("🔧 enforced hug height on token frame", f.name, f.height);
+  });
 
   // Position near viewport center
   tokensFrame.x = figma.viewport.center.x - tokensFrame.width / 2;
