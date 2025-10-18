@@ -6,6 +6,7 @@
  */
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
+import { buildTokensTable } from "../../figmaRendering/buildTokensTable";
 import {
   startCrawl,
   getJobStatus,
@@ -449,6 +450,23 @@ async function handleGetLastManifest(): Promise<void> {
 }
 
 /**
+ * Handle building tokens table
+ */
+async function handleBuildTokensTable(msg: {
+  cssVariables: any;
+  pageUrl: string;
+}): Promise<void> {
+  try {
+    await buildTokensTable(msg.cssVariables, msg.pageUrl);
+  } catch (error) {
+    console.error("Failed to build tokens table:", error);
+    figma.notify("Error: Could not build tokens table.", {
+      error: true,
+    });
+  }
+}
+
+/**
  * Main message router for UI messages
  */
 export async function handleUIMessage(msg: any): Promise<void> {
@@ -479,6 +497,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "get-last-manifest":
       await handleGetLastManifest();
+      break;
+
+    case "build-tokens-table":
+      await handleBuildTokensTable(msg);
       break;
 
     case "close":
