@@ -209,6 +209,84 @@ export const StylingTab: React.FC = () => {
     );
   };
 
+  const handleBuildCombinedTokensTable = () => {
+    console.log("🔨 handleBuildCombinedTokensTable called");
+
+    if (!manifestData || !manifestData.tree) {
+      console.warn("❌ No manifest data available");
+      return;
+    }
+
+    // Filter pages that have CSS variables
+    const pagesWithTokens = allPages.filter(
+      (page) => page.styleData?.cssVariables
+    );
+
+    if (pagesWithTokens.length === 0) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "notify",
+            message: "No pages with CSS variables found",
+          },
+        },
+        "*"
+      );
+      return;
+    }
+
+    // Merge all CSS variables from all pages
+    const mergedVariables = {
+      colors: { primitives: {}, aliases: {} },
+      spacing: { primitives: {}, aliases: {} },
+      typography: { primitives: {}, aliases: {} },
+      sizing: { primitives: {}, aliases: {} },
+      borders: { primitives: {}, aliases: {} },
+      shadows: { primitives: {}, aliases: {} },
+      other: { primitives: {}, aliases: {} },
+    };
+
+    pagesWithTokens.forEach((page) => {
+      const cssVars = page.styleData!.cssVariables;
+
+      // Merge each category
+      Object.keys(mergedVariables).forEach((category) => {
+        if (cssVars[category]) {
+          // Merge primitives
+          if (cssVars[category].primitives) {
+            Object.assign(
+              mergedVariables[category as keyof typeof mergedVariables]
+                .primitives,
+              cssVars[category].primitives
+            );
+          }
+          // Merge aliases
+          if (cssVars[category].aliases) {
+            Object.assign(
+              mergedVariables[category as keyof typeof mergedVariables].aliases,
+              cssVars[category].aliases
+            );
+          }
+        }
+      });
+    });
+
+    console.log("✅ Merged CSS variables from all pages");
+    console.log("🎨 Combined variables:", mergedVariables);
+
+    // Send message to plugin to build the combined table
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "build-tokens-table",
+          cssVariables: mergedVariables,
+          pageUrl: "App Tokens (Combined)",
+        },
+      },
+      "*"
+    );
+  };
+
   return (
     <div
       style={{
@@ -370,6 +448,37 @@ export const StylingTab: React.FC = () => {
       >
         Build tables for all pages (
         {allPages.filter((p) => p.styleData?.cssVariables).length})
+      </button>
+
+      <button
+        onClick={handleBuildCombinedTokensTable}
+        disabled={
+          !manifestData ||
+          isLoading ||
+          allPages.filter((p) => p.styleData?.cssVariables).length === 0
+        }
+        style={{
+          padding: "10px 16px",
+          background:
+            manifestData &&
+            !isLoading &&
+            allPages.filter((p) => p.styleData?.cssVariables).length > 0
+              ? "#ff9800"
+              : "#ccc",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor:
+            manifestData &&
+            !isLoading &&
+            allPages.filter((p) => p.styleData?.cssVariables).length > 0
+              ? "pointer"
+              : "not-allowed",
+          fontSize: "14px",
+          fontWeight: "500",
+        }}
+      >
+        Build combined App tokens table
       </button>
     </div>
   );
