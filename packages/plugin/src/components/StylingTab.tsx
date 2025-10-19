@@ -2,10 +2,21 @@ import React, { useEffect, useState } from "react";
 import { useAtom } from "jotai";
 import { manifestDataAtom } from "../store/atoms";
 
+interface PageNode {
+  url: string;
+  title?: string;
+  styleData?: {
+    cssVariables?: any;
+  };
+  children?: PageNode[];
+}
+
 export const StylingTab: React.FC = () => {
   const [manifestData, setManifestData] = useAtom(manifestDataAtom);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedPageUrl, setSelectedPageUrl] = useState<string>("");
+  const [allPages, setAllPages] = useState<PageNode[]>([]);
 
   // Fetch manifest data when tab mounts if not already in state
   useEffect(() => {
@@ -13,6 +24,28 @@ export const StylingTab: React.FC = () => {
       loadManifestData();
     }
   }, []);
+
+  // Extract all pages from tree when manifestData changes
+  useEffect(() => {
+    if (manifestData?.tree) {
+      const pages = flattenPageTree(manifestData.tree);
+      setAllPages(pages);
+      if (pages.length > 0 && !selectedPageUrl) {
+        setSelectedPageUrl(pages[0].url);
+      }
+    }
+  }, [manifestData]);
+
+  // Recursively flatten the page tree
+  const flattenPageTree = (node: PageNode): PageNode[] => {
+    const pages: PageNode[] = [node];
+    if (node.children) {
+      node.children.forEach((child) => {
+        pages.push(...flattenPageTree(child));
+      });
+    }
+    return pages;
+  };
 
   const loadManifestData = async () => {
     setIsLoading(true);
@@ -80,16 +113,22 @@ export const StylingTab: React.FC = () => {
       return;
     }
 
-    const currentPage = manifestData.tree;
-    console.log("📄 currentPage:", currentPage);
-    console.log("📄 currentPage.styleData:", currentPage.styleData);
+    // Find the selected page
+    const selectedPage = allPages.find((page) => page.url === selectedPageUrl);
+    if (!selectedPage) {
+      console.warn("❌ No page selected");
+      return;
+    }
+
+    console.log("📄 selectedPage:", selectedPage);
+    console.log("📄 selectedPage.styleData:", selectedPage.styleData);
     console.log(
-      "📄 currentPage.styleData.cssVariables:",
-      currentPage.styleData?.cssVariables
+      "📄 selectedPage.styleData.cssVariables:",
+      selectedPage.styleData?.cssVariables
     );
 
-    if (currentPage.styleData && currentPage.styleData.cssVariables) {
-      const cssVars = currentPage.styleData.cssVariables;
+    if (selectedPage.styleData && selectedPage.styleData.cssVariables) {
+      const cssVars = selectedPage.styleData.cssVariables;
       console.log("✅ Found CSS variables");
       console.log(
         "🎨 cssVariables structure:",
@@ -98,7 +137,7 @@ export const StylingTab: React.FC = () => {
       console.log("🎨 Sending to plugin:", {
         type: "build-tokens-table",
         cssVariables: cssVars,
-        pageUrl: currentPage.url,
+        pageUrl: selectedPage.url,
       });
 
       // Send message to plugin code to build the table
@@ -107,7 +146,7 @@ export const StylingTab: React.FC = () => {
           pluginMessage: {
             type: "build-tokens-table",
             cssVariables: cssVars,
-            pageUrl: currentPage.url,
+            pageUrl: selectedPage.url,
           },
         },
         "*"
@@ -125,6 +164,49 @@ export const StylingTab: React.FC = () => {
         "*"
       );
     }
+  };
+
+  const handleBuildAllTokensTables = () => {
+    console.log("🔨 handleBuildAllTokensTables called");
+
+    if (!manifestData || !manifestData.tree) {
+      console.warn("❌ No manifest data available");
+      return;
+    }
+
+    // Filter pages that have CSS variables
+    const pagesWithTokens = allPages.filter(
+      (page) => page.styleData?.cssVariables
+    );
+
+    if (pagesWithTokens.length === 0) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "notify",
+            message: "No pages with CSS variables found",
+          },
+        },
+        "*"
+      );
+      return;
+    }
+
+    console.log(`📊 Building tables for ${pagesWithTokens.length} pages`);
+
+    // Send message to plugin to build tables for all pages
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "build-all-tokens-tables",
+          pages: pagesWithTokens.map((page) => ({
+            cssVariables: page.styleData!.cssVariables,
+            pageUrl: page.url,
+          })),
+        },
+      },
+      "*"
+    );
   };
 
   return (
@@ -197,21 +279,97 @@ export const StylingTab: React.FC = () => {
         </button>
       )}
 
+      {manifestData && allPages.length > 0 && (
+        <div
+          style={{
+            padding: "12px",
+            background: "#f8f9fa",
+            border: "1px solid #dee2e6",
+            borderRadius: "4px",
+            fontSize: "13px",
+          }}
+        >
+          <div style={{ marginBottom: "8px", fontWeight: "500" }}>
+            Select Page:
+          </div>
+          <select
+            value={selectedPageUrl}
+            onChange={(e) => setSelectedPageUrl(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "8px",
+              fontSize: "13px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              background: "white",
+            }}
+          >
+            {allPages.map((page) => (
+              <option key={page.url} value={page.url}>
+                {page.title || page.url}
+                {!page.styleData?.cssVariables && " (no tokens)"}
+              </option>
+            ))}
+          </select>
+          <div style={{ marginTop: "4px", fontSize: "11px", color: "#6c757d" }}>
+            {allPages.length} page(s) found •{" "}
+            {allPages.filter((p) => p.styleData?.cssVariables).length} with
+            tokens
+          </div>
+        </div>
+      )}
+
       <button
         onClick={handleBuildTokensTable}
-        disabled={!manifestData || isLoading}
+        disabled={!manifestData || isLoading || !selectedPageUrl}
         style={{
           padding: "10px 16px",
-          background: manifestData && !isLoading ? "#0d99ff" : "#ccc",
+          background:
+            manifestData && !isLoading && selectedPageUrl ? "#0d99ff" : "#ccc",
           color: "white",
           border: "none",
           borderRadius: "4px",
-          cursor: manifestData && !isLoading ? "pointer" : "not-allowed",
+          cursor:
+            manifestData && !isLoading && selectedPageUrl
+              ? "pointer"
+              : "not-allowed",
           fontSize: "14px",
           fontWeight: "500",
         }}
       >
-        Build tokens table
+        Build tokens table for selected page
+      </button>
+
+      <button
+        onClick={handleBuildAllTokensTables}
+        disabled={
+          !manifestData ||
+          isLoading ||
+          allPages.filter((p) => p.styleData?.cssVariables).length === 0
+        }
+        style={{
+          padding: "10px 16px",
+          background:
+            manifestData &&
+            !isLoading &&
+            allPages.filter((p) => p.styleData?.cssVariables).length > 0
+              ? "#28a745"
+              : "#ccc",
+          color: "white",
+          border: "none",
+          borderRadius: "4px",
+          cursor:
+            manifestData &&
+            !isLoading &&
+            allPages.filter((p) => p.styleData?.cssVariables).length > 0
+              ? "pointer"
+              : "not-allowed",
+          fontSize: "14px",
+          fontWeight: "500",
+        }}
+      >
+        Build tables for all pages (
+        {allPages.filter((p) => p.styleData?.cssVariables).length})
       </button>
     </div>
   );

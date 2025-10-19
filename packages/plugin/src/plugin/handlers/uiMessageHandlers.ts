@@ -467,6 +467,39 @@ async function handleBuildTokensTable(msg: {
 }
 
 /**
+ * Handle building tokens tables for all pages
+ */
+async function handleBuildAllTokensTables(msg: {
+  pages: Array<{ cssVariables: any; pageUrl: string }>;
+}): Promise<void> {
+  try {
+    console.log(`🔨 Building tables for ${msg.pages.length} pages`);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const page of msg.pages) {
+      try {
+        await buildTokensTable(page.cssVariables, page.pageUrl);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to build table for ${page.pageUrl}:`, error);
+        errorCount++;
+      }
+    }
+
+    figma.notify(
+      `✅ Built ${successCount} token table(s)${errorCount > 0 ? ` (${errorCount} failed)` : ""}`,
+      { timeout: 3000 }
+    );
+  } catch (error) {
+    console.error("Failed to build tokens tables:", error);
+    figma.notify("Error: Could not build tokens tables.", {
+      error: true,
+    });
+  }
+}
+
+/**
  * Main message router for UI messages
  */
 export async function handleUIMessage(msg: any): Promise<void> {
@@ -501,6 +534,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "build-tokens-table":
       await handleBuildTokensTable(msg);
+      break;
+
+    case "build-all-tokens-tables":
+      await handleBuildAllTokensTables(msg);
       break;
 
     case "close":
