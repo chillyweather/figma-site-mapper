@@ -10,6 +10,7 @@ export interface PluginSettings {
   sampleSize: string;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
+  highlightAllElements: boolean;
   captureOnlyVisibleElements: boolean;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   loginUrl: string;
@@ -179,6 +180,10 @@ export interface SettingsViewProps {
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   detectInteractiveElements: boolean;
   handleDetectInteractiveElementsChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  highlightAllElements: boolean;
+  handleHighlightAllElementsChange: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => void;
   captureOnlyVisibleElements: boolean;

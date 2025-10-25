@@ -161,6 +161,7 @@ server.post("/crawl", async (request, reply) => {
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    highlightAllElements,
     auth,
     styleExtraction,
   } = request.body as {
@@ -175,6 +176,7 @@ server.post("/crawl", async (request, reply) => {
     sampleSize?: number;
     showBrowser?: boolean;
     detectInteractiveElements?: boolean;
+    highlightAllElements?: boolean;
     auth?: {
       method: "credentials" | "cookies";
       loginUrl?: string;
@@ -213,10 +215,11 @@ server.post("/crawl", async (request, reply) => {
     delay: delay || 0,
     requestDelay: requestDelay || 1000,
     maxDepth: maxDepth === undefined ? 0 : maxDepth, // 0 means no limit, undefined defaults to no limit
-    defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
-    sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
-    showBrowser: showBrowser !== false, // Default to false (headless)
+    defaultLanguageOnly,
+    sampleSize,
+    showBrowser,
     detectInteractiveElements: detectInteractiveElements !== false, // Default to true
+    highlightAllElements: highlightAllElements || false,
     auth,
     styleExtraction,
   });

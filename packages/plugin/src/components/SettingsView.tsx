@@ -37,6 +37,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleShowBrowserChange,
   detectInteractiveElements,
   handleDetectInteractiveElementsChange,
+  highlightAllElements,
+  handleHighlightAllElementsChange,
   captureOnlyVisibleElements,
   handleCaptureOnlyVisibleElementsChange,
   authMethod,
@@ -348,6 +350,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </label>
       <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
         Add numbered frames around links and buttons for user journey mapping
+      </div>
+
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          cursor: "pointer",
+          marginTop: "12px",
+        }}
+      >
+        <input
+          id="highlight-all-elements-checkbox"
+          type="checkbox"
+          checked={highlightAllElements}
+          onChange={handleHighlightAllElementsChange}
+          disabled={isLoading || !!jobId || !extractStyles}
+          style={{ marginRight: "8px" }}
+        />
+        Highlight all detected elements
+      </label>
+      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+        Create purple highlights for all detected elements (headings, buttons,
+        inputs, etc.). Requires style extraction to be enabled.
       </div>
     </div>
 

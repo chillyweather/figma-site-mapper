@@ -15,6 +15,7 @@ import {
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
 import { handleShowStylingElements } from "./stylingHandlers";
+import { DEFAULT_SETTINGS } from "../../constants";
 
 let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
@@ -227,16 +228,20 @@ export async function handleSaveSettings(msg: any): Promise<void> {
  */
 export async function handleLoadSettings(): Promise<void> {
   try {
-    const settings = await figma.clientStorage.getAsync("settings");
+    const storedSettings = await figma.clientStorage.getAsync("settings");
+    // Merge stored settings with defaults to ensure new fields have default values
+    const settings = storedSettings
+      ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
+      : DEFAULT_SETTINGS;
     figma.ui.postMessage({
       type: "settings-loaded",
-      settings: settings || null,
+      settings: settings,
     });
   } catch (error) {
     console.error("Failed to load settings:", error);
     figma.ui.postMessage({
       type: "settings-loaded",
-      settings: null,
+      settings: DEFAULT_SETTINGS,
     });
   }
 }

@@ -70,6 +70,7 @@ export function useCrawl() {
               sampleSize: parseSampleSize(settings.sampleSize),
               showBrowser: settings.showBrowser,
               detectInteractiveElements: settings.detectInteractiveElements,
+              highlightAllElements: settings.highlightAllElements,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
               extractStyles: settings.extractStyles,

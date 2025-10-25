@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   sampleSize: "3",
   showBrowser: false,
   detectInteractiveElements: true,
+  highlightAllElements: false,
   captureOnlyVisibleElements: true,
   authMethod: "none",
   loginUrl: "",

@@ -794,6 +794,7 @@ export async function runCrawler(
   sampleSize: number = 3,
   showBrowser: boolean = false,
   detectInteractiveElements: boolean = true,
+  highlightAllElements: boolean = false,
   auth?: {
     method: "credentials" | "cookies";
     loginUrl?: string;
@@ -829,6 +830,7 @@ export async function runCrawler(
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    highlightAllElements,
     styleExtraction: styleExtraction?.enabled
       ? styleExtraction.preset
       : "disabled",

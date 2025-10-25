@@ -169,6 +169,13 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleHighlightAllElementsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateSetting("highlightAllElements", e.target.checked);
+    },
+    [updateSetting]
+  );
+
   const handleCaptureOnlyVisibleElementsChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateSetting("captureOnlyVisibleElements", e.target.checked);
@@ -353,6 +360,8 @@ export const App: React.FC = () => {
       handleDetectInteractiveElementsChange={
         handleDetectInteractiveElementsChange
       }
+      highlightAllElements={settings.highlightAllElements}
+      handleHighlightAllElementsChange={handleHighlightAllElementsChange}
       captureOnlyVisibleElements={settings.captureOnlyVisibleElements}
       handleCaptureOnlyVisibleElementsChange={
         handleCaptureOnlyVisibleElementsChange

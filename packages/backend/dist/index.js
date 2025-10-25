@@ -1,32 +1,32 @@
-import Fastify from 'fastify';
-import { crawlQueue } from './queue.js';
-import { openAuthSession } from './crawler.js';
+import Fastify from "fastify";
+import { crawlQueue } from "./queue.js";
+import { openAuthSession } from "./crawler.js";
 import cors from "@fastify/cors";
-import fastifyStatic from '@fastify/static';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fastifyStatic from "@fastify/static";
+import path from "path";
+import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const server = Fastify({
-    logger: true
+    logger: true,
 });
 await server.register(cors, {
     origin: "*",
 });
 await server.register(fastifyStatic, {
     root: path.join(__dirname, "..", "static"),
-    prefix: "/static/"
+    prefix: "/static/",
 });
 await server.register(async function (fastify) {
     await fastify.register(fastifyStatic, {
         root: path.join(__dirname, "..", "screenshots"),
-        prefix: "/screenshots/"
+        prefix: "/screenshots/",
     });
 });
-server.get('/', async (request, reply) => {
-    return { hello: 'world' };
+server.get("/", async (request, reply) => {
+    return { hello: "world" };
 });
-server.post('/progress/:jobId', async (request, reply) => {
+server.post("/progress/:jobId", async (request, reply) => {
     const { jobId } = request.params;
     const { stage, currentPage, totalPages, currentUrl, progress } = request.body;
     try {
@@ -43,8 +43,8 @@ server.post('/progress/:jobId', async (request, reply) => {
                 totalPages,
                 currentUrl,
                 progress,
-                timestamp: new Date().toISOString()
-            }
+                timestamp: new Date().toISOString(),
+            },
         });
         return { message: "Progress updated" };
     }
@@ -60,17 +60,17 @@ server.get("/status/:jobId", async (request, reply) => {
         const job = await crawlQueue.getJob(jobId);
         if (!job) {
             // Check if manifest file exists as fallback
-            const fs = await import('fs/promises');
+            const fs = await import("fs/promises");
             try {
                 await fs.access(manifestPath);
                 // Manifest exists, assume job completed
                 return {
                     jobId,
-                    status: 'completed',
+                    status: "completed",
                     progress: 100,
                     result: {
-                        manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`
-                    }
+                        manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`,
+                    },
                 };
             }
             catch {
@@ -88,28 +88,28 @@ server.get("/status/:jobId", async (request, reply) => {
             detailedProgress = jobData.progress;
         }
         switch (state) {
-            case 'completed':
-                status = 'completed';
+            case "completed":
+                status = "completed";
                 result = {
                     manifestUrl: `http://localhost:3006/screenshots/manifest-${jobId}.json`,
-                    detectInteractiveElements: jobData.detectInteractiveElements !== false
+                    detectInteractiveElements: jobData.detectInteractiveElements !== false,
                 };
                 break;
-            case 'failed':
-                status = 'failed';
+            case "failed":
+                status = "failed";
                 break;
-            case 'active':
-                status = 'processing';
+            case "active":
+                status = "processing";
                 break;
             default:
-                status = 'pending';
+                status = "pending";
         }
         return {
             jobId,
             status,
-            progress: detailedProgress || (typeof progress === 'number' ? progress : 0),
+            progress: detailedProgress || (typeof progress === "number" ? progress : 0),
             result,
-            detailedProgress
+            detailedProgress,
         };
     }
     catch (error) {
@@ -117,9 +117,9 @@ server.get("/status/:jobId", async (request, reply) => {
         return reply.status(500).send({ error: "Internal server error" });
     }
 });
-server.post('/crawl', async (request, reply) => {
+server.post("/crawl", async (request, reply) => {
     //add validation
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, auth } = request.body;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, auth, styleExtraction, } = request.body;
     if (!url || !publicUrl) {
         reply.status(400).send({ error: "URL and publicUrl is required" });
         return;
@@ -132,15 +132,17 @@ server.post('/crawl', async (request, reply) => {
         delay: delay || 0,
         requestDelay: requestDelay || 1000,
         maxDepth: maxDepth === undefined ? 0 : maxDepth, // 0 means no limit, undefined defaults to no limit
-        defaultLanguageOnly: defaultLanguageOnly !== false, // Default to true
-        sampleSize: sampleSize === undefined ? 3 : sampleSize, // 0 means no limit
-        showBrowser: showBrowser !== false, // Default to false (headless)
+        defaultLanguageOnly,
+        sampleSize,
+        showBrowser,
         detectInteractiveElements: detectInteractiveElements !== false, // Default to true
-        auth
+        highlightAllElements: highlightAllElements || false,
+        auth,
+        styleExtraction,
     });
     return { message: "Crawl job successfully queued.", jobId: job.id };
 });
-server.post('/auth-session', async (request, reply) => {
+server.post("/auth-session", async (request, reply) => {
     const { url } = request.body;
     if (!url) {
         reply.status(400).send({ error: "URL is required" });
@@ -154,7 +156,7 @@ server.post('/auth-session', async (request, reply) => {
         server.log.error(`Error in auth session: ${error}`);
         return reply.status(500).send({
             error: "Failed to open authentication session",
-            message: error instanceof Error ? error.message : String(error)
+            message: error instanceof Error ? error.message : String(error),
         });
     }
 });

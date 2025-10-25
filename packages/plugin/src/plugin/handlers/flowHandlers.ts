@@ -1038,7 +1038,20 @@ async function pollForCompletion(
           );
         }
 
-        await renderTargetPage(flowPage, manifestData, x, y);
+        // Load settings to check if element highlights should be shown
+        const settings = await loadSettings();
+        const highlightAllElements = settings?.highlightAllElements || false;
+        console.log(
+          `🎨 Highlight all elements setting: ${highlightAllElements}`
+        );
+
+        await renderTargetPage(
+          flowPage,
+          manifestData,
+          x,
+          y,
+          highlightAllElements
+        );
 
         // Update progress: Creating arrows
         sendProgressUpdate({
