@@ -98,7 +98,8 @@ export async function renderSitemap(
   screenshotWidth: number = 1440,
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
-  onProgress?: (stage: string, progress: number) => void
+  onProgress?: (stage: string, progress: number) => void,
+  highlightElementFilters?: any
 ) {
   console.log("Rendering sitemap for tree:", manifestData.tree);
   console.log("Detect interactive elements:", detectInteractiveElements);
@@ -123,7 +124,8 @@ export async function renderSitemap(
     pages,
     screenshotWidth,
     detectInteractiveElements,
-    highlightAllElements
+    highlightAllElements,
+    highlightElementFilters
   );
 
   // Notify progress: Creating index page (80-90%)

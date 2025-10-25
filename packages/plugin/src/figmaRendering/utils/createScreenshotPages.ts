@@ -1,6 +1,10 @@
 import { TreeNode, InteractiveElement } from "../../types";
 
-
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
 
 async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
   const response = await fetch(url);
@@ -11,23 +15,32 @@ async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
   return new Uint8Array(arrayBuffer);
 }
 
-async function getImageDimensions(imageBytes: Uint8Array): Promise<{ width: number; height: number }> {
+async function getImageDimensions(
+  imageBytes: Uint8Array
+): Promise<{ width: number; height: number }> {
   // Simple PNG/JPEG dimension parser
   const data = new Uint8Array(imageBytes);
 
   // Check for PNG signature
-  if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4E && data[3] === 0x47) {
+  if (
+    data[0] === 0x89 &&
+    data[1] === 0x50 &&
+    data[2] === 0x4e &&
+    data[3] === 0x47
+  ) {
     // PNG: width and height are at bytes 16-23
-    const width = (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
-    const height = (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
+    const width =
+      (data[16] << 24) | (data[17] << 16) | (data[18] << 8) | data[19];
+    const height =
+      (data[20] << 24) | (data[21] << 16) | (data[22] << 8) | data[23];
     return { width, height };
   }
 
   // Check for JPEG signature
-  if (data[0] === 0xFF && data[1] === 0xD8) {
+  if (data[0] === 0xff && data[1] === 0xd8) {
     // JPEG: scan for SOF0 marker (0xFF 0xC0)
     for (let i = 2; i < data.length - 9; i++) {
-      if (data[i] === 0xFF && data[i + 1] === 0xC0) {
+      if (data[i] === 0xff && data[i + 1] === 0xc0) {
         const height = (data[i + 5] << 8) | data[i + 6];
         const width = (data[i + 7] << 8) | data[i + 8];
         return { width, height };
@@ -46,7 +59,7 @@ function isImageTooLarge(imageBytes: Uint8Array): boolean {
 function parseHostname(url: string): string | null {
   try {
     // Remove protocol
-    const withoutProtocol = url.replace(/^https?:\/\//, '');
+    const withoutProtocol = url.replace(/^https?:\/\//, "");
     // Get hostname part (before first slash, colon, or end)
     const hostname = withoutProtocol.split(/[\/:\?#]/)[0];
     return hostname.toLowerCase();
@@ -58,7 +71,7 @@ function parseHostname(url: string): string | null {
 function isExternalLink(href: string, baseUrl: string): boolean {
   try {
     // Handle relative URLs - they are internal
-    if (!href.startsWith('http://') && !href.startsWith('https://')) {
+    if (!href.startsWith("http://") && !href.startsWith("https://")) {
       return false;
     }
 
@@ -81,11 +94,16 @@ export async function createScreenshotPages(
   pages: TreeNode[],
   screenshotWidth: number = 1440,
   detectInteractiveElements: boolean = true,
-  highlightAllElements: boolean = false
+  highlightAllElements: boolean = false,
+  highlightElementFilters?: any
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
-  console.log(`Interactive elements detection: ${detectInteractiveElements ? 'enabled' : 'disabled'}`);
-  console.log(`Highlight all elements: ${highlightAllElements ? 'enabled' : 'disabled'}`);
+  console.log(
+    `Interactive elements detection: ${detectInteractiveElements ? "enabled" : "disabled"}`
+  );
+  console.log(
+    `Highlight all elements: ${highlightAllElements ? "enabled" : "disabled"}`
+  );
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
 
@@ -135,7 +153,7 @@ export async function createScreenshotPages(
     // Create reference entries for each link
     let linkNum = 1;
     for (const element of elements) {
-      if (element.href && element.href !== '#') {
+      if (element.href && element.href !== "#") {
         const entryFrame = figma.createFrame();
         entryFrame.name = `Link ${linkNum} Reference`;
         entryFrame.layoutMode = "HORIZONTAL";
@@ -155,7 +173,7 @@ export async function createScreenshotPages(
         // Determine if link is external
         const isExternal = isExternalLink(element.href, pageUrl);
         const badgeColor = isExternal
-          ? { r: 0.1, g: 0.6, b: 0.7 }   // Dark cyan/turquoise for external links
+          ? { r: 0.1, g: 0.6, b: 0.7 } // Dark cyan/turquoise for external links
           : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
 
         // Create badge icon
@@ -178,8 +196,11 @@ export async function createScreenshotPages(
         badgeNumText.y = (18 - badgeNumText.height) / 2;
 
         // Add to badge container
-        const badgeGroup = figma.group([badgeIcon, badgeNumText], figma.currentPage)
-        badgeContainer.appendChild(badgeGroup)
+        const badgeGroup = figma.group(
+          [badgeIcon, badgeNumText],
+          figma.currentPage
+        );
+        badgeContainer.appendChild(badgeGroup);
         //badgeContainer.appendChild(badgeIcon);
         //badgeContainer.appendChild(badgeNumText);
 
@@ -189,9 +210,10 @@ export async function createScreenshotPages(
         destText.fontSize = 12;
 
         // Truncate long URLs for display
-        const displayUrl = element.href.length > 60
-          ? element.href.substring(0, 57) + "..."
-          : element.href;
+        const displayUrl =
+          element.href.length > 60
+            ? element.href.substring(0, 57) + "..."
+            : element.href;
 
         destText.characters = displayUrl;
         destText.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
@@ -220,7 +242,10 @@ export async function createScreenshotPages(
   }
 
   // Create navigation frame function (for absolute positioning)
-  function createNavigationFrame(pageTitle: string, pageUrl?: string): FrameNode {
+  function createNavigationFrame(
+    pageTitle: string,
+    pageUrl?: string
+  ): FrameNode {
     const navFrame = figma.createFrame();
     navFrame.name = "Navigation";
     navFrame.layoutMode = "NONE"; // No autolayout for absolute positioning
@@ -306,12 +331,16 @@ export async function createScreenshotPages(
 
           // Check if image is too large for Figma
           if (isImageTooLarge(imageBytes)) {
-            console.log(`Image slice ${i + 1} too large for ${page.url}, trying thumbnail...`);
+            console.log(
+              `Image slice ${i + 1} too large for ${page.url}, trying thumbnail...`
+            );
             imageBytes = await fetchImageAsUint8Array(page.thumbnail);
             imageUrl = page.thumbnail;
           }
         } catch (sliceError) {
-          console.log(`Failed to fetch slice ${i + 1} for ${page.url}, trying thumbnail...`);
+          console.log(
+            `Failed to fetch slice ${i + 1} for ${page.url}, trying thumbnail...`
+          );
           imageBytes = await fetchImageAsUint8Array(page.thumbnail);
           imageUrl = page.thumbnail;
         }
@@ -325,7 +354,10 @@ export async function createScreenshotPages(
           const aspectRatio = dimensions.width / dimensions.height;
           calculatedHeight = screenshotWidth / aspectRatio;
         } catch (error) {
-          console.log(`Failed to get dimensions for ${imageUrl}, using fallback height:`, error);
+          console.log(
+            `Failed to get dimensions for ${imageUrl}, using fallback height:`,
+            error
+          );
         }
 
         const rect = figma.createRectangle();
@@ -334,7 +366,9 @@ export async function createScreenshotPages(
 
         screenshotsFrame.appendChild(rect);
 
-        console.log(`Successfully created slice ${i + 1} for ${page.url} using ${imageUrl}`);
+        console.log(
+          `Successfully created slice ${i + 1} for ${page.url} using ${imageUrl}`
+        );
       }
 
       // Resize frame to fit content
@@ -364,12 +398,16 @@ export async function createScreenshotPages(
         try {
           imageBytes = await fetchImageAsUint8Array(screenshotUrl);
         } catch (sliceError) {
-          console.log(`Failed to fetch slice ${i + 1} for height calculation, trying thumbnail...`);
+          console.log(
+            `Failed to fetch slice ${i + 1} for height calculation, trying thumbnail...`
+          );
           try {
             imageBytes = await fetchImageAsUint8Array(page.thumbnail);
             imageUrl = page.thumbnail;
           } catch (thumbError) {
-            console.log(`Failed to fetch thumbnail too, skipping height calculation`);
+            console.log(
+              `Failed to fetch thumbnail too, skipping height calculation`
+            );
             continue;
           }
         }
@@ -380,7 +418,9 @@ export async function createScreenshotPages(
           const calculatedHeight = screenshotWidth / aspectRatio;
           totalHeight += calculatedHeight;
         } catch (error) {
-          console.log(`Failed to get dimensions for ${imageUrl}, using fallback height`);
+          console.log(
+            `Failed to get dimensions for ${imageUrl}, using fallback height`
+          );
           totalHeight += 1024; // fallback height
         }
       }
@@ -402,29 +442,42 @@ export async function createScreenshotPages(
       let scaleFactor = 1;
       if (screenshots.length > 0) {
         try {
-          const firstScreenshotBytes = await fetchImageAsUint8Array(screenshots[0]);
+          const firstScreenshotBytes = await fetchImageAsUint8Array(
+            screenshots[0]
+          );
           const dimensions = await getImageDimensions(firstScreenshotBytes);
           originalWidth = dimensions.width;
           scaleFactor = screenshotWidth / originalWidth;
-          console.log(`Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`);
+          console.log(
+            `Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`
+          );
         } catch (error) {
-          console.log(`Could not calculate scaling factor, using 1:1 scaling:`, error);
+          console.log(
+            `Could not calculate scaling factor, using 1:1 scaling:`,
+            error
+          );
         }
       }
 
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)
-      if (detectInteractiveElements && page.interactiveElements && page.interactiveElements.length > 0) {
-        console.log(`Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`);
+      if (
+        detectInteractiveElements &&
+        page.interactiveElements &&
+        page.interactiveElements.length > 0
+      ) {
+        console.log(
+          `Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`
+        );
 
         // Add red frames and numbered badges for each interactive element
         let linkCounter = 1;
 
         for (const element of page.interactiveElements) {
-          const elementLabel = element.text || element.href || 'unnamed';
-          
+          const elementLabel = element.text || element.href || "unnamed";
+
           // Create main highlight rectangle with numbered name
           const highlightRect = figma.createRectangle();
-          
+
           // Scale coordinates and dimensions to match screenshot scaling
           const scaledX = element.x * scaleFactor;
           const scaledY = element.y * scaleFactor;
@@ -438,14 +491,16 @@ export async function createScreenshotPages(
 
           // Style the highlight - red 1px stroke, no fill, 50% opacity
           highlightRect.fills = [];
-          highlightRect.strokes = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+          highlightRect.strokes = [
+            { type: "SOLID", color: { r: 1, g: 0, b: 0 } },
+          ];
           highlightRect.strokeWeight = 1;
           highlightRect.opacity = 0.5;
 
           // Add numbered badge for links with destinations
-          if (element.href && element.href !== '#') {
+          if (element.href && element.href !== "#") {
             highlightRect.name = `link_${linkCounter}_highlight: ${elementLabel}`;
-            
+
             // Determine if link is external
             const isExternal = isExternalLink(element.href, page.url);
             const badgeColor = isExternal
@@ -474,22 +529,26 @@ export async function createScreenshotPages(
             badgeText.fontSize = 9;
             badgeText.characters = linkCounter.toString();
             badgeText.name = `link_${linkCounter}_badge_text`;
-            
+
             // Validate and sanitize URL before setting hyperlink
             try {
               let validUrl = element.href;
 
               // For internal links (relative URLs), prepend the base site URL
-              if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
+              if (
+                !validUrl.startsWith("http://") &&
+                !validUrl.startsWith("https://") &&
+                !validUrl.startsWith("mailto:")
+              ) {
                 const match = page.url.match(/^https?:\/\/[^\/]+/);
                 const baseUrl = match ? match[0] : null;
                 if (baseUrl) {
-                  if (!validUrl.startsWith('/')) {
-                    validUrl = '/' + validUrl;
+                  if (!validUrl.startsWith("/")) {
+                    validUrl = "/" + validUrl;
                   }
                   validUrl = baseUrl + validUrl;
                 } else {
-                  validUrl = 'https://' + validUrl;
+                  validUrl = "https://" + validUrl;
                 }
               }
 
@@ -501,12 +560,19 @@ export async function createScreenshotPages(
 
               const hyperlinkTarget: HyperlinkTarget = {
                 type: "URL",
-                value: validUrl
+                value: validUrl,
               };
-              badgeText.setRangeHyperlink(0, badgeText.characters.length, hyperlinkTarget);
+              badgeText.setRangeHyperlink(
+                0,
+                badgeText.characters.length,
+                hyperlinkTarget
+              );
               console.log(`Added hyperlink: ${validUrl}`);
             } catch (urlError) {
-              console.log(`Skipping invalid hyperlink for: ${element.href}`, urlError);
+              console.log(
+                `Skipping invalid hyperlink for: ${element.href}`,
+                urlError
+              );
             }
             badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
 
@@ -514,10 +580,13 @@ export async function createScreenshotPages(
             badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
             badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
-            const badgeGroup = figma.group([badge, badgeText], figma.currentPage)
-            badgeGroup.name = `link_${linkCounter}_badge`
+            const badgeGroup = figma.group(
+              [badge, badgeText],
+              figma.currentPage
+            );
+            badgeGroup.name = `link_${linkCounter}_badge`;
 
-            overlayContainer.appendChild(badgeGroup)
+            overlayContainer.appendChild(badgeGroup);
 
             console.log(`Added link badge ${linkCounter} for ${element.href}`);
             linkCounter++;
@@ -527,28 +596,94 @@ export async function createScreenshotPages(
 
           overlayContainer.appendChild(highlightRect);
 
-          console.log(`Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`);
+          console.log(
+            `Created highlight at scaled position (${scaledX}, ${scaledY}) size ${scaledWidth}x${scaledHeight} (original: ${element.x}, ${element.y} ${element.width}x${element.height})`
+          );
         }
 
-        console.log(`Added interactive element highlights with scaled positioning for ${page.url}`);
+        console.log(
+          `Added interactive element highlights with scaled positioning for ${page.url}`
+        );
 
         // Create reference list for link mappings if there are links
         if (linkCounter > 1) {
-          await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements, page.url);
+          await createLinkReferenceList(
+            overlayContainer,
+            linkCounter - 1,
+            page.interactiveElements,
+            page.url
+          );
         }
       }
 
-      // Add purple highlights for all detected elements from styleData (if enabled)
-      if (highlightAllElements && (page as any).styleData && (page as any).styleData.elements && (page as any).styleData.elements.length > 0) {
+      // Add color-coded highlights for detected elements (if enabled)
+      if (
+        highlightAllElements &&
+        (page as any).styleData &&
+        (page as any).styleData.elements &&
+        (page as any).styleData.elements.length > 0
+      ) {
         const elements = (page as any).styleData.elements;
-        console.log(`🎨 Adding purple highlights for ${elements.length} detected elements on ${page.url}`);
 
-        const purpleColor = { r: 0.44, g: 0.26, b: 0.76 };
+        // Color scheme for different element types (matching styling mode)
+        const ELEMENT_COLORS: Record<string, RGB> = {
+          link: { r: 0, g: 102 / 255, b: 204 / 255 }, // Blue #0066CC
+          button: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
+          heading: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
+          input: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+          textarea: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+          select: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+          image: { r: 32 / 255, g: 201 / 255, b: 151 / 255 }, // Teal #20C997
+          paragraph: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+          div: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+          other: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+        };
+
+        // Default filters if not provided (smart defaults)
+        const filters = highlightElementFilters || {
+          headings: true,
+          buttons: true,
+          inputs: true,
+          textareas: true,
+          selects: true,
+          images: true,
+          links: true,
+          paragraphs: false,
+          divs: false,
+          other: false,
+        };
+
         let elementCounter = 1;
+        let filteredCount = 0;
 
         for (const el of elements) {
+          // Skip if element type is filtered out
+          const elementType = el.elementType || "other";
+          const filterKey = elementType + "s"; // Convert 'button' to 'buttons', etc.
+          if (filters[filterKey] === false) {
+            filteredCount++;
+            continue;
+          }
+
           // Validate bounding box
-          if (!el.boundingBox || el.boundingBox.width <= 0 || el.boundingBox.height <= 0) {
+          if (
+            !el.boundingBox ||
+            el.boundingBox.width <= 0 ||
+            el.boundingBox.height <= 0
+          ) {
+            continue;
+          }
+
+          // Skip very small elements (likely noise) or very large (likely containers)
+          const MIN_SIZE = 10;
+          const MAX_SIZE_PERCENT = 0.8; // 80% of viewport
+          if (
+            el.boundingBox.width < MIN_SIZE ||
+            el.boundingBox.height < MIN_SIZE
+          ) {
+            continue;
+          }
+          if (el.boundingBox.width > screenshotWidth * MAX_SIZE_PERCENT) {
             continue;
           }
 
@@ -557,26 +692,35 @@ export async function createScreenshotPages(
           const scaledWidth = el.boundingBox.width * scaleFactor;
           const scaledHeight = el.boundingBox.height * scaleFactor;
 
+          // Get color for this element type
+          const elementColor =
+            ELEMENT_COLORS[elementType] || ELEMENT_COLORS.other;
+
           const rect = figma.createRectangle();
           rect.x = scaledX;
           rect.y = scaledY;
           rect.resize(scaledWidth, scaledHeight);
           rect.fills = [];
-          rect.strokes = [{ type: "SOLID", color: purpleColor }];
+          rect.strokes = [{ type: "SOLID", color: elementColor }];
           rect.strokeWeight = 2;
           rect.opacity = 0.6;
 
-          const elementLabel = (el.text || el.value || el.type || `element_${elementCounter}`).toString();
-          rect.name = `${el.type || 'element'}_highlight: ${elementLabel.substring(0, 50)}`;
+          const elementLabel = (
+            el.text ||
+            el.value ||
+            el.type ||
+            `element_${elementCounter}`
+          ).toString();
+          rect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
 
-          // Create small purple badge with counter
+          // Create small badge with counter
           const badgeSize = 16;
           const badge = figma.createEllipse();
           badge.name = `element_${elementCounter}_badge_circle`;
           badge.x = scaledX + scaledWidth - badgeSize - 2;
           badge.y = scaledY - 2;
           badge.resize(badgeSize, badgeSize);
-          badge.fills = [{ type: "SOLID", color: purpleColor }];
+          badge.fills = [{ type: "SOLID", color: elementColor }];
           badge.strokes = [];
 
           const badgeText = figma.createText();
@@ -596,12 +740,15 @@ export async function createScreenshotPages(
           overlayContainer.appendChild(badgeGroup);
           elementCounter++;
         }
+
+        console.log(
+          `🎨 Added ${elementCounter - 1} color-coded highlights (${filteredCount} elements filtered out) on ${page.url}`
+        );
       }
 
       // Add the overlay container to the page
       newPage.appendChild(overlayContainer);
       console.log(`Added absolute positioning overlay for ${page.url}`);
-
     } catch (error) {
       console.error(`Failed to place images for ${page.url}:`, error);
       figma.notify(`Error placing images for ${page.url}`, { error: true });
@@ -621,10 +768,13 @@ export function updateNavigationLinks(indexPageId: string) {
   for (const page of figma.root.children) {
     if (page.name === "Index") continue;
 
-    const navFrame = page.findOne(node => node.name === "Navigation") as FrameNode;
+    const navFrame = page.findOne(
+      (node) => node.name === "Navigation"
+    ) as FrameNode;
     if (navFrame) {
-      const backText = navFrame.findOne(node =>
-        node.type === "TEXT" && node.characters.includes("← Back to Index")
+      const backText = navFrame.findOne(
+        (node) =>
+          node.type === "TEXT" && node.characters.includes("← Back to Index")
       ) as TextNode;
 
       if (backText) {

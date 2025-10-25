@@ -314,11 +314,18 @@ export async function handleGetStatus(msg: any): Promise<void> {
       // Render sitemap with progress updates
       // Determine highlight setting from stored settings
       let highlightAllElements = false;
+      let highlightElementFilters = null;
       try {
         const storedSettings = await figma.clientStorage.getAsync("settings");
-        const merged = storedSettings ? Object.assign({}, DEFAULT_SETTINGS, storedSettings) : DEFAULT_SETTINGS;
+        const merged = storedSettings
+          ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
+          : DEFAULT_SETTINGS;
         highlightAllElements = !!merged.highlightAllElements;
-        console.log(`🎨 Highlight all elements setting: ${highlightAllElements}`);
+        highlightElementFilters = merged.highlightElementFilters || null;
+        console.log(
+          `🎨 Highlight all elements setting: ${highlightAllElements}`
+        );
+        console.log(`🎨 Element filters:`, highlightElementFilters);
       } catch (e) {
         console.log("Could not load settings for highlightAllElements");
       }
@@ -339,7 +346,8 @@ export async function handleGetStatus(msg: any): Promise<void> {
               progress,
             },
           });
-        }
+        },
+        highlightElementFilters
       );
 
       // Final completion - now set status to completed

@@ -71,6 +71,7 @@ export function useCrawl() {
               showBrowser: settings.showBrowser,
               detectInteractiveElements: settings.detectInteractiveElements,
               highlightAllElements: settings.highlightAllElements,
+              highlightElementFilters: settings.highlightElementFilters,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
               extractStyles: settings.extractStyles,

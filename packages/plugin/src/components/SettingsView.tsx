@@ -39,6 +39,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleDetectInteractiveElementsChange,
   highlightAllElements,
   handleHighlightAllElementsChange,
+  highlightElementFilters,
+  handleHighlightFilterChange,
   captureOnlyVisibleElements,
   handleCaptureOnlyVisibleElementsChange,
   authMethod,
@@ -369,12 +371,223 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           disabled={isLoading || !!jobId || !extractStyles}
           style={{ marginRight: "8px" }}
         />
-        Highlight all detected elements
+        Highlight detected elements
       </label>
       <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
-        Create purple highlights for all detected elements (headings, buttons,
-        inputs, etc.). Requires style extraction to be enabled.
+        Create color-coded highlights for detected elements. Requires style
+        extraction to be enabled.
       </div>
+
+      {highlightAllElements && (
+        <div
+          style={{
+            marginTop: "8px",
+            marginLeft: "24px",
+            padding: "8px",
+            backgroundColor: "#f8f9fa",
+            borderRadius: "4px",
+            border: "1px solid #e9ecef",
+          }}
+        >
+          <div
+            style={{ fontSize: "11px", fontWeight: "600", marginBottom: "6px" }}
+          >
+            Element Types to Highlight:
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.buttons}
+                onChange={(e) =>
+                  handleHighlightFilterChange("buttons", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#28A745", marginRight: "4px" }}>●</span>{" "}
+              Buttons
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.links}
+                onChange={(e) =>
+                  handleHighlightFilterChange("links", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#0066CC", marginRight: "4px" }}>●</span>{" "}
+              Links
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.inputs}
+                onChange={(e) =>
+                  handleHighlightFilterChange("inputs", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
+              Form Inputs
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.textareas}
+                onChange={(e) =>
+                  handleHighlightFilterChange("textareas", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
+              Textareas
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.selects}
+                onChange={(e) =>
+                  handleHighlightFilterChange("selects", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
+              Selects
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.headings}
+                onChange={(e) =>
+                  handleHighlightFilterChange("headings", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#6F42C1", marginRight: "4px" }}>●</span>{" "}
+              Headings
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.images}
+                onChange={(e) =>
+                  handleHighlightFilterChange("images", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#20C997", marginRight: "4px" }}>●</span>{" "}
+              Images
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.paragraphs}
+                onChange={(e) =>
+                  handleHighlightFilterChange("paragraphs", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
+              Paragraphs
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.divs}
+                onChange={(e) =>
+                  handleHighlightFilterChange("divs", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
+              Divs
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: "11px",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={highlightElementFilters.other}
+                onChange={(e) =>
+                  handleHighlightFilterChange("other", e.target.checked)
+                }
+                disabled={isLoading || !!jobId}
+                style={{ marginRight: "6px" }}
+              />
+              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
+              Other
+            </label>
+          </div>
+        </div>
+      )}
     </div>
 
     <div id="authentication-section" style={{ marginBottom: "16px" }}>

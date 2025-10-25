@@ -41,7 +41,9 @@ function extractDomain(url: string): string | null {
 async function loadSettings(): Promise<any> {
   try {
     const stored = await figma.clientStorage.getAsync("settings");
-    const merged = stored ? Object.assign({}, DEFAULT_SETTINGS, stored) : DEFAULT_SETTINGS;
+    const merged = stored
+      ? Object.assign({}, DEFAULT_SETTINGS, stored)
+      : DEFAULT_SETTINGS;
     return merged;
   } catch (error) {
     console.error("Failed to load settings:", error);
@@ -1043,16 +1045,20 @@ async function pollForCompletion(
         // Load settings to check if element highlights should be shown
         const settings = await loadSettings();
         const highlightAllElements = settings?.highlightAllElements || false;
+        const highlightElementFilters =
+          settings?.highlightElementFilters || null;
         console.log(
           `🎨 Highlight all elements setting: ${highlightAllElements}`
         );
+        console.log(`🎨 Element filters:`, highlightElementFilters);
 
         await renderTargetPage(
           flowPage,
           manifestData,
           x,
           y,
-          highlightAllElements
+          highlightAllElements,
+          highlightElementFilters
         );
 
         // Update progress: Creating arrows

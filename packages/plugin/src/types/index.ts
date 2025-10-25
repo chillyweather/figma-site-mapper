@@ -11,6 +11,7 @@ export interface PluginSettings {
   showBrowser: boolean;
   detectInteractiveElements: boolean;
   highlightAllElements: boolean;
+  highlightElementFilters: ElementFilters;
   captureOnlyVisibleElements: boolean;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   loginUrl: string;
@@ -185,6 +186,11 @@ export interface SettingsViewProps {
   highlightAllElements: boolean;
   handleHighlightAllElementsChange: (
     e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
+  highlightElementFilters: ElementFilters;
+  handleHighlightFilterChange: (
+    elementType: keyof ElementFilters,
+    checked: boolean
   ) => void;
   captureOnlyVisibleElements: boolean;
   handleCaptureOnlyVisibleElementsChange: (

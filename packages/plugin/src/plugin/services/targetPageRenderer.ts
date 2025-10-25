@@ -20,7 +20,8 @@ export async function renderTargetPage(
   manifestData: ManifestData,
   x: number,
   y: number,
-  highlightAllElements: boolean = false
+  highlightAllElements: boolean = false,
+  highlightElementFilters?: any
 ): Promise<void> {
   console.log("Rendering target page at", x, y);
 
@@ -61,9 +62,13 @@ export async function renderTargetPage(
     pageData.styleData.elements.length > 0
   ) {
     console.log(
-      `🎨 Adding purple highlights for ${pageData.styleData.elements.length} detected elements`
+      `🎨 Adding color-coded highlights for ${pageData.styleData.elements.length} detected elements`
     );
-    await addElementHighlightsOverlay(targetFrame, pageData);
+    await addElementHighlightsOverlay(
+      targetFrame,
+      pageData,
+      highlightElementFilters
+    );
   }
 
   flowPage.appendChild(targetFrame);
@@ -270,11 +275,12 @@ function normalizeUrl(href: string, pageUrl: string): string {
 }
 
 /**
- * Add purple highlights overlay for all detected elements from styleData
+ * Add color-coded highlights overlay for all detected elements from styleData
  */
 async function addElementHighlightsOverlay(
   targetFrame: FrameNode,
-  pageData: any
+  pageData: any,
+  highlightElementFilters?: any
 ): Promise<void> {
   const overlayContainer = figma.createFrame();
   overlayContainer.name = "element_highlights_overlay";
@@ -284,10 +290,46 @@ async function addElementHighlightsOverlay(
   overlayContainer.fills = [];
   overlayContainer.clipsContent = false;
 
-  const purpleColor = { r: 0.44, g: 0.26, b: 0.76 }; // Purple color (#6f42c1)
+  // Color scheme for different element types (matching styling mode)
+  const ELEMENT_COLORS: Record<string, RGB> = {
+    link: { r: 0, g: 102 / 255, b: 204 / 255 }, // Blue #0066CC
+    button: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
+    heading: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
+    input: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+    textarea: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+    select: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+    image: { r: 32 / 255, g: 201 / 255, b: 151 / 255 }, // Teal #20C997
+    paragraph: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+    div: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+    other: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+  };
+
+  // Default filters if not provided (smart defaults)
+  const filters = highlightElementFilters || {
+    headings: true,
+    buttons: true,
+    inputs: true,
+    textareas: true,
+    selects: true,
+    images: true,
+    links: true,
+    paragraphs: false,
+    divs: false,
+    other: false,
+  };
+
   let elementCounter = 1;
+  let filteredCount = 0;
 
   for (const element of pageData.styleData.elements) {
+    // Skip if element type is filtered out
+    const elementType = element.elementType || "other";
+    const filterKey = elementType + "s"; // Convert 'button' to 'buttons', etc.
+    if (filters[filterKey] === false) {
+      filteredCount++;
+      continue;
+    }
+
     // Skip elements without valid bounding box
     if (
       !element.boundingBox ||
@@ -297,12 +339,24 @@ async function addElementHighlightsOverlay(
       continue;
     }
 
+    // Skip very small elements or very large ones (likely containers)
+    const MIN_SIZE = 10;
+    if (
+      element.boundingBox.width < MIN_SIZE ||
+      element.boundingBox.height < MIN_SIZE
+    ) {
+      continue;
+    }
+
+    // Get color for this element type
+    const elementColor = ELEMENT_COLORS[elementType] || ELEMENT_COLORS.other;
+
     const highlightRect = figma.createRectangle();
     highlightRect.x = element.boundingBox.x;
     highlightRect.y = element.boundingBox.y;
     highlightRect.resize(element.boundingBox.width, element.boundingBox.height);
     highlightRect.fills = [];
-    highlightRect.strokes = [{ type: "SOLID", color: purpleColor }];
+    highlightRect.strokes = [{ type: "SOLID", color: elementColor }];
     highlightRect.strokeWeight = 2;
     highlightRect.opacity = 0.6;
 
@@ -311,13 +365,13 @@ async function addElementHighlightsOverlay(
       element.value ||
       element.type ||
       `element_${elementCounter}`;
-    highlightRect.name = `${element.type}_highlight: ${elementLabel.substring(0, 50)}`;
+    highlightRect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
 
     // Create badge for element
     const badge = await createElementBadge(
       element,
       elementCounter,
-      purpleColor
+      elementColor
     );
 
     overlayContainer.appendChild(highlightRect);
@@ -325,11 +379,14 @@ async function addElementHighlightsOverlay(
     elementCounter++;
   }
 
+  console.log(
+    `🎨 Added ${elementCounter - 1} color-coded highlights (${filteredCount} filtered out)`
+  );
   targetFrame.appendChild(overlayContainer);
 }
 
 /**
- * Create purple badge for detected element
+ * Create badge for detected element
  */
 async function createElementBadge(
   element: any,

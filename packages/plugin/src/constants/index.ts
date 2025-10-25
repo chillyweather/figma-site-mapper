@@ -13,6 +13,18 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   showBrowser: false,
   detectInteractiveElements: true,
   highlightAllElements: false,
+  highlightElementFilters: {
+    headings: true,
+    buttons: true,
+    inputs: true,
+    textareas: true,
+    selects: true,
+    images: true,
+    links: true,
+    paragraphs: false, // Skip by default - too many
+    divs: false, // Skip by default - usually containers
+    other: false, // Skip by default - noise
+  },
   captureOnlyVisibleElements: true,
   authMethod: "none",
   loginUrl: "",

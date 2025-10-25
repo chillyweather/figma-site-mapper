@@ -176,6 +176,16 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleHighlightFilterChange = useCallback(
+    (elementType: keyof ElementFilters, checked: boolean) => {
+      updateSetting("highlightElementFilters", {
+        ...settings.highlightElementFilters,
+        [elementType]: checked,
+      });
+    },
+    [updateSetting, settings.highlightElementFilters]
+  );
+
   const handleCaptureOnlyVisibleElementsChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateSetting("captureOnlyVisibleElements", e.target.checked);
@@ -362,6 +372,8 @@ export const App: React.FC = () => {
       }
       highlightAllElements={settings.highlightAllElements}
       handleHighlightAllElementsChange={handleHighlightAllElementsChange}
+      highlightElementFilters={settings.highlightElementFilters}
+      handleHighlightFilterChange={handleHighlightFilterChange}
       captureOnlyVisibleElements={settings.captureOnlyVisibleElements}
       handleCaptureOnlyVisibleElementsChange={
         handleCaptureOnlyVisibleElementsChange
