@@ -90,6 +90,179 @@ function isExternalLink(href: string, baseUrl: string): boolean {
   }
 }
 
+// Create element reference list function
+async function createElementReferenceList(
+  container: FrameNode,
+  elementData: Array<{
+    number: number;
+    type: string;
+    color: RGB;
+    id?: string;
+    classes: string[];
+    text?: string;
+  }>,
+  linkReferenceFrame?: FrameNode | null
+): Promise<void> {
+  // Create reference frame
+  const refFrame = figma.createFrame();
+  refFrame.name = "Element References";
+  refFrame.layoutMode = "VERTICAL";
+  refFrame.primaryAxisAlignItems = "MIN";
+  refFrame.counterAxisAlignItems = "MIN";
+  refFrame.itemSpacing = 8;
+  refFrame.paddingTop = 16;
+  refFrame.paddingBottom = 16;
+  refFrame.paddingLeft = 16;
+  refFrame.paddingRight = 16;
+  refFrame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
+  refFrame.strokes = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
+  refFrame.strokeWeight = 1;
+  refFrame.cornerRadius = 8;
+
+  // Position reference list relative to link references if available
+  if (linkReferenceFrame) {
+    refFrame.x = linkReferenceFrame.x + linkReferenceFrame.width + 48;
+    refFrame.y = linkReferenceFrame.y;
+  } else {
+    refFrame.x = 20; // 20px margin from left
+    refFrame.y = container.height + 64; // 64px below the screenshots
+  }
+
+  // Load fonts before creating text
+  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
+
+  // Create title
+  const titleText = figma.createText();
+  titleText.fontName = { family: "Inter", style: "Bold" };
+  titleText.fontSize = 14;
+  titleText.characters = `Element Reference (${elementData.length} elements):`;
+  titleText.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
+  refFrame.appendChild(titleText);
+
+  // Create reference entries for each element
+  for (const element of elementData) {
+    const entryFrame = figma.createFrame();
+    entryFrame.name = `Element ${element.number} Reference`;
+    entryFrame.layoutMode = "HORIZONTAL";
+    entryFrame.primaryAxisAlignItems = "MIN";
+    entryFrame.counterAxisAlignItems = "CENTER";
+    entryFrame.itemSpacing = 8;
+    entryFrame.fills = [];
+
+    // Create badge container with absolute positioning (matches link refs)
+    const badgeContainer = figma.createFrame();
+    badgeContainer.name = `Badge ${element.number}`;
+    badgeContainer.resize(18, 18);
+    badgeContainer.fills = [];
+    badgeContainer.strokes = [];
+    badgeContainer.layoutMode = "NONE";
+
+    // Create badge icon with element's color
+    const badgeIcon = figma.createEllipse();
+    badgeIcon.resize(18, 18);
+    badgeIcon.fills = [{ type: "SOLID", color: element.color }];
+    badgeIcon.strokes = [];
+    badgeIcon.x = 0;
+    badgeIcon.y = 0;
+
+    // Create badge number text
+    const badgeNumText = figma.createText();
+    badgeNumText.fontName = { family: "Inter", style: "Bold" };
+    badgeNumText.fontSize = 9;
+    badgeNumText.characters = element.number.toString();
+    badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+
+    // Center text in badge
+    badgeNumText.x = (18 - badgeNumText.width) / 2;
+    badgeNumText.y = (18 - badgeNumText.height) / 2;
+
+    const badgeGroup = figma.group(
+      [badgeIcon, badgeNumText],
+      figma.currentPage
+    );
+    badgeGroup.name = `Element ${element.number} Badge`;
+    badgeContainer.appendChild(badgeGroup);
+    entryFrame.appendChild(badgeContainer);
+
+    // Create info text frame
+    const infoFrame = figma.createFrame();
+    infoFrame.name = "Info";
+    infoFrame.layoutMode = "VERTICAL";
+    infoFrame.primaryAxisAlignItems = "MIN";
+    infoFrame.counterAxisAlignItems = "MIN";
+    infoFrame.itemSpacing = 2;
+    infoFrame.fills = [];
+    infoFrame.primaryAxisSizingMode = "AUTO";
+    infoFrame.counterAxisSizingMode = "AUTO";
+
+    // Element type (capitalized)
+    const typeText = figma.createText();
+    typeText.fontName = { family: "Inter", style: "Medium" };
+    typeText.fontSize = 11;
+    const capitalizedType =
+      element.type.charAt(0).toUpperCase() + element.type.slice(1);
+    typeText.characters = capitalizedType;
+    typeText.fills = [{ type: "SOLID", color: element.color }];
+    infoFrame.appendChild(typeText);
+
+    // ID and/or classes
+    let identifierText = "";
+    if (element.id) {
+      identifierText = `#${element.id}`;
+    }
+    if (element.classes && element.classes.length > 0) {
+      const classesStr = element.classes
+        .slice(0, 3)
+        .map((c) => `.${c}`)
+        .join(" ");
+      identifierText = identifierText
+        ? `${identifierText} ${classesStr}`
+        : classesStr;
+    }
+
+    if (identifierText) {
+      const idClassText = figma.createText();
+      idClassText.fontName = { family: "Inter", style: "Regular" };
+      idClassText.fontSize = 10;
+      idClassText.characters = identifierText;
+      idClassText.fills = [
+        { type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4 } },
+      ];
+      infoFrame.appendChild(idClassText);
+    }
+
+    // Optional: Add text content preview (truncated)
+    if (element.text && element.text.trim()) {
+      const textPreview = figma.createText();
+      textPreview.fontName = { family: "Inter", style: "Regular" };
+      textPreview.fontSize = 9;
+      const truncatedText = element.text.trim().substring(0, 50);
+      textPreview.characters =
+        truncatedText.length < element.text.trim().length
+          ? `"${truncatedText}..."`
+          : `"${truncatedText}"`;
+      textPreview.fills = [
+        { type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5 } },
+      ];
+      infoFrame.appendChild(textPreview);
+    }
+
+    entryFrame.appendChild(infoFrame);
+    entryFrame.layoutAlign = "STRETCH";
+    entryFrame.primaryAxisSizingMode = "AUTO";
+    entryFrame.counterAxisSizingMode = "AUTO";
+    refFrame.appendChild(entryFrame);
+  }
+
+  refFrame.layoutAlign = "STRETCH";
+  refFrame.primaryAxisSizingMode = "AUTO";
+  refFrame.counterAxisSizingMode = "AUTO";
+
+  container.appendChild(refFrame);
+}
+
 export async function createScreenshotPages(
   pages: TreeNode[],
   screenshotWidth: number = 1440,
@@ -117,7 +290,7 @@ export async function createScreenshotPages(
     totalLinks: number,
     elements: InteractiveElement[],
     pageUrl: string
-  ): Promise<void> {
+  ): Promise<FrameNode | null> {
     // Create reference frame
     const refFrame = figma.createFrame();
     refFrame.name = "Link References";
@@ -239,6 +412,7 @@ export async function createScreenshotPages(
 
     container.appendChild(refFrame);
     console.log(`Created link reference list with ${totalLinks} entries`);
+    return refFrame;
   }
 
   // Create navigation frame function (for absolute positioning)
@@ -459,6 +633,8 @@ export async function createScreenshotPages(
         }
       }
 
+      let linkReferenceFrame: FrameNode | null = null;
+
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)
       if (
         detectInteractiveElements &&
@@ -607,7 +783,7 @@ export async function createScreenshotPages(
 
         // Create reference list for link mappings if there are links
         if (linkCounter > 1) {
-          await createLinkReferenceList(
+          linkReferenceFrame = await createLinkReferenceList(
             overlayContainer,
             linkCounter - 1,
             page.interactiveElements,
@@ -655,6 +831,14 @@ export async function createScreenshotPages(
 
         let elementCounter = 1;
         let filteredCount = 0;
+        const elementReferenceData: Array<{
+          number: number;
+          type: string;
+          color: RGB;
+          id?: string;
+          classes: string[];
+          text?: string;
+        }> = [];
 
         for (const el of elements) {
           // Skip if element type is filtered out
@@ -738,12 +922,32 @@ export async function createScreenshotPages(
 
           overlayContainer.appendChild(rect);
           overlayContainer.appendChild(badgeGroup);
+
+          // Store element data for reference list
+          elementReferenceData.push({
+            number: elementCounter,
+            type: elementType,
+            color: elementColor,
+            id: el.id,
+            classes: el.classes || [],
+            text: el.text,
+          });
+
           elementCounter++;
         }
 
         console.log(
           `🎨 Added ${elementCounter - 1} color-coded highlights (${filteredCount} elements filtered out) on ${page.url}`
         );
+
+        // Create element reference list if there are any elements
+        if (elementReferenceData.length > 0) {
+          await createElementReferenceList(
+            overlayContainer,
+            elementReferenceData,
+            linkReferenceFrame
+          );
+        }
       }
 
       // Add the overlay container to the page
