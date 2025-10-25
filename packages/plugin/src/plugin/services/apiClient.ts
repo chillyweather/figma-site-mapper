@@ -25,6 +25,7 @@ export async function startCrawl(
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
       detectInteractiveElements: params.detectInteractiveElements !== false,
       styleExtraction: params.styleExtraction,
+      captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
     }),
   });
 

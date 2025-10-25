@@ -60,6 +60,8 @@ export interface CrawlParams {
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
+  // Whether backend should capture only visible elements (optional, forwarded)
+  captureOnlyVisibleElements?: boolean;
   auth: any;
   styleExtraction?: StyleExtractionSettings;
 }

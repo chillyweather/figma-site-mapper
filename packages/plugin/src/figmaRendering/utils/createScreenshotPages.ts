@@ -80,10 +80,12 @@ function isExternalLink(href: string, baseUrl: string): boolean {
 export async function createScreenshotPages(
   pages: TreeNode[],
   screenshotWidth: number = 1440,
-  detectInteractiveElements: boolean = true
+  detectInteractiveElements: boolean = true,
+  highlightAllElements: boolean = false
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
   console.log(`Interactive elements detection: ${detectInteractiveElements ? 'enabled' : 'disabled'}`);
+  console.log(`Highlight all elements: ${highlightAllElements ? 'enabled' : 'disabled'}`);
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
 
@@ -395,25 +397,24 @@ export async function createScreenshotPages(
       navFrame.resize(screenshotWidth, navHeight);
       overlayContainer.appendChild(navFrame);
 
+      // Compute scaling factor once (for both interactive and style elements)
+      let originalWidth = screenshotWidth; // fallback
+      let scaleFactor = 1;
+      if (screenshots.length > 0) {
+        try {
+          const firstScreenshotBytes = await fetchImageAsUint8Array(screenshots[0]);
+          const dimensions = await getImageDimensions(firstScreenshotBytes);
+          originalWidth = dimensions.width;
+          scaleFactor = screenshotWidth / originalWidth;
+          console.log(`Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`);
+        } catch (error) {
+          console.log(`Could not calculate scaling factor, using 1:1 scaling:`, error);
+        }
+      }
+
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)
       if (detectInteractiveElements && page.interactiveElements && page.interactiveElements.length > 0) {
         console.log(`Adding ${page.interactiveElements.length} interactive element frames for ${page.url}`);
-
-        // Get the original screenshot dimensions to calculate scaling factor
-        let originalWidth = screenshotWidth; // fallback
-        let scaleFactor = 1;
-
-        if (screenshots.length > 0) {
-          try {
-            const firstScreenshotBytes = await fetchImageAsUint8Array(screenshots[0]);
-            const dimensions = await getImageDimensions(firstScreenshotBytes);
-            originalWidth = dimensions.width;
-            scaleFactor = screenshotWidth / originalWidth;
-            console.log(`Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`);
-          } catch (error) {
-            console.log(`Could not calculate scaling factor, using 1:1 scaling:`, error);
-          }
-        }
 
         // Add red frames and numbered badges for each interactive element
         let linkCounter = 1;
@@ -480,7 +481,8 @@ export async function createScreenshotPages(
 
               // For internal links (relative URLs), prepend the base site URL
               if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('mailto:')) {
-                const baseUrl = page.url.match(/^https?:\/\/[^\/]+/)?.[0];
+                const match = page.url.match(/^https?:\/\/[^\/]+/);
+                const baseUrl = match ? match[0] : null;
                 if (baseUrl) {
                   if (!validUrl.startsWith('/')) {
                     validUrl = '/' + validUrl;
@@ -533,6 +535,66 @@ export async function createScreenshotPages(
         // Create reference list for link mappings if there are links
         if (linkCounter > 1) {
           await createLinkReferenceList(overlayContainer, linkCounter - 1, page.interactiveElements, page.url);
+        }
+      }
+
+      // Add purple highlights for all detected elements from styleData (if enabled)
+      if (highlightAllElements && (page as any).styleData && (page as any).styleData.elements && (page as any).styleData.elements.length > 0) {
+        const elements = (page as any).styleData.elements;
+        console.log(`🎨 Adding purple highlights for ${elements.length} detected elements on ${page.url}`);
+
+        const purpleColor = { r: 0.44, g: 0.26, b: 0.76 };
+        let elementCounter = 1;
+
+        for (const el of elements) {
+          // Validate bounding box
+          if (!el.boundingBox || el.boundingBox.width <= 0 || el.boundingBox.height <= 0) {
+            continue;
+          }
+
+          const scaledX = el.boundingBox.x * scaleFactor;
+          const scaledY = el.boundingBox.y * scaleFactor;
+          const scaledWidth = el.boundingBox.width * scaleFactor;
+          const scaledHeight = el.boundingBox.height * scaleFactor;
+
+          const rect = figma.createRectangle();
+          rect.x = scaledX;
+          rect.y = scaledY;
+          rect.resize(scaledWidth, scaledHeight);
+          rect.fills = [];
+          rect.strokes = [{ type: "SOLID", color: purpleColor }];
+          rect.strokeWeight = 2;
+          rect.opacity = 0.6;
+
+          const elementLabel = (el.text || el.value || el.type || `element_${elementCounter}`).toString();
+          rect.name = `${el.type || 'element'}_highlight: ${elementLabel.substring(0, 50)}`;
+
+          // Create small purple badge with counter
+          const badgeSize = 16;
+          const badge = figma.createEllipse();
+          badge.name = `element_${elementCounter}_badge_circle`;
+          badge.x = scaledX + scaledWidth - badgeSize - 2;
+          badge.y = scaledY - 2;
+          badge.resize(badgeSize, badgeSize);
+          badge.fills = [{ type: "SOLID", color: purpleColor }];
+          badge.strokes = [];
+
+          const badgeText = figma.createText();
+          await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+          badgeText.fontName = { family: "Inter", style: "Bold" };
+          badgeText.fontSize = 8;
+          badgeText.characters = elementCounter.toString();
+          badgeText.name = `element_${elementCounter}_badge_text`;
+          badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+          badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
+          badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
+
+          const badgeGroup = figma.group([badge, badgeText], figma.currentPage);
+          badgeGroup.name = `element_${elementCounter}_badge`;
+
+          overlayContainer.appendChild(rect);
+          overlayContainer.appendChild(badgeGroup);
+          elementCounter++;
         }
       }
 

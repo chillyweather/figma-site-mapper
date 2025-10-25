@@ -97,10 +97,12 @@ export async function renderSitemap(
   manifestData: { tree: TreeNode | null },
   screenshotWidth: number = 1440,
   detectInteractiveElements: boolean = true,
+  highlightAllElements: boolean = false,
   onProgress?: (stage: string, progress: number) => void
 ) {
   console.log("Rendering sitemap for tree:", manifestData.tree);
   console.log("Detect interactive elements:", detectInteractiveElements);
+  console.log("Highlight all elements:", highlightAllElements);
 
   // Check if tree exists
   if (!manifestData.tree) {
@@ -120,7 +122,8 @@ export async function renderSitemap(
   const pageIdMap = await createScreenshotPages(
     pages,
     screenshotWidth,
-    detectInteractiveElements
+    detectInteractiveElements,
+    highlightAllElements
   );
 
   // Notify progress: Creating index page (80-90%)

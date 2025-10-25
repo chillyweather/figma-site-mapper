@@ -6,6 +6,7 @@
  */
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
+import { DEFAULT_SETTINGS } from "../../constants";
 import { buildTokensTable } from "../../figmaRendering/buildTokensTable";
 import {
   startCrawl,
@@ -15,7 +16,6 @@ import {
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
 import { handleShowStylingElements } from "./stylingHandlers";
-import { DEFAULT_SETTINGS } from "../../constants";
 
 let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
@@ -128,6 +128,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     extractBorders,
     includeSelectors,
     includeComputedStyles,
+    highlightAllElements,
   } = msg;
 
   console.log("📡 Received crawl request for URL:", url);
@@ -311,10 +312,22 @@ export async function handleGetStatus(msg: any): Promise<void> {
         result.result?.detectInteractiveElements !== false;
 
       // Render sitemap with progress updates
+      // Determine highlight setting from stored settings
+      let highlightAllElements = false;
+      try {
+        const storedSettings = await figma.clientStorage.getAsync("settings");
+        const merged = storedSettings ? Object.assign({}, DEFAULT_SETTINGS, storedSettings) : DEFAULT_SETTINGS;
+        highlightAllElements = !!merged.highlightAllElements;
+        console.log(`🎨 Highlight all elements setting: ${highlightAllElements}`);
+      } catch (e) {
+        console.log("Could not load settings for highlightAllElements");
+      }
+
       await renderSitemap(
         manifestData,
         screenshotWidth,
         detectInteractiveElements,
+        highlightAllElements,
         (stage: string, progress: number) => {
           // Send progress update to UI
           figma.ui.postMessage({

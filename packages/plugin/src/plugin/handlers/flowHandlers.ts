@@ -11,6 +11,7 @@
 import { FlowLink } from "../types";
 import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
+import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 
@@ -39,8 +40,9 @@ function extractDomain(url: string): string | null {
  */
 async function loadSettings(): Promise<any> {
   try {
-    const settings = await figma.clientStorage.getAsync("settings");
-    return settings || {};
+    const stored = await figma.clientStorage.getAsync("settings");
+    const merged = stored ? Object.assign({}, DEFAULT_SETTINGS, stored) : DEFAULT_SETTINGS;
+    return merged;
   } catch (error) {
     console.error("Failed to load settings:", error);
     return {};
