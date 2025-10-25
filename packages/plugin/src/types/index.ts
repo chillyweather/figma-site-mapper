@@ -70,6 +70,89 @@ export interface FlowLink {
   url: string;
 }
 
+// Element extraction types
+export type ElementMode = "flow" | "styling";
+
+export type ElementType =
+  | "heading"
+  | "button"
+  | "input"
+  | "textarea"
+  | "select"
+  | "image"
+  | "link"
+  | "paragraph"
+  | "div"
+  | "other";
+
+export interface ElementFilters {
+  headings: boolean;
+  buttons: boolean;
+  inputs: boolean;
+  textareas: boolean;
+  selects: boolean;
+  images: boolean;
+  links: boolean;
+  paragraphs: boolean;
+  divs: boolean;
+  other: boolean;
+}
+
+export interface ExtractedElement {
+  selector: string;
+  tagName: string;
+  type: string;
+  elementType: ElementType; // Categorized type
+  classes: string[];
+  id?: string;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  styles?: {
+    color?: string;
+    backgroundColor?: string;
+    fontSize?: string;
+    fontFamily?: string;
+    fontWeight?: string;
+    lineHeight?: string;
+    padding?: string;
+    margin?: string;
+    borderRadius?: string;
+    borderWidth?: string;
+    borderColor?: string;
+    borderStyle?: string;
+    display?: string;
+    position?: string;
+    width?: string;
+    height?: string;
+  };
+  text?: string;
+  href?: string;
+  ariaLabel?: string;
+  role?: string;
+  // Additional properties for future expansion
+  value?: string;
+  placeholder?: string;
+  src?: string;
+  alt?: string;
+}
+
+export interface CategorizedElements {
+  headings: ExtractedElement[];
+  buttons: ExtractedElement[];
+  inputs: ExtractedElement[];
+  textareas: ExtractedElement[];
+  selects: ExtractedElement[];
+  images: ExtractedElement[];
+  links: ExtractedElement[];
+  paragraphs: ExtractedElement[];
+  divs: ExtractedElement[];
+  other: ExtractedElement[];
+}
+
 export interface SettingsViewProps {
   url: string;
   screenshotWidth: string;
@@ -179,6 +262,16 @@ export interface MainViewProps {
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
   crawlProgress: CrawlProgress;
+  // Styling mode props
+  elementMode: ElementMode;
+  onElementModeChange: (mode: ElementMode) => void;
+  categorizedElements: CategorizedElements | null;
+  elementFilters: ElementFilters;
+  onElementFilterChange: (
+    elementType: keyof ElementFilters,
+    checked: boolean
+  ) => void;
+  handleShowStyling: () => void;
 }
 
 export interface CrawlingTabProps {
@@ -198,6 +291,16 @@ export interface MappingTabProps {
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
+  // Styling mode props
+  elementMode: ElementMode;
+  onElementModeChange: (mode: ElementMode) => void;
+  categorizedElements: CategorizedElements | null;
+  elementFilters: ElementFilters;
+  onElementFilterChange: (
+    elementType: keyof ElementFilters,
+    checked: boolean
+  ) => void;
+  handleShowStyling: () => void;
 }
 
 export interface FocusedInputProps {

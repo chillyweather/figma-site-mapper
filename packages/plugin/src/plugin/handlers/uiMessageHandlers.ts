@@ -14,6 +14,7 @@ import {
   openAuthSession,
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
+import { handleShowStylingElements } from "./stylingHandlers";
 
 let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
@@ -522,6 +523,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "show-flow":
       await handleShowFlow(msg.selectedLinks);
+      break;
+
+    case "show-styling-elements":
+      await handleShowStylingElements(msg.filters);
       break;
 
     case "open-auth-session":

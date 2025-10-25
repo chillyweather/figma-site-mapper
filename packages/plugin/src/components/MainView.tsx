@@ -20,6 +20,13 @@ export const MainView: React.FC<MainViewProps> = ({
   handleShowFlow,
   flowProgress,
   crawlProgress,
+  // Styling mode props
+  elementMode,
+  onElementModeChange,
+  categorizedElements,
+  elementFilters,
+  onElementFilterChange,
+  handleShowStyling,
 }) => {
   const [activeTab, setActiveTab] = useState<
     "crawling" | "mapping" | "styling"
@@ -149,6 +156,12 @@ export const MainView: React.FC<MainViewProps> = ({
           handleLinkCheck={handleLinkCheck}
           handleShowFlow={handleShowFlow}
           flowProgress={flowProgress}
+          elementMode={elementMode}
+          onElementModeChange={onElementModeChange}
+          categorizedElements={categorizedElements}
+          elementFilters={elementFilters}
+          onElementFilterChange={onElementFilterChange}
+          handleShowStyling={handleShowStyling}
         />
       )}
 

@@ -47,6 +47,12 @@ interface ExtractedElement {
   href?: string;
   ariaLabel?: string;
   role?: string;
+  // Additional properties for inputs, images, etc.
+  value?: string;
+  placeholder?: string;
+  checked?: boolean;
+  src?: string;
+  alt?: string;
 }
 
 interface CSSVariablesByCategory {
@@ -672,6 +678,24 @@ async function extractStyleData(
       // Extract href for links
       if (el.tagName === "A") {
         extractedElement.href = (el as HTMLAnchorElement).href;
+      }
+
+      // Extract input-specific attributes
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+        const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
+        extractedElement.value = inputEl.value || undefined;
+        extractedElement.placeholder = inputEl.placeholder || undefined;
+        if (el.tagName === "INPUT") {
+          extractedElement.checked =
+            (el as HTMLInputElement).checked || undefined;
+        }
+      }
+
+      // Extract image attributes
+      if (el.tagName === "IMG") {
+        const imgEl = el as HTMLImageElement;
+        extractedElement.src = imgEl.src || undefined;
+        extractedElement.alt = imgEl.alt || undefined;
       }
 
       // Extract ARIA attributes

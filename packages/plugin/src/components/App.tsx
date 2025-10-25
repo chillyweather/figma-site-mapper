@@ -1,13 +1,20 @@
 import React, { useCallback } from "react";
 import { useAtom } from "jotai";
-import { currentViewAtom } from "../store/atoms";
+import {
+  currentViewAtom,
+  elementModeAtom,
+  elementFiltersAtom,
+  categorizedElementsAtom,
+} from "../store/atoms";
 import { useSettings } from "../hooks/useSettings";
 import { useCrawl } from "../hooks/useCrawl";
 import { useFlowMapping } from "../hooks/useFlowMapping";
+import { useElementData } from "../hooks/useElementData";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
 import { StylingView } from "./StylingView";
 import { getPresetConfig } from "../utils/stylePresets";
+import { ElementMode, ElementFilters } from "../types";
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
@@ -21,6 +28,48 @@ export const App: React.FC = () => {
     handleShowFlow,
     flowProgress,
   } = useFlowMapping();
+
+  // Load and categorize elements from manifest
+  useElementData();
+
+  // Element mode and filters
+  const [elementMode, setElementMode] = useAtom(elementModeAtom);
+  const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
+  const [categorizedElements] = useAtom(categorizedElementsAtom);
+
+  // Element mode handler
+  const handleElementModeChange = useCallback(
+    (mode: ElementMode) => {
+      setElementMode(mode);
+    },
+    [setElementMode]
+  );
+
+  // Element filter handler
+  const handleElementFilterChange = useCallback(
+    (elementType: keyof ElementFilters, checked: boolean) => {
+      setElementFilters((prev) => ({
+        ...prev,
+        [elementType]: checked,
+      }));
+    },
+    [setElementFilters]
+  );
+
+  // Styling mode handler (placeholder for now)
+  const handleShowStyling = useCallback(() => {
+    console.log("Show styling with filters:", elementFilters);
+    // TODO: Implement styling mode rendering
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "show-styling-elements",
+          filters: elementFilters,
+        },
+      },
+      "*"
+    );
+  }, [elementFilters]);
 
   // View switching
   const switchToMain = useCallback(
@@ -362,6 +411,13 @@ export const App: React.FC = () => {
       handleShowFlow={handleShowFlow}
       flowProgress={flowProgress}
       crawlProgress={crawlProgress}
+      // Styling mode props
+      elementMode={elementMode}
+      onElementModeChange={handleElementModeChange}
+      categorizedElements={categorizedElements}
+      elementFilters={elementFilters}
+      onElementFilterChange={handleElementFilterChange}
+      handleShowStyling={handleShowStyling}
     />
   );
 };

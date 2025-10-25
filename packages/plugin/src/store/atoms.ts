@@ -4,6 +4,9 @@ import {
   BadgeLink,
   FlowProgress,
   CrawlProgress,
+  ElementMode,
+  ElementFilters,
+  CategorizedElements,
 } from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
 
@@ -44,3 +47,21 @@ export const flowProgressAtom = atom<FlowProgress>({
 
 // Manifest data atom
 export const manifestDataAtom = atom<any>(null);
+
+// Element mode and filters atoms
+export const elementModeAtom = atom<ElementMode>("flow");
+
+export const elementFiltersAtom = atom<ElementFilters>({
+  headings: true,
+  buttons: true,
+  inputs: true,
+  textareas: true,
+  selects: true,
+  images: true,
+  links: true,
+  paragraphs: false, // Start with paragraphs off to avoid clutter
+  divs: false, // Start with divs off to avoid clutter
+  other: false,
+});
+
+export const categorizedElementsAtom = atom<CategorizedElements | null>(null);

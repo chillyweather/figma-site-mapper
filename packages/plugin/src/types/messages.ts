@@ -4,6 +4,7 @@ export type PluginMessageType =
   | "load-settings"
   | "get-status"
   | "show-flow"
+  | "show-styling-elements"
   | "close"
   | "crawl-started"
   | "settings-loaded"
