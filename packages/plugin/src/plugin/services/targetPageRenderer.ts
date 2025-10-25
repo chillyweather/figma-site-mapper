@@ -247,8 +247,8 @@ async function createBadge(
   badge.name = `link_${linkCounter}_badge_circle`;
 
   const badgeSize = 18;
-  badge.x = element.x + element.width - badgeSize - 4;
-  badge.y = element.y - 4;
+  badge.x = element.x - 4;
+  badge.y = element.y + element.height - badgeSize + 4;
   badge.resize(badgeSize, badgeSize);
   badge.fills = [{ type: "SOLID", color: badgeColor }];
   badge.strokes = [];

@@ -681,10 +681,10 @@ export async function createScreenshotPages(
             const badge = figma.createEllipse();
             badge.name = `link_${linkCounter}_badge_circle`;
 
-            // Position badge in top-right corner of element
+            // Position badge in bottom-left corner of element
             const badgeSize = 18;
-            badge.x = scaledX + scaledWidth - badgeSize - 4;
-            badge.y = scaledY - 4;
+            badge.x = scaledX - 4;
+            badge.y = scaledY + scaledHeight - badgeSize + 4;
             badge.resize(badgeSize, badgeSize);
 
             // Style badge - colored fill, no stroke
