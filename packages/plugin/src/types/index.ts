@@ -262,9 +262,7 @@ export interface MainViewProps {
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
   crawlProgress: CrawlProgress;
-  // Styling mode props
-  elementMode: ElementMode;
-  onElementModeChange: (mode: ElementMode) => void;
+  // Element styling props
   categorizedElements: CategorizedElements | null;
   elementFilters: ElementFilters;
   onElementFilterChange: (

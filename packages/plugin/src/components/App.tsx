@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import { useAtom } from "jotai";
 import {
   currentViewAtom,
-  elementModeAtom,
   elementFiltersAtom,
   categorizedElementsAtom,
   selectedPageUrlAtom,
@@ -16,7 +15,7 @@ import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
 import { StylingView } from "./StylingView";
 import { getPresetConfig } from "../utils/stylePresets";
-import { ElementMode, ElementFilters } from "../types";
+import { ElementFilters } from "../types";
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
@@ -38,17 +37,8 @@ export const App: React.FC = () => {
   // Load and categorize elements from manifest for selected page
   useElementData(selectedPageUrl);
 
-  const [elementMode, setElementMode] = useAtom(elementModeAtom);
   const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
   const [categorizedElements] = useAtom(categorizedElementsAtom);
-
-  // Element mode handler
-  const handleElementModeChange = useCallback(
-    (mode: ElementMode) => {
-      setElementMode(mode);
-    },
-    [setElementMode]
-  );
 
   // Element filter handler
   const handleElementFilterChange = useCallback(
@@ -426,9 +416,7 @@ export const App: React.FC = () => {
       handleShowFlow={handleShowFlow}
       flowProgress={flowProgress}
       crawlProgress={crawlProgress}
-      // Styling mode props
-      elementMode={elementMode}
-      onElementModeChange={handleElementModeChange}
+      // Element styling props
       categorizedElements={categorizedElements}
       elementFilters={elementFilters}
       onElementFilterChange={handleElementFilterChange}

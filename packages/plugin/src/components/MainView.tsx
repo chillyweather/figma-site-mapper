@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
-import { MappingTab } from "./MappingTab";
-import { StylingTab } from "./StylingTab";
+import { FlowsTab } from "./FlowsTab";
+import { ElementStylingTab } from "./ElementStylingTab";
+import { TokensTab } from "./TokensTab";
 
 export const MainView: React.FC<MainViewProps> = ({
   url,
@@ -20,9 +21,7 @@ export const MainView: React.FC<MainViewProps> = ({
   handleShowFlow,
   flowProgress,
   crawlProgress,
-  // Styling mode props
-  elementMode,
-  onElementModeChange,
+  // Element styling props
   categorizedElements,
   elementFilters,
   onElementFilterChange,
@@ -32,7 +31,7 @@ export const MainView: React.FC<MainViewProps> = ({
   onPageSelection,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "mapping" | "styling"
+    "crawling" | "flows" | "styling" | "tokens"
   >("crawling");
 
   return (
@@ -100,17 +99,17 @@ export const MainView: React.FC<MainViewProps> = ({
         </button>
         <button
           id="flows-tab-button"
-          onClick={() => setActiveTab("mapping")}
+          onClick={() => setActiveTab("flows")}
           style={{
             background: "none",
             border: "none",
             padding: "8px 16px",
             cursor: "pointer",
             fontSize: "12px",
-            fontWeight: activeTab === "mapping" ? "600" : "400",
-            color: activeTab === "mapping" ? "#000" : "#666",
+            fontWeight: activeTab === "flows" ? "600" : "400",
+            color: activeTab === "flows" ? "#000" : "#666",
             borderBottom:
-              activeTab === "mapping"
+              activeTab === "flows"
                 ? "2px solid #0066cc"
                 : "2px solid transparent",
           }}
@@ -136,6 +135,25 @@ export const MainView: React.FC<MainViewProps> = ({
         >
           Styling
         </button>
+        <button
+          id="tokens-tab-button"
+          onClick={() => setActiveTab("tokens")}
+          style={{
+            background: "none",
+            border: "none",
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontSize: "12px",
+            fontWeight: activeTab === "tokens" ? "600" : "400",
+            color: activeTab === "tokens" ? "#000" : "#666",
+            borderBottom:
+              activeTab === "tokens"
+                ? "2px solid #0066cc"
+                : "2px solid transparent",
+          }}
+        >
+          Tokens
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -152,15 +170,18 @@ export const MainView: React.FC<MainViewProps> = ({
         />
       )}
 
-      {activeTab === "mapping" && (
-        <MappingTab
+      {activeTab === "flows" && (
+        <FlowsTab
           badgeLinks={badgeLinks}
           checkedLinks={checkedLinks}
           handleLinkCheck={handleLinkCheck}
           handleShowFlow={handleShowFlow}
           flowProgress={flowProgress}
-          elementMode={elementMode}
-          onElementModeChange={onElementModeChange}
+        />
+      )}
+
+      {activeTab === "styling" && (
+        <ElementStylingTab
           categorizedElements={categorizedElements}
           elementFilters={elementFilters}
           onElementFilterChange={onElementFilterChange}
@@ -171,7 +192,7 @@ export const MainView: React.FC<MainViewProps> = ({
         />
       )}
 
-      {activeTab === "styling" && <StylingTab />}
+      {activeTab === "tokens" && <TokensTab />}
     </div>
   );
 };

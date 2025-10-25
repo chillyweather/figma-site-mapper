@@ -11,7 +11,7 @@ interface PageNode {
   children?: PageNode[];
 }
 
-export const StylingTab: React.FC = () => {
+export const TokensTab: React.FC = () => {
   const [manifestData, setManifestData] = useAtom(manifestDataAtom);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
