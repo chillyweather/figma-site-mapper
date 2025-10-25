@@ -1,5 +1,5 @@
 import { TreeNode, InteractiveElement } from "../../types";
-import type { ElementFilters, ElementType } from "../../types";
+import type { ElementFilters, ElementType } from "../../types/index";
 import { categorizeElementType } from "../../utils/elementCategorization";
 
 interface RGB {
@@ -131,6 +131,33 @@ function isExternalLink(href: string, baseUrl: string): boolean {
   }
 }
 
+/**
+ * Build a map of bounding box coordinates to link metadata
+ * This allows matching styleData elements with interactive elements that have links
+ */
+function buildLinkMetadataMap(
+  interactiveElements: InteractiveElement[],
+  pageUrl: string
+): Map<string, { linkNumber: number; href: string; isExternal: boolean }> {
+  const map = new Map();
+  let linkNumber = 1;
+
+  for (const element of interactiveElements) {
+    if (element.href && element.href !== "#") {
+      // Create a key from bounding box coordinates
+      const key = `${element.x},${element.y},${element.width},${element.height}`;
+      map.set(key, {
+        linkNumber,
+        href: element.href,
+        isExternal: isExternalLink(element.href, pageUrl),
+      });
+      linkNumber++;
+    }
+  }
+
+  return map;
+}
+
 // Create element reference list function
 async function createElementReferenceList(
   container: FrameNode,
@@ -141,8 +168,10 @@ async function createElementReferenceList(
     id?: string;
     classes: string[];
     text?: string;
-  }>,
-  linkReferenceFrame?: FrameNode | null
+    href?: string;
+    linkNumber?: number;
+    isExternal?: boolean;
+  }>
 ): Promise<void> {
   // Create reference frame
   const refFrame = figma.createFrame();
@@ -160,14 +189,9 @@ async function createElementReferenceList(
   refFrame.strokeWeight = 1;
   refFrame.cornerRadius = 8;
 
-  // Position reference list relative to link references if available
-  if (linkReferenceFrame) {
-    refFrame.x = linkReferenceFrame.x + linkReferenceFrame.width + 48;
-    refFrame.y = linkReferenceFrame.y;
-  } else {
-    refFrame.x = 20; // 20px margin from left
-    refFrame.y = container.height + 64; // 64px below the screenshots
-  }
+  // Position reference list below the screenshots
+  refFrame.x = 20; // 20px margin from left
+  refFrame.y = container.height + 64; // 64px below the screenshots
 
   // Load fonts before creating text
   await figma.loadFontAsync({ family: "Inter", style: "Bold" });
@@ -290,6 +314,69 @@ async function createElementReferenceList(
       infoFrame.appendChild(textPreview);
     }
 
+    // Add link information if element has a link
+    if (element.href && element.linkNumber) {
+      const linkInfoFrame = figma.createFrame();
+      linkInfoFrame.name = "Link Info";
+      linkInfoFrame.layoutMode = "HORIZONTAL";
+      linkInfoFrame.primaryAxisAlignItems = "CENTER";
+      linkInfoFrame.counterAxisAlignItems = "CENTER";
+      linkInfoFrame.itemSpacing = 6;
+      linkInfoFrame.fills = [];
+      linkInfoFrame.primaryAxisSizingMode = "AUTO";
+      linkInfoFrame.counterAxisSizingMode = "AUTO";
+
+      // Small link badge with number (matches the overlay badge)
+      const linkBadgeContainer = figma.createFrame();
+      linkBadgeContainer.name = `Link Badge ${element.linkNumber}`;
+      linkBadgeContainer.resize(14, 14);
+      linkBadgeContainer.fills = [];
+      linkBadgeContainer.strokes = [];
+      linkBadgeContainer.layoutMode = "NONE";
+
+      const linkBadgeColor = element.isExternal
+        ? { r: 0.1, g: 0.6, b: 0.7 } // External: cyan
+        : { r: 0.9, g: 0.45, b: 0.1 }; // Internal: orange
+
+      const linkBadgeCircle = figma.createEllipse();
+      linkBadgeCircle.resize(14, 14);
+      linkBadgeCircle.fills = [{ type: "SOLID", color: linkBadgeColor }];
+      linkBadgeCircle.strokes = [];
+      linkBadgeCircle.x = 0;
+      linkBadgeCircle.y = 0;
+
+      const linkBadgeText = figma.createText();
+      linkBadgeText.fontName = { family: "Inter", style: "Bold" };
+      linkBadgeText.fontSize = 7;
+      linkBadgeText.characters = element.linkNumber.toString();
+      linkBadgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+      linkBadgeText.x = (14 - linkBadgeText.width) / 2;
+      linkBadgeText.y = (14 - linkBadgeText.height) / 2;
+
+      const linkBadgeGroup = figma.group(
+        [linkBadgeCircle, linkBadgeText],
+        figma.currentPage
+      );
+      linkBadgeContainer.appendChild(linkBadgeGroup);
+      linkInfoFrame.appendChild(linkBadgeContainer);
+
+      // Link destination text
+      const linkDestText = figma.createText();
+      linkDestText.fontName = { family: "Inter", style: "Regular" };
+      linkDestText.fontSize = 9;
+      const displayUrl =
+        element.href.length > 50
+          ? element.href.substring(0, 47) + "..."
+          : element.href;
+      linkDestText.characters = `→ ${displayUrl}`;
+      linkDestText.fills = [
+        { type: "SOLID", color: { r: 0.3, g: 0.5, b: 0.7 } },
+      ];
+      linkInfoFrame.appendChild(linkDestText);
+
+      infoFrame.appendChild(linkInfoFrame);
+    }
+
     entryFrame.appendChild(infoFrame);
     entryFrame.layoutAlign = "STRETCH";
     entryFrame.primaryAxisSizingMode = "AUTO";
@@ -324,137 +411,6 @@ export async function createScreenshotPages(
   // Load font for navigation frame - use Inter only
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
   const fontName = { family: "Inter", style: "Regular" };
-
-  // Create link reference list function
-  async function createLinkReferenceList(
-    container: FrameNode,
-    totalLinks: number,
-    elements: InteractiveElement[],
-    pageUrl: string
-  ): Promise<FrameNode | null> {
-    // Create reference frame
-    const refFrame = figma.createFrame();
-    refFrame.name = "Link References";
-    refFrame.layoutMode = "VERTICAL";
-    refFrame.primaryAxisAlignItems = "MIN";
-    refFrame.counterAxisAlignItems = "MIN";
-    refFrame.itemSpacing = 8;
-    refFrame.paddingTop = 16;
-    refFrame.paddingBottom = 16;
-    refFrame.paddingLeft = 16;
-    refFrame.paddingRight = 16;
-    refFrame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
-    refFrame.strokes = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
-    refFrame.strokeWeight = 1;
-    refFrame.cornerRadius = 8;
-
-    // Position reference list 64px below the screenshots
-    refFrame.x = 20; // 20px margin from left
-    refFrame.y = container.height + 64; // 64px below the screenshots
-
-    // Load fonts before creating text
-    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-
-    // Create title
-    const titleText = figma.createText();
-    titleText.fontName = { family: "Inter", style: "Bold" };
-    titleText.fontSize = 14;
-    titleText.characters = "Link Destinations:";
-    titleText.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
-    refFrame.appendChild(titleText);
-
-    // Create reference entries for each link
-    let linkNum = 1;
-    for (const element of elements) {
-      if (element.href && element.href !== "#") {
-        const entryFrame = figma.createFrame();
-        entryFrame.name = `Link ${linkNum} Reference`;
-        entryFrame.layoutMode = "HORIZONTAL";
-        entryFrame.primaryAxisAlignItems = "MIN";
-        entryFrame.counterAxisAlignItems = "CENTER";
-        entryFrame.itemSpacing = 8;
-        entryFrame.fills = [];
-
-        // Create badge container with absolute positioning for proper text centering
-        const badgeContainer = figma.createFrame();
-        badgeContainer.name = `Badge ${linkNum}`;
-        badgeContainer.resize(18, 18);
-        badgeContainer.fills = [];
-        badgeContainer.strokes = [];
-        badgeContainer.layoutMode = "NONE"; // Absolute positioning for centering
-
-        // Determine if link is external
-        const isExternal = isExternalLink(element.href, pageUrl);
-        const badgeColor = isExternal
-          ? { r: 0.1, g: 0.6, b: 0.7 } // Dark cyan/turquoise for external links
-          : { r: 0.9, g: 0.45, b: 0.1 }; // Brighter orange for internal links
-
-        // Create badge icon
-        const badgeIcon = figma.createEllipse();
-        badgeIcon.resize(18, 18);
-        badgeIcon.fills = [{ type: "SOLID", color: badgeColor }]; // Colored fill
-        badgeIcon.strokes = []; // No stroke
-        badgeIcon.x = 0;
-        badgeIcon.y = 0;
-
-        // Create badge number text (font already loaded)
-        const badgeNumText = figma.createText();
-        badgeNumText.fontName = { family: "Inter", style: "Bold" };
-        badgeNumText.fontSize = 9;
-        badgeNumText.characters = linkNum.toString();
-        badgeNumText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }]; // White text
-
-        // Center text in badge
-        badgeNumText.x = (18 - badgeNumText.width) / 2;
-        badgeNumText.y = (18 - badgeNumText.height) / 2;
-
-        // Add to badge container
-        const badgeGroup = figma.group(
-          [badgeIcon, badgeNumText],
-          figma.currentPage
-        );
-        badgeContainer.appendChild(badgeGroup);
-        //badgeContainer.appendChild(badgeIcon);
-        //badgeContainer.appendChild(badgeNumText);
-
-        // Create destination text
-        const destText = figma.createText();
-        destText.fontName = { family: "Inter", style: "Regular" };
-        destText.fontSize = 12;
-
-        // Truncate long URLs for display
-        const displayUrl =
-          element.href.length > 60
-            ? element.href.substring(0, 57) + "..."
-            : element.href;
-
-        destText.characters = displayUrl;
-        destText.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
-
-        // Add elements to entry frame
-        entryFrame.appendChild(badgeContainer);
-        entryFrame.appendChild(destText);
-
-        // Auto-resize entry frame
-        entryFrame.layoutAlign = "STRETCH";
-        entryFrame.primaryAxisSizingMode = "AUTO";
-        entryFrame.counterAxisSizingMode = "AUTO";
-
-        refFrame.appendChild(entryFrame);
-        linkNum++;
-      }
-    }
-
-    // Auto-resize reference frame
-    refFrame.layoutAlign = "STRETCH";
-    refFrame.primaryAxisSizingMode = "AUTO";
-    refFrame.counterAxisSizingMode = "AUTO";
-
-    container.appendChild(refFrame);
-    console.log(`Created link reference list with ${totalLinks} entries`);
-    return refFrame;
-  }
 
   // Create navigation frame function (for absolute positioning)
   function createNavigationFrame(
@@ -674,8 +630,6 @@ export async function createScreenshotPages(
         }
       }
 
-      let linkReferenceFrame: FrameNode | null = null;
-
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)
       if (
         detectInteractiveElements &&
@@ -821,16 +775,6 @@ export async function createScreenshotPages(
         console.log(
           `Added interactive element highlights with scaled positioning for ${page.url}`
         );
-
-        // Create reference list for link mappings if there are links
-        if (linkCounter > 1) {
-          linkReferenceFrame = await createLinkReferenceList(
-            overlayContainer,
-            linkCounter - 1,
-            page.interactiveElements,
-            page.url
-          );
-        }
       }
 
       // Add color-coded highlights for detected elements (if enabled)
@@ -849,6 +793,12 @@ export async function createScreenshotPages(
             : {}
         );
 
+        // Build link metadata map from interactive elements
+        const linkMetadataMap = buildLinkMetadataMap(
+          page.interactiveElements || [],
+          page.url
+        );
+
         let elementCounter = 1;
         let filteredCount = 0;
         const elementReferenceData: Array<{
@@ -858,6 +808,9 @@ export async function createScreenshotPages(
           id?: string;
           classes: string[];
           text?: string;
+          href?: string;
+          linkNumber?: number;
+          isExternal?: boolean;
         }> = [];
 
         for (const el of elements) {
@@ -949,6 +902,10 @@ export async function createScreenshotPages(
 
           const classes = Array.isArray(el.classes) ? el.classes : [];
 
+          // Look up link metadata if this element has a bounding box
+          const elementKey = `${el.boundingBox.x},${el.boundingBox.y},${el.boundingBox.width},${el.boundingBox.height}`;
+          const linkMeta = linkMetadataMap.get(elementKey);
+
           elementReferenceData.push({
             number: elementCounter,
             type: elementType,
@@ -956,6 +913,9 @@ export async function createScreenshotPages(
             id: el.id,
             classes,
             text: el.text,
+            href: linkMeta?.href,
+            linkNumber: linkMeta?.linkNumber,
+            isExternal: linkMeta?.isExternal,
           });
 
           elementCounter++;
@@ -968,8 +928,7 @@ export async function createScreenshotPages(
         if (elementReferenceData.length > 0) {
           await createElementReferenceList(
             overlayContainer,
-            elementReferenceData,
-            linkReferenceFrame
+            elementReferenceData
           );
         }
       }
