@@ -1,10 +1,51 @@
 import { TreeNode, InteractiveElement } from "../../types";
+import type { ElementFilters, ElementType } from "../../types";
+import { categorizeElementType } from "../../utils/elementCategorization";
 
 interface RGB {
   r: number;
   g: number;
   b: number;
 }
+
+const ELEMENT_HIGHLIGHT_COLORS: Record<ElementType, RGB> = {
+  heading: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
+  button: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
+  input: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+  textarea: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+  select: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
+  image: { r: 32 / 255, g: 201 / 255, b: 151 / 255 }, // Teal #20C997
+  link: { r: 0, g: 102 / 255, b: 204 / 255 }, // Blue #0066CC
+  paragraph: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+  div: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+  other: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
+};
+
+const ELEMENT_TYPE_TO_FILTER_KEY: Record<ElementType, keyof ElementFilters> = {
+  heading: "headings",
+  button: "buttons",
+  input: "inputs",
+  textarea: "textareas",
+  select: "selects",
+  image: "images",
+  link: "links",
+  paragraph: "paragraphs",
+  div: "divs",
+  other: "other",
+};
+
+const DEFAULT_ELEMENT_FILTERS: ElementFilters = {
+  headings: true,
+  buttons: true,
+  inputs: true,
+  textareas: true,
+  selects: true,
+  images: true,
+  links: true,
+  paragraphs: false,
+  divs: false,
+  other: false,
+};
 
 async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
   const response = await fetch(url);
@@ -95,7 +136,7 @@ async function createElementReferenceList(
   container: FrameNode,
   elementData: Array<{
     number: number;
-    type: string;
+    type: ElementType;
     color: RGB;
     id?: string;
     classes: string[];
@@ -800,40 +841,19 @@ export async function createScreenshotPages(
         (page as any).styleData.elements.length > 0
       ) {
         const elements = (page as any).styleData.elements;
-
-        // Color scheme for different element types (matching styling mode)
-        const ELEMENT_COLORS: Record<string, RGB> = {
-          link: { r: 0, g: 102 / 255, b: 204 / 255 }, // Blue #0066CC
-          button: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
-          heading: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
-          input: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-          textarea: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-          select: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-          image: { r: 32 / 255, g: 201 / 255, b: 151 / 255 }, // Teal #20C997
-          paragraph: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-          div: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-          other: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-        };
-
-        // Default filters if not provided (smart defaults)
-        const filters = highlightElementFilters || {
-          headings: true,
-          buttons: true,
-          inputs: true,
-          textareas: true,
-          selects: true,
-          images: true,
-          links: true,
-          paragraphs: false,
-          divs: false,
-          other: false,
-        };
+        const filters: ElementFilters = Object.assign(
+          {},
+          DEFAULT_ELEMENT_FILTERS,
+          highlightElementFilters && typeof highlightElementFilters === "object"
+            ? (highlightElementFilters as Partial<ElementFilters>)
+            : {}
+        );
 
         let elementCounter = 1;
         let filteredCount = 0;
         const elementReferenceData: Array<{
           number: number;
-          type: string;
+          type: ElementType;
           color: RGB;
           id?: string;
           classes: string[];
@@ -841,10 +861,16 @@ export async function createScreenshotPages(
         }> = [];
 
         for (const el of elements) {
-          // Skip if element type is filtered out
-          const elementType = el.elementType || "other";
-          const filterKey = elementType + "s"; // Convert 'button' to 'buttons', etc.
-          if (filters[filterKey] === false) {
+          let elementType =
+            (el.elementType as ElementType | undefined) ||
+            categorizeElementType(el.tagName || "", el.type || "");
+
+          if (!elementType || !ELEMENT_TYPE_TO_FILTER_KEY[elementType]) {
+            elementType = "other";
+          }
+
+          const filterKey = ELEMENT_TYPE_TO_FILTER_KEY[elementType];
+          if (!filters[filterKey]) {
             filteredCount++;
             continue;
           }
@@ -876,9 +902,7 @@ export async function createScreenshotPages(
           const scaledWidth = el.boundingBox.width * scaleFactor;
           const scaledHeight = el.boundingBox.height * scaleFactor;
 
-          // Get color for this element type
-          const elementColor =
-            ELEMENT_COLORS[elementType] || ELEMENT_COLORS.other;
+          const elementColor = ELEMENT_HIGHLIGHT_COLORS[elementType];
 
           const rect = figma.createRectangle();
           rect.x = scaledX;
@@ -923,13 +947,14 @@ export async function createScreenshotPages(
           overlayContainer.appendChild(rect);
           overlayContainer.appendChild(badgeGroup);
 
-          // Store element data for reference list
+          const classes = Array.isArray(el.classes) ? el.classes : [];
+
           elementReferenceData.push({
             number: elementCounter,
             type: elementType,
             color: elementColor,
             id: el.id,
-            classes: el.classes || [],
+            classes,
             text: el.text,
           });
 
@@ -940,7 +965,6 @@ export async function createScreenshotPages(
           `🎨 Added ${elementCounter - 1} color-coded highlights (${filteredCount} elements filtered out) on ${page.url}`
         );
 
-        // Create element reference list if there are any elements
         if (elementReferenceData.length > 0) {
           await createElementReferenceList(
             overlayContainer,

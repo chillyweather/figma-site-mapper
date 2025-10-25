@@ -104,10 +104,9 @@ export function categorizeElements(elements: any[]): CategorizedElements {
     );
 
     // Add elementType to the element
-    const categorizedElement: ExtractedElement = {
-      ...element,
+    const categorizedElement: ExtractedElement = Object.assign({}, element, {
       elementType,
-    };
+    });
 
     // Add to appropriate category using the mapping
     const categoryKey = elementTypeToCategoryKey[elementType];
