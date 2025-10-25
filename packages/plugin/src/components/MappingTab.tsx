@@ -1,6 +1,16 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { MappingTabProps, BadgeLink, ElementFilters } from "../types/index";
 import { FlowProgress } from "./FlowProgress";
+
+interface PageNode {
+  url: string;
+  title?: string;
+  styleData?: {
+    elements?: any[];
+    cssVariables?: any;
+  };
+  children?: PageNode[];
+}
 
 export const MappingTab: React.FC<MappingTabProps> = ({
   badgeLinks,
@@ -14,7 +24,35 @@ export const MappingTab: React.FC<MappingTabProps> = ({
   elementFilters,
   onElementFilterChange,
   handleShowStyling,
+  manifestData,
+  selectedPageUrl,
+  onPageSelection,
 }) => {
+  const [allPages, setAllPages] = useState<PageNode[]>([]);
+
+  // Extract all pages from manifest tree
+  useEffect(() => {
+    if (manifestData?.tree) {
+      const pages = flattenPageTree(manifestData.tree);
+      setAllPages(pages);
+
+      // Set initial selected page if not set
+      if (pages.length > 0 && !selectedPageUrl) {
+        onPageSelection(pages[0].url);
+      }
+    }
+  }, [manifestData, selectedPageUrl, onPageSelection]);
+
+  // Recursively flatten the page tree
+  const flattenPageTree = (node: PageNode): PageNode[] => {
+    const pages: PageNode[] = [node];
+    if (node.children) {
+      node.children.forEach((child) => {
+        pages.push(...flattenPageTree(child));
+      });
+    }
+    return pages;
+  };
   // Calculate total selected elements in styling mode
   const getSelectedCount = () => {
     if (!categorizedElements) return 0;
@@ -216,7 +254,7 @@ export const MappingTab: React.FC<MappingTabProps> = ({
             id="styling-content"
             style={{ flex: 1, overflowY: "auto", padding: "16px" }}
           >
-            {!categorizedElements ? (
+            {!manifestData?.tree ? (
               <div
                 style={{
                   textAlign: "center",
@@ -224,13 +262,51 @@ export const MappingTab: React.FC<MappingTabProps> = ({
                   padding: "32px 16px",
                 }}
               >
-                <p>No elements data available.</p>
+                <p>No manifest data available.</p>
                 <p style={{ fontSize: "11px", marginTop: "8px" }}>
                   Crawl a website with style extraction enabled to see elements.
                 </p>
               </div>
             ) : (
               <>
+                {/* Page Selector */}
+                {allPages.length > 1 && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        marginBottom: "4px",
+                        color: "#212529",
+                      }}
+                    >
+                      Select Page:
+                    </label>
+                    <select
+                      value={selectedPageUrl}
+                      onChange={(e) => onPageSelection(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "6px 8px",
+                        fontSize: "11px",
+                        border: "1px solid #e9ecef",
+                        borderRadius: "4px",
+                        backgroundColor: "white",
+                      }}
+                    >
+                      {allPages.map((page) => (
+                        <option key={page.url} value={page.url}>
+                          {page.title || page.url}
+                          {page.styleData?.elements
+                            ? ` (${page.styleData.elements.length} elements)`
+                            : " (no elements)"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <h4
                   style={{
                     margin: "0 0 12px 0",
@@ -240,68 +316,86 @@ export const MappingTab: React.FC<MappingTabProps> = ({
                 >
                   Element Types
                 </h4>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  {(
-                    Object.entries(elementFilters) as [
-                      keyof ElementFilters,
-                      boolean,
-                    ][]
-                  ).map(([type, checked]) => {
-                    const count = categorizedElements[type]?.length || 0;
-                    const label = type.charAt(0).toUpperCase() + type.slice(1);
 
-                    return (
-                      <label
-                        key={type}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          padding: "8px",
-                          backgroundColor: "#f8f9fa",
-                          borderRadius: "4px",
-                          border: "1px solid #e9ecef",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) =>
-                            onElementFilterChange(type, e.target.checked)
-                          }
-                          style={{ marginRight: "8px" }}
-                        />
-                        <span
+                {!categorizedElements ? (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      color: "#666",
+                      padding: "16px",
+                      backgroundColor: "#f8f9fa",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <p style={{ fontSize: "11px" }}>
+                      No elements found on this page.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    {(
+                      Object.entries(elementFilters) as [
+                        keyof ElementFilters,
+                        boolean,
+                      ][]
+                    ).map(([type, checked]) => {
+                      const count = categorizedElements[type]?.length || 0;
+                      const label =
+                        type.charAt(0).toUpperCase() + type.slice(1);
+
+                      return (
+                        <label
+                          key={type}
                           style={{
-                            flex: 1,
-                            fontSize: "11px",
-                            fontWeight: "500",
-                            color: "#212529",
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "8px",
+                            backgroundColor: "#f8f9fa",
+                            borderRadius: "4px",
+                            border: "1px solid #e9ecef",
+                            cursor: "pointer",
                           }}
                         >
-                          {label}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            color: "#6c757d",
-                            backgroundColor: "#e9ecef",
-                            padding: "2px 8px",
-                            borderRadius: "12px",
-                          }}
-                        >
-                          {count}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              onElementFilterChange(type, e.target.checked)
+                            }
+                            style={{ marginRight: "8px" }}
+                          />
+                          <span
+                            style={{
+                              flex: 1,
+                              fontSize: "11px",
+                              fontWeight: "500",
+                              color: "#212529",
+                            }}
+                          >
+                            {label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              color: "#6c757d",
+                              backgroundColor: "#e9ecef",
+                              padding: "2px 8px",
+                              borderRadius: "12px",
+                            }}
+                          >
+                            {count}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
           </div>

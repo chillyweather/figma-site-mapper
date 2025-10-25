@@ -27,6 +27,9 @@ export const MainView: React.FC<MainViewProps> = ({
   elementFilters,
   onElementFilterChange,
   handleShowStyling,
+  manifestData,
+  selectedPageUrl,
+  onPageSelection,
 }) => {
   const [activeTab, setActiveTab] = useState<
     "crawling" | "mapping" | "styling"
@@ -162,6 +165,9 @@ export const MainView: React.FC<MainViewProps> = ({
           elementFilters={elementFilters}
           onElementFilterChange={onElementFilterChange}
           handleShowStyling={handleShowStyling}
+          manifestData={manifestData}
+          selectedPageUrl={selectedPageUrl}
+          onPageSelection={onPageSelection}
         />
       )}
 

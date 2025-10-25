@@ -65,3 +65,6 @@ export const elementFiltersAtom = atom<ElementFilters>({
 });
 
 export const categorizedElementsAtom = atom<CategorizedElements | null>(null);
+
+// Selected page URL for element data
+export const selectedPageUrlAtom = atom<string>("");

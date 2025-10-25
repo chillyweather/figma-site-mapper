@@ -5,6 +5,8 @@ import {
   elementModeAtom,
   elementFiltersAtom,
   categorizedElementsAtom,
+  selectedPageUrlAtom,
+  manifestDataAtom,
 } from "../store/atoms";
 import { useSettings } from "../hooks/useSettings";
 import { useCrawl } from "../hooks/useCrawl";
@@ -29,10 +31,13 @@ export const App: React.FC = () => {
     flowProgress,
   } = useFlowMapping();
 
-  // Load and categorize elements from manifest
-  useElementData();
+  // Element mode, filters, and page selection
+  const [selectedPageUrl, setSelectedPageUrl] = useAtom(selectedPageUrlAtom);
+  const [manifestData] = useAtom(manifestDataAtom);
 
-  // Element mode and filters
+  // Load and categorize elements from manifest for selected page
+  useElementData(selectedPageUrl);
+
   const [elementMode, setElementMode] = useAtom(elementModeAtom);
   const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
   const [categorizedElements] = useAtom(categorizedElementsAtom);
@@ -56,20 +61,30 @@ export const App: React.FC = () => {
     [setElementFilters]
   );
 
+  // Page selection handler
+  const handlePageSelection = useCallback(
+    (pageUrl: string) => {
+      setSelectedPageUrl(pageUrl);
+    },
+    [setSelectedPageUrl]
+  );
+
   // Styling mode handler (placeholder for now)
   const handleShowStyling = useCallback(() => {
     console.log("Show styling with filters:", elementFilters);
+    console.log("Selected page URL:", selectedPageUrl);
     // TODO: Implement styling mode rendering
     parent.postMessage(
       {
         pluginMessage: {
           type: "show-styling-elements",
           filters: elementFilters,
+          pageUrl: selectedPageUrl,
         },
       },
       "*"
     );
-  }, [elementFilters]);
+  }, [elementFilters, selectedPageUrl]);
 
   // View switching
   const switchToMain = useCallback(
@@ -418,6 +433,9 @@ export const App: React.FC = () => {
       elementFilters={elementFilters}
       onElementFilterChange={handleElementFilterChange}
       handleShowStyling={handleShowStyling}
+      manifestData={manifestData}
+      selectedPageUrl={selectedPageUrl}
+      onPageSelection={handlePageSelection}
     />
   );
 };

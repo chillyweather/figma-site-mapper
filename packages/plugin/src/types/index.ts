@@ -272,6 +272,9 @@ export interface MainViewProps {
     checked: boolean
   ) => void;
   handleShowStyling: () => void;
+  manifestData: any;
+  selectedPageUrl: string;
+  onPageSelection: (pageUrl: string) => void;
 }
 
 export interface CrawlingTabProps {
@@ -301,6 +304,9 @@ export interface MappingTabProps {
     checked: boolean
   ) => void;
   handleShowStyling: () => void;
+  manifestData: any;
+  selectedPageUrl: string;
+  onPageSelection: (pageUrl: string) => void;
 }
 
 export interface FocusedInputProps {
