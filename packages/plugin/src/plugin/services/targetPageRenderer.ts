@@ -340,7 +340,28 @@ async function addElementHighlightsOverlay(
       : {}
   );
 
+  // Build link metadata map from interactive elements
+  const linkMetadataMap = new Map<
+    string,
+    { linkNumber: number; href: string; isExternal: boolean }
+  >();
+  let linkNum = 1;
+  if (pageData.interactiveElements) {
+    for (const element of pageData.interactiveElements) {
+      if (element.href && element.href !== "#") {
+        const key = `${element.x},${element.y},${element.width},${element.height}`;
+        linkMetadataMap.set(key, {
+          linkNumber: linkNum,
+          href: element.href,
+          isExternal: isExternalLink(element.href, pageData.url),
+        });
+        linkNum++;
+      }
+    }
+  }
+
   let elementCounter = 1;
+  let linkCounter = 1;
   let filteredCount = 0;
 
   for (const element of pageData.styleData.elements) {
@@ -393,18 +414,40 @@ async function addElementHighlightsOverlay(
       element.value ||
       element.type ||
       `element_${elementCounter}`;
-    highlightRect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
 
-    // Create badge for element
+    // Look up link metadata
+    const elementKey = `${element.boundingBox.x},${element.boundingBox.y},${element.boundingBox.width},${element.boundingBox.height}`;
+    const linkMeta = linkMetadataMap.get(elementKey);
+    const isLink = !!linkMeta;
+    const currentLinkNumber = isLink ? linkCounter : null;
+
+    // Use link_X_highlight naming for links
+    if (isLink && currentLinkNumber) {
+      highlightRect.name = `link_${currentLinkNumber}_highlight: ${elementLabel.substring(0, 50)}`;
+    } else {
+      highlightRect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
+    }
+
+    // Create badge for element - links get link_X_badge naming
     const badge = await createElementBadge(
       element,
       elementCounter,
-      elementColor
+      linkMeta,
+      currentLinkNumber,
+      isLink
+        ? linkMeta!.isExternal
+          ? BADGE_COLORS.EXTERNAL
+          : BADGE_COLORS.INTERNAL
+        : elementColor,
+      pageData.url
     );
 
     overlayContainer.appendChild(highlightRect);
     overlayContainer.appendChild(badge);
     elementCounter++;
+    if (isLink) {
+      linkCounter++;
+    }
   }
 
   console.log(
@@ -419,12 +462,24 @@ async function addElementHighlightsOverlay(
 async function createElementBadge(
   element: any,
   counter: number,
-  color: RGB
+  linkMeta:
+    | { linkNumber: number; href: string; isExternal: boolean }
+    | undefined,
+  linkNumber: number | null,
+  color: RGB,
+  pageUrl: string
 ): Promise<GroupNode> {
+  const isLink = !!linkMeta;
   const badge = figma.createEllipse();
-  badge.name = `element_${counter}_badge_circle`;
 
-  const badgeSize = 16;
+  // Use link_X_badge naming for links
+  if (isLink && linkNumber) {
+    badge.name = `link_${linkNumber}_badge_circle`;
+  } else {
+    badge.name = `element_${counter}_badge_circle`;
+  }
+
+  const badgeSize = isLink ? 18 : 16;
   const x = element.boundingBox.x + element.boundingBox.width - badgeSize - 2;
   const y = element.boundingBox.y - 2;
 
@@ -437,15 +492,52 @@ async function createElementBadge(
   const badgeText = figma.createText();
   await figma.loadFontAsync({ family: "Inter", style: "Bold" });
   badgeText.fontName = { family: "Inter", style: "Bold" };
-  badgeText.fontSize = 8;
-  badgeText.characters = counter.toString();
-  badgeText.name = `element_${counter}_badge_text`;
+  badgeText.fontSize = isLink ? 9 : 8;
+  badgeText.characters =
+    isLink && linkNumber ? linkNumber.toString() : counter.toString();
+
+  if (isLink && linkNumber) {
+    badgeText.name = `link_${linkNumber}_badge_text`;
+  } else {
+    badgeText.name = `element_${counter}_badge_text`;
+  }
+
   badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
   badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
   badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
+  // Add hyperlink to badge text for links
+  if (isLink && linkMeta?.href) {
+    try {
+      const validUrl = normalizeUrl(linkMeta.href, pageUrl);
+      const urlPattern = /^https?:\/\/[^\s]+$/;
+
+      if (urlPattern.test(validUrl)) {
+        const hyperlinkTarget: HyperlinkTarget = {
+          type: "URL",
+          value: validUrl,
+        };
+        badgeText.setRangeHyperlink(
+          0,
+          badgeText.characters.length,
+          hyperlinkTarget
+        );
+        console.log(
+          `Added hyperlink to element badge ${linkNumber}: ${validUrl}`
+        );
+      }
+    } catch (error) {
+      console.log(`Skipping hyperlink for element badge: ${linkMeta.href}`);
+    }
+  }
+
   const badgeGroup = figma.group([badge, badgeText], figma.currentPage);
-  badgeGroup.name = `element_${counter}_badge`;
+
+  if (isLink && linkNumber) {
+    badgeGroup.name = `link_${linkNumber}_badge`;
+  } else {
+    badgeGroup.name = `element_${counter}_badge`;
+  }
 
   return badgeGroup;
 }

@@ -800,6 +800,7 @@ export async function createScreenshotPages(
         );
 
         let elementCounter = 1;
+        let linkCounter = 1;
         let filteredCount = 0;
         const elementReferenceData: Array<{
           number: number;
@@ -872,53 +873,144 @@ export async function createScreenshotPages(
             el.type ||
             `element_${elementCounter}`
           ).toString();
-          rect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
 
-          // Create small badge with counter
-          const badgeSize = 16;
+          // Look up link metadata if this element has a bounding box
+          const elementKey = `${el.boundingBox.x},${el.boundingBox.y},${el.boundingBox.width},${el.boundingBox.height}`;
+          const linkMeta = linkMetadataMap.get(elementKey);
+          const isLink = !!linkMeta;
+          const currentLinkNumber = isLink ? linkCounter : null;
+
+          // Use link_X_highlight naming for links, element_type_highlight for others
+          if (isLink && currentLinkNumber) {
+            rect.name = `link_${currentLinkNumber}_highlight: ${elementLabel.substring(0, 50)}`;
+          } else {
+            rect.name = `${elementType}_highlight: ${elementLabel.substring(0, 50)}`;
+          }
+
+          // Create badge with counter
+          // Links get size 18 badges, others get size 16
+          const badgeSize = isLink ? 18 : 16;
           const badge = figma.createEllipse();
-          badge.name = `element_${elementCounter}_badge_circle`;
+
+          // Use link_X_badge naming for links to support flow building
+          if (isLink && currentLinkNumber) {
+            badge.name = `link_${currentLinkNumber}_badge_circle`;
+          } else {
+            badge.name = `element_${elementCounter}_badge_circle`;
+          }
+
           badge.x = scaledX + scaledWidth - badgeSize - 2;
           badge.y = scaledY - 2;
           badge.resize(badgeSize, badgeSize);
-          badge.fills = [{ type: "SOLID", color: elementColor }];
+
+          // Use orange/cyan colors for links based on external/internal
+          const badgeColor =
+            isLink && linkMeta
+              ? linkMeta.isExternal
+                ? { r: 0.1, g: 0.6, b: 0.7 } // Cyan for external
+                : { r: 0.9, g: 0.45, b: 0.1 } // Orange for internal
+              : elementColor;
+
+          badge.fills = [{ type: "SOLID", color: badgeColor }];
           badge.strokes = [];
 
           const badgeText = figma.createText();
           await figma.loadFontAsync({ family: "Inter", style: "Bold" });
           badgeText.fontName = { family: "Inter", style: "Bold" };
-          badgeText.fontSize = 8;
-          badgeText.characters = elementCounter.toString();
-          badgeText.name = `element_${elementCounter}_badge_text`;
+          badgeText.fontSize = isLink ? 9 : 8;
+
+          // Use link number for links, element number for others
+          badgeText.characters =
+            isLink && currentLinkNumber
+              ? currentLinkNumber.toString()
+              : elementCounter.toString();
+
+          if (isLink && currentLinkNumber) {
+            badgeText.name = `link_${currentLinkNumber}_badge_text`;
+          } else {
+            badgeText.name = `element_${elementCounter}_badge_text`;
+          }
+
           badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
           badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
           badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
+          // Add hyperlink to badge text for links (needed for flow building)
+          if (isLink && linkMeta?.href) {
+            try {
+              let validUrl = linkMeta.href;
+
+              // For internal links (relative URLs), prepend the base site URL
+              if (
+                !validUrl.startsWith("http://") &&
+                !validUrl.startsWith("https://") &&
+                !validUrl.startsWith("mailto:")
+              ) {
+                const match = page.url.match(/^https?:\/\/[^\/]+/);
+                const baseUrl = match ? match[0] : null;
+                if (baseUrl) {
+                  if (!validUrl.startsWith("/")) {
+                    validUrl = "/" + validUrl;
+                  }
+                  validUrl = baseUrl + validUrl;
+                } else {
+                  validUrl = "https://" + validUrl;
+                }
+              }
+
+              // Basic URL validation
+              const urlPattern = /^https?:\/\/[^\s]+$/;
+              if (urlPattern.test(validUrl)) {
+                const hyperlinkTarget: HyperlinkTarget = {
+                  type: "URL",
+                  value: validUrl,
+                };
+                badgeText.setRangeHyperlink(
+                  0,
+                  badgeText.characters.length,
+                  hyperlinkTarget
+                );
+                console.log(
+                  `Added hyperlink to element badge ${currentLinkNumber}: ${validUrl}`
+                );
+              }
+            } catch (urlError) {
+              console.log(
+                `Skipping hyperlink for element badge: ${linkMeta.href}`,
+                urlError
+              );
+            }
+          }
+
           const badgeGroup = figma.group([badge, badgeText], figma.currentPage);
-          badgeGroup.name = `element_${elementCounter}_badge`;
+
+          if (isLink && currentLinkNumber) {
+            badgeGroup.name = `link_${currentLinkNumber}_badge`;
+          } else {
+            badgeGroup.name = `element_${elementCounter}_badge`;
+          }
 
           overlayContainer.appendChild(rect);
           overlayContainer.appendChild(badgeGroup);
 
           const classes = Array.isArray(el.classes) ? el.classes : [];
 
-          // Look up link metadata if this element has a bounding box
-          const elementKey = `${el.boundingBox.x},${el.boundingBox.y},${el.boundingBox.width},${el.boundingBox.height}`;
-          const linkMeta = linkMetadataMap.get(elementKey);
-
           elementReferenceData.push({
             number: elementCounter,
             type: elementType,
-            color: elementColor,
+            color: isLink ? badgeColor : elementColor,
             id: el.id,
             classes,
             text: el.text,
             href: linkMeta?.href,
-            linkNumber: linkMeta?.linkNumber,
+            linkNumber: currentLinkNumber || linkMeta?.linkNumber,
             isExternal: linkMeta?.isExternal,
           });
 
           elementCounter++;
+          if (isLink) {
+            linkCounter++;
+          }
         }
 
         console.log(
