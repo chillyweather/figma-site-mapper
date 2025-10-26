@@ -181,15 +181,7 @@ export const MainView: React.FC<MainViewProps> = ({
       )}
 
       {activeTab === "styling" && (
-        <ElementStylingTab
-          categorizedElements={categorizedElements}
-          elementFilters={elementFilters}
-          onElementFilterChange={onElementFilterChange}
-          handleShowStyling={handleShowStyling}
-          manifestData={manifestData}
-          selectedPageUrl={selectedPageUrl}
-          onPageSelection={onPageSelection}
-        />
+        <ElementStylingTab handleShowStyling={handleShowStyling} />
       )}
 
       {activeTab === "tokens" && <TokensTab />}
