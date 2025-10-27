@@ -5,12 +5,14 @@ export type PluginMessageType =
   | "get-status"
   | "show-flow"
   | "show-styling-elements"
+  | "get-current-page-url"
   | "close"
   | "crawl-started"
   | "settings-loaded"
   | "status-update"
   | "badge-links-update"
-  | "open-auth-session";
+  | "open-auth-session"
+  | "current-page-url";
 
 export interface StyleExtractionSettings {
   enabled: boolean;

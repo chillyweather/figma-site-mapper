@@ -59,22 +59,18 @@ export const App: React.FC = () => {
     [setSelectedPageUrl]
   );
 
-  // Styling mode handler (placeholder for now)
+  // Styling mode handler
   const handleShowStyling = useCallback(() => {
-    console.log("Show styling with filters:", elementFilters);
-    console.log("Selected page URL:", selectedPageUrl);
-    // TODO: Implement styling mode rendering
+    console.log("Creating styling page for current page");
     parent.postMessage(
       {
         pluginMessage: {
           type: "show-styling-elements",
-          filters: elementFilters,
-          pageUrl: selectedPageUrl,
         },
       },
       "*"
     );
-  }, [elementFilters, selectedPageUrl]);
+  }, []);
 
   // View switching
   const switchToMain = useCallback(

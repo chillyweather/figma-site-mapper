@@ -15,7 +15,10 @@ import {
   openAuthSession,
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
-import { handleShowStylingElements } from "./stylingHandlers";
+import {
+  handleShowStylingElements,
+  handleGetCurrentPageUrl,
+} from "./stylingHandlers";
 
 let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
@@ -551,8 +554,12 @@ export async function handleUIMessage(msg: any): Promise<void> {
       await handleShowFlow(msg.selectedLinks);
       break;
 
+    case "get-current-page-url":
+      await handleGetCurrentPageUrl();
+      break;
+
     case "show-styling-elements":
-      await handleShowStylingElements(msg.filters);
+      await handleShowStylingElements();
       break;
 
     case "open-auth-session":

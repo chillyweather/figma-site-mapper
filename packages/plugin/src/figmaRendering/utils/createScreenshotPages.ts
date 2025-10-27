@@ -474,6 +474,9 @@ export async function createScreenshotPages(
     const newPage = figma.createPage();
     newPage.name = page.title.substring(0, 50);
     pageIdMap.set(page.url, newPage.id);
+    
+    // Store URL in plugin data for later reference
+    newPage.setPluginData("URL", page.url);
 
     try {
       const screenshots = page.screenshot;

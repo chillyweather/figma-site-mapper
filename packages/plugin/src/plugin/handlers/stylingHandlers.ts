@@ -1,215 +1,215 @@
 /**
  * STYLING ELEMENT HANDLERS
  *
- * Handles creating element highlights for styling mode:
- * 1. Loading categorized elements from manifest
- * 2. Creating colored highlights based on element type
- * 3. Managing element visibility based on filters
+ * Handles creating a styling page for the current page:
+ * 1. Gets URL from current page plugin data
+ * 2. Creates new page with 🎨 prefix
+ * 3. Crawls single page with element highlighting
+ * 4. Renders below current page
  */
 
-import type { ElementFilters } from "../../types/index";
-
-// Color scheme for different element types
-const ELEMENT_COLORS: Record<keyof ElementFilters, RGB> = {
-  links: { r: 0, g: 102 / 255, b: 204 / 255 }, // Blue #0066CC
-  buttons: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
-  headings: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
-  inputs: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-  textareas: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-  selects: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
-  images: { r: 32 / 255, g: 201 / 255, b: 151 / 255 }, // Teal #20C997
-  paragraphs: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-  divs: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-  other: { r: 108 / 255, g: 117 / 255, b: 125 / 255 }, // Gray #6C757D
-};
-
-interface RGB {
-  r: number;
-  g: number;
-  b: number;
-}
+import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { POLLING_CONFIG } from "../constants";
+import { renderTargetPage } from "../services/targetPageRenderer";
+import { loadDomainCookies } from "./uiMessageHandlers";
 
 /**
- * Load the last manifest from client storage
+ * Extract domain from URL string
  */
-async function loadManifest(): Promise<any> {
+function extractDomain(url: string): string | null {
   try {
-    const manifest = await figma.clientStorage.getAsync("lastManifest");
-    if (!manifest) {
-      console.warn("No manifest found in storage");
-      return null;
-    }
-    return manifest;
+    let domain = url.replace(/^https?:\/\//, "");
+    domain = domain.split("/")[0];
+    domain = domain.split("?")[0];
+    domain = domain.split(":")[0];
+    return domain;
   } catch (error) {
-    console.error("Failed to load manifest:", error);
+    console.error("Failed to extract domain from URL:", error);
     return null;
   }
 }
 
 /**
- * Create highlight rectangles for styling elements
+ * Load settings from client storage
  */
-async function createElementHighlights(
-  elements: any[],
-  elementType: keyof ElementFilters,
-  screenshot: FrameNode
-): Promise<void> {
-  const color = ELEMENT_COLORS[elementType];
-
-  for (const element of elements) {
-    const { x, y, width, height } = element.boundingBox;
-
-    // Create rectangle for highlight
-    const rect = figma.createRectangle();
-    rect.name = `${String(elementType)}-highlight`;
-    rect.resize(width, height);
-    rect.x = screenshot.x + x;
-    rect.y = screenshot.y + y;
-
-    // Style as outline with semi-transparent fill
-    rect.fills = [
-      {
-        type: "SOLID",
-        color: color,
-        opacity: 0.1,
-      },
-    ];
-    rect.strokes = [
-      {
-        type: "SOLID",
-        color: color,
-      },
-    ];
-    rect.strokeWeight = 2;
-    rect.cornerRadius = 2;
-
-    // Add to current page
-    figma.currentPage.appendChild(rect);
-
-    // Optional: Add label for element type
-    if (element.text || element.id) {
-      const label = figma.createText();
-      await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-      label.characters =
-        element.text?.substring(0, 30) || element.id || elementType;
-      label.fontSize = 10;
-      label.x = rect.x;
-      label.y = rect.y - 15;
-      label.fills = [{ type: "SOLID", color: color }];
-      figma.currentPage.appendChild(label);
-    }
+async function loadSettings(): Promise<any> {
+  try {
+    const settings = await figma.clientStorage.getAsync("pluginSettings");
+    return settings || {};
+  } catch (error) {
+    console.error("Failed to load settings:", error);
+    return {};
   }
 }
 
 /**
- * Get categorized elements from manifest
+ * Handle get-current-page-url request from UI
  */
-function categorizeElements(
-  elements: any[]
-): Record<keyof ElementFilters, any[]> {
-  const categorized: Record<keyof ElementFilters, any[]> = {
-    headings: [],
-    buttons: [],
-    inputs: [],
-    textareas: [],
-    selects: [],
-    images: [],
-    links: [],
-    paragraphs: [],
-    divs: [],
-    other: [],
-  };
-
-  elements.forEach((element) => {
-    const tag = element.tagName?.toLowerCase();
-    const type = element.type?.toLowerCase();
-
-    if (tag?.match(/^h[1-6]$/)) {
-      categorized.headings.push(element);
-    } else if (tag === "button" || type === "button" || type === "submit") {
-      categorized.buttons.push(element);
-    } else if (
-      tag === "input" &&
-      !["button", "submit", "reset"].includes(type)
-    ) {
-      categorized.inputs.push(element);
-    } else if (tag === "textarea") {
-      categorized.textareas.push(element);
-    } else if (tag === "select") {
-      categorized.selects.push(element);
-    } else if (tag === "img" || tag === "picture" || tag === "svg") {
-      categorized.images.push(element);
-    } else if (tag === "a") {
-      categorized.links.push(element);
-    } else if (tag === "p") {
-      categorized.paragraphs.push(element);
-    } else if (tag === "div") {
-      categorized.divs.push(element);
-    } else {
-      categorized.other.push(element);
-    }
+export async function handleGetCurrentPageUrl(): Promise<void> {
+  const currentPage = figma.currentPage;
+  const url = currentPage.getPluginData("URL");
+  
+  console.log("Current page URL:", url || "not set");
+  
+  figma.ui.postMessage({
+    type: "current-page-url",
+    url: url || null,
   });
-
-  return categorized;
 }
 
 /**
  * Handle show-styling-elements request from UI
+ * This creates a new styling page below the current page
  */
-export async function handleShowStylingElements(
-  filters: ElementFilters
-): Promise<void> {
-  console.log("🎨 Creating styling element highlights with filters:", filters);
+export async function handleShowStylingElements(): Promise<void> {
+  console.log("🎨 Starting styling page creation");
 
   try {
-    // Load manifest
-    const manifest = await loadManifest();
-    if (!manifest?.tree?.styleData?.elements) {
-      figma.notify(
-        "No element data available. Please crawl a site with style extraction enabled."
-      );
+    const currentPage = figma.currentPage;
+    const pageUrl = currentPage.getPluginData("URL");
+
+    if (!pageUrl) {
+      figma.notify("No URL found for current page", { error: true });
       return;
     }
 
-    // Get elements and categorize
-    const allElements = manifest.tree.styleData.elements;
-    const categorized = categorizeElements(allElements);
+    console.log("Creating styling page for URL:", pageUrl);
 
-    // Find the screenshot frame
-    const screenshotFrame = figma.currentPage.findOne(
-      (node) => node.type === "FRAME" && node.name.includes("screenshot")
-    ) as FrameNode;
+    // Load settings
+    const settings = await loadSettings();
+    const showBrowser = settings.showBrowser || false;
 
-    if (!screenshotFrame) {
-      figma.notify(
-        "No screenshot frame found. Please render the sitemap first."
-      );
-      return;
-    }
-
-    // Create highlights for each enabled filter
-    let totalHighlights = 0;
-    for (const [elementType, enabled] of Object.entries(filters) as [
-      keyof ElementFilters,
-      boolean,
-    ][]) {
-      if (enabled && categorized[elementType].length > 0) {
-        await createElementHighlights(
-          categorized[elementType],
-          elementType,
-          screenshotFrame
-        );
-        totalHighlights += categorized[elementType].length;
+    // Try to load cached cookies for this domain
+    let domainCookies = null;
+    try {
+      const domain = extractDomain(pageUrl);
+      if (domain) {
+        domainCookies = await loadDomainCookies(domain);
       }
+    } catch (error) {
+      console.log("Could not load domain cookies:", error);
     }
 
-    if (totalHighlights === 0) {
-      figma.notify("No elements found matching your filters");
-    } else {
-      figma.notify(`Created ${totalHighlights} element highlights`);
+    // Build auth object if we have cookies
+    let auth = null;
+    if (domainCookies && domainCookies.length > 0) {
+      auth = {
+        method: "cookies" as const,
+        cookies: domainCookies,
+      };
+      console.log(
+        `🍪 Using ${domainCookies.length} cached cookies for authentication`
+      );
     }
+
+    // Start crawl with limit 1 and highlight elements enabled
+    figma.notify("Crawling page for styling...");
+    
+    const result = await startCrawl({
+      url: pageUrl,
+      maxRequestsPerCrawl: 1,
+      screenshotWidth: 1440,
+      deviceScaleFactor: 1,
+      delay: 0,
+      requestDelay: 1000,
+      maxDepth: 0,
+      defaultLanguageOnly: false,
+      sampleSize: 1,
+      showBrowser: showBrowser,
+      detectInteractiveElements: true,
+      captureOnlyVisibleElements: true,
+      auth: auth,
+    });
+
+    const jobId = result.jobId;
+    console.log(`Started crawl job ${jobId} for styling page`);
+
+    // Poll for completion
+    await pollForStylingPageCompletion(jobId, currentPage);
   } catch (error) {
-    console.error("Failed to create styling highlights:", error);
-    figma.notify("Error creating element highlights");
+    console.error("Failed to create styling page:", error);
+    figma.notify("Error creating styling page", { error: true });
   }
 }
+
+/**
+ * Poll for job completion and render styling page
+ */
+async function pollForStylingPageCompletion(
+  jobId: string,
+  sourcePage: PageNode
+): Promise<void> {
+  let attempts = 0;
+  const maxAttempts = POLLING_CONFIG.MAX_ATTEMPTS;
+
+  while (attempts < maxAttempts) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, POLLING_CONFIG.INTERVAL_MS)
+    );
+    attempts++;
+
+    try {
+      const status = await getJobStatus(jobId);
+      console.log(`Polling attempt ${attempts}: ${status.status}`);
+
+      if (status.status === "completed" && status.result?.manifestUrl) {
+        console.log("Crawl completed, creating styling page");
+
+        // Fetch manifest
+        const manifestData = await fetchManifest(status.result.manifestUrl);
+
+        // Create new page with 🎨 prefix
+        const stylingPage = figma.createPage();
+        stylingPage.name = `🎨 ${sourcePage.name}`;
+
+        // Find index of source page and insert styling page right after it
+        const allPages = figma.root.children;
+        const sourceIndex = allPages.indexOf(sourcePage);
+        if (sourceIndex !== -1) {
+          // Move styling page to position after source page
+          const targetIndex = sourceIndex + 1;
+          // Use appendChild then reorder
+          if (targetIndex < allPages.length) {
+            figma.root.insertChild(targetIndex, stylingPage);
+          }
+        }
+
+        // Switch to the new styling page
+        figma.currentPage = stylingPage;
+
+        // Render the page with ALL element types highlighted
+        await renderTargetPage(
+          stylingPage,
+          manifestData,
+          0, // x position
+          0, // y position
+          true, // highlightAllElements = true
+          {
+            // Highlight ALL element types
+            headings: true,
+            buttons: true,
+            inputs: true,
+            textareas: true,
+            selects: true,
+            images: true,
+            links: true,
+            paragraphs: true,
+            divs: true,
+            other: true,
+          }
+        );
+
+        figma.notify("✨ Styling page created successfully!");
+        return;
+      } else if (status.status === "failed") {
+        figma.notify("Crawl failed", { error: true });
+        return;
+      }
+    } catch (error) {
+      console.error("Polling error:", error);
+    }
+  }
+
+  figma.notify("Timeout waiting for crawl to complete", { error: true });
+}
+
