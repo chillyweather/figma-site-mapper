@@ -1,6 +1,10 @@
+import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
+import { connectDB } from "./db.js";
+
+await connectDB();
 
 const processor = async (job: Job) => {
   const {

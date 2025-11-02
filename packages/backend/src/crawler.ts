@@ -2,6 +2,9 @@ import { PlaywrightCrawler, Configuration } from "crawlee";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
+import { Types } from "mongoose";
+import { Page } from "./models/Page.js";
+import { Element } from "./models/Element.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -697,6 +700,18 @@ export async function runCrawler(
       : "disabled",
   });
 
+  let projectObjectId: Types.ObjectId | null = null;
+  if (projectId) {
+    try {
+      projectObjectId = new Types.ObjectId(projectId);
+    } catch (error) {
+      console.error(
+        `❌ Invalid projectId provided: ${projectId} - ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
+  }
+
   // Use job-specific storage directory to avoid conflicts between concurrent jobs
   // This allows multiple crawls to run simultaneously without interfering with each other
   const storageDir = jobId
@@ -727,6 +742,7 @@ export async function runCrawler(
   let totalPages = 0;
   let isTerminating = false; // Flag to prevent multiple termination attempts
   let pageCounter = 1; // Counter to track crawl order for numbering
+  let missingProjectIdWarned = false;
   // Helper to decide if we reached or exceeded limit (excluding login/auth pages)
   const shouldTerminate = () =>
     !!(
@@ -1387,6 +1403,136 @@ export async function runCrawler(
           `Generated ${screenshotSlices.length} screenshot slice(s) for ${request.url}`
         );
 
+        if (projectObjectId) {
+          try {
+            const pageUpdate: Record<string, unknown> = {
+              title,
+              screenshotPaths: screenshotSlices,
+            };
+
+            if (styleData) {
+              pageUpdate.globalStyles = {
+                cssVariables: styleData.cssVariables,
+                tokens: styleData.tokens,
+              };
+            }
+
+            const pageDoc = await Page.findOneAndUpdate(
+              { projectId: projectObjectId, url: request.url },
+              {
+                $set: pageUpdate,
+                $setOnInsert: {
+                  projectId: projectObjectId,
+                  url: request.url,
+                },
+              },
+              {
+                upsert: true,
+                new: true,
+                setDefaultsOnInsert: true,
+              }
+            );
+
+            if (!pageDoc) {
+              throw new Error(`Page upsert returned null for ${request.url}`);
+            }
+
+            const pageId = pageDoc._id as Types.ObjectId;
+
+            await Element.deleteMany({ pageId });
+
+            type InsertElement = {
+              pageId: Types.ObjectId;
+              projectId: Types.ObjectId;
+              type: string;
+              selector?: string;
+              tagName?: string;
+              elementId?: string;
+              classes: string[];
+              bbox: {
+                x: number;
+                y: number;
+                width: number;
+                height: number;
+              };
+              href?: string;
+              text?: string;
+              styles: Record<string, string>;
+              styleTokens: string[];
+              ariaLabel?: string;
+              role?: string;
+              value?: string;
+              placeholder?: string;
+              checked?: boolean;
+              src?: string;
+              alt?: string;
+            };
+
+            const elementsToInsert =
+              styleData?.elements?.reduce<InsertElement[]>((acc, element) => {
+                const { boundingBox } = element;
+                if (!boundingBox) {
+                  return acc;
+                }
+
+                const elementType = element.type || element.tagName || "node";
+                const styles: Record<string, string> = element.styles
+                  ? element.styles
+                  : {};
+                const classes = element.classes?.slice() ?? [];
+                const styleTokens = element.styleTokens?.slice() ?? [];
+
+                acc.push({
+                  pageId,
+                  projectId: projectObjectId!,
+                  type: elementType,
+                  selector: element.selector,
+                  tagName: element.tagName,
+                  elementId: element.id,
+                  classes,
+                  bbox: {
+                    x: boundingBox.x,
+                    y: boundingBox.y,
+                    width: boundingBox.width,
+                    height: boundingBox.height,
+                  },
+                  href: element.href,
+                  text: element.text,
+                  styles,
+                  styleTokens,
+                  ariaLabel: element.ariaLabel,
+                  role: element.role,
+                  value: element.value,
+                  placeholder: element.placeholder,
+                  checked: element.checked,
+                  src: element.src,
+                  alt: element.alt,
+                });
+
+                return acc;
+              }, []) ?? [];
+
+            if (elementsToInsert && elementsToInsert.length > 0) {
+              await Element.insertMany(elementsToInsert, { ordered: false });
+              log.info(
+                `Persisted ${elementsToInsert.length} elements for ${request.url}`
+              );
+            } else {
+              log.info(`No style elements to persist for ${request.url}`);
+            }
+          } catch (error) {
+            log.error(
+              `❌ Failed to persist page data for ${request.url}: ${error instanceof Error ? error.message : String(error)}`
+            );
+            throw error;
+          }
+        } else if (!missingProjectIdWarned) {
+          log.info(
+            `No projectId supplied for crawl; skipping database persistence`
+          );
+          missingProjectIdWarned = true;
+        }
+
         crawledPages.push({
           url: request.url,
           title: title,
@@ -1643,25 +1789,9 @@ export async function runCrawler(
     crawledPages.map((p) => p.url)
   );
 
-  const siteTree = buildTree(crawledPages, canonicalStartUrl);
-
   console.log(
-    `🌲 Tree built with ${siteTree ? countTreeNodes(siteTree as PageData & { children: PageData[] }) : 0} nodes`
+    "✅ Crawler finished. Data persisted to MongoDB (if configured)."
   );
-
-  const manifest = {
-    startUrl: canonicalStartUrl,
-    crawlDate: new Date().toISOString(),
-    tree: siteTree,
-    cookies: capturedCookies.length > 0 ? capturedCookies : undefined,
-  };
-
-  const manifestFilename = jobId ? `manifest-${jobId}.json` : "manifest.json";
-  const manifestPath = path.join(screenshotDir, manifestFilename);
-  console.log("📄 Saving manifest to:", manifestPath);
-
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-  console.log(`✅ Crawler finished and ${manifestFilename} created.`);
 }
 
 /**

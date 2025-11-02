@@ -4,6 +4,10 @@ export interface IElement extends Document {
   pageId: Types.ObjectId;
   projectId: Types.ObjectId;
   type: string;
+  selector?: string;
+  tagName?: string;
+  elementId?: string;
+  classes?: string[];
   bbox?: {
     x: number;
     y: number;
@@ -13,6 +17,14 @@ export interface IElement extends Document {
   href?: string;
   text?: string;
   styles?: Record<string, any>;
+  styleTokens?: string[];
+  ariaLabel?: string;
+  role?: string;
+  value?: string;
+  placeholder?: string;
+  checked?: boolean;
+  src?: string;
+  alt?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +48,22 @@ const ElementSchema = new Schema<IElement>(
       required: true,
       trim: true,
     },
+    selector: {
+      type: String,
+      trim: true,
+    },
+    tagName: {
+      type: String,
+      trim: true,
+    },
+    elementId: {
+      type: String,
+      trim: true,
+    },
+    classes: {
+      type: [String],
+      default: [],
+    },
     bbox: {
       type: {
         x: { type: Number, required: true },
@@ -56,6 +84,37 @@ const ElementSchema = new Schema<IElement>(
     styles: {
       type: Schema.Types.Mixed,
       default: {},
+    },
+    styleTokens: {
+      type: [String],
+      default: [],
+    },
+    ariaLabel: {
+      type: String,
+      trim: true,
+    },
+    role: {
+      type: String,
+      trim: true,
+    },
+    value: {
+      type: String,
+      trim: true,
+    },
+    placeholder: {
+      type: String,
+      trim: true,
+    },
+    checked: {
+      type: Boolean,
+    },
+    src: {
+      type: String,
+      trim: true,
+    },
+    alt: {
+      type: String,
+      trim: true,
     },
   },
   {

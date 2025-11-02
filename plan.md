@@ -30,12 +30,12 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 1.  **Upgrade Crawler (`crawler.ts`):** - [x] Modify `runCrawler` to accept a `projectId`. - [x] This is the most complex task: rewrite the `page.evaluate` script. It must: - [x] Iterate over _all_ elements (not just links/buttons). - [x] For each element, iterate over a predefined list of CSS properties (`color`, `backgroundColor`, `font-size`, `font-family`, etc.). - [x] For each property, call `element.style.getPropertyValue('property-name')`. - [x] If the result starts with `var(--`, store that token. - [x] If not, get the `getComputedStyle(element).getPropertyValue('property-name')` as a fallback. - [x] Store this as a `styles: { color: "var(--color-primary)", "font-size": "16px" }` object. - [x] Separately, extract all CSS Custom Properties from the `:root`.
 2.  **Refactor Data Persistence:**
 
-    - [ ] Remove all `fs.writeFileSync` logic for `manifest.json`.
-    - [ ] Inside the `requestHandler`, after gathering data for a page:
+    - [x] Remove all `fs.writeFileSync` logic for `manifest.json`.
+    - [x] Inside the `requestHandler`, after gathering data for a page:
 
-    1. [ ] `const page = await Page.findOneAndUpdate({ url: page.url, projectId }, { ...pageData }, { new: true, upsert: true });`
-    2. [ ] `await Element.deleteMany({ pageId: page._id });`
-    3. [ ] `await Element.insertMany(elementsData.map(e => ({ ...e, pageId: page.\_id, projectId })));
+    1. [x] `const page = await Page.findOneAndUpdate({ url: page.url, projectId }, { ...pageData }, { new: true, upsert: true });`
+    2. [x] `await Element.deleteMany({ pageId: page._id });`
+    3. [x] `await Element.insertMany(elementsData.map(e => ({ ...e, pageId: page.\_id, projectId }));
 
 3.  **Update API Endpoints:** - [ ] Modify `POST /crawl` to require `projectId` and pass it to `runCrawler`. - [ ] Create `POST /recrawl-page` that does the same but with `maxRequestsPerCrawl: 1`. - [ ] Remove the `manifestUrl` from the `/status/:jobId` response. - [ ] Implement `GET /page`, `GET /elements`, `GET /styles/global`, `GET /styles/element` to query the new collections.
 
