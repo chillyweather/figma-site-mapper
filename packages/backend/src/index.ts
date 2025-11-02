@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
@@ -5,6 +6,7 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { fileURLToPath } from "url";
+import { connectDB } from "./db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -249,6 +251,9 @@ server.post("/auth-session", async (request, reply) => {
 
 const start = async () => {
   try {
+    // Connect to MongoDB before starting the server
+    await connectDB();
+
     await server.listen({ port: 3006 });
   } catch (err) {
     server.log.error(err);
