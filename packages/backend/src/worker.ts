@@ -16,6 +16,7 @@ const processor = async (job: Job) => {
     showBrowser,
     detectInteractiveElements,
     highlightAllElements,
+    projectId,
     auth,
     styleExtraction,
   } = job.data;
@@ -48,6 +49,7 @@ const processor = async (job: Job) => {
       showBrowser,
       detectInteractiveElements,
       highlightAllElements,
+      projectId,
       auth,
       styleExtraction
     );

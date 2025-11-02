@@ -25,24 +25,8 @@ interface ExtractedElement {
     width: number;
     height: number;
   };
-  styles?: {
-    color?: string;
-    backgroundColor?: string;
-    fontSize?: string;
-    fontFamily?: string;
-    fontWeight?: string;
-    lineHeight?: string;
-    padding?: string;
-    margin?: string;
-    borderRadius?: string;
-    borderWidth?: string;
-    borderColor?: string;
-    borderStyle?: string;
-    display?: string;
-    position?: string;
-    width?: string;
-    height?: string;
-  };
+  styles?: Record<string, string>;
+  styleTokens?: string[];
   text?: string;
   href?: string;
   ariaLabel?: string;
@@ -55,40 +39,55 @@ interface ExtractedElement {
   alt?: string;
 }
 
-interface CSSVariablesByCategory {
-  colors: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  spacing: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  typography: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  sizing: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  borders: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  shadows: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-  other: {
-    primitives: Record<string, string>;
-    aliases: Record<string, string>;
-  };
-}
+// CSS properties that we want to capture on every element.
+const ELEMENT_STYLE_PROPERTIES = [
+  "color",
+  "background-color",
+  "font-size",
+  "font-family",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "text-transform",
+  "text-decoration",
+  "display",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "margin",
+  "margin-top",
+  "margin-right",
+  "margin-bottom",
+  "margin-left",
+  "padding",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "border-width",
+  "border-style",
+  "border-color",
+  "border-radius",
+  "box-shadow",
+  "width",
+  "height",
+  "min-width",
+  "min-height",
+  "max-width",
+  "max-height",
+  "opacity",
+  "background-image",
+  "background-size",
+  "background-position",
+  "background-repeat",
+];
 
 interface StyleData {
   elements: ExtractedElement[];
-  cssVariables?: CSSVariablesByCategory;
+  cssVariables: Record<string, string>;
+  tokens: string[];
 }
 
 interface PageData {
@@ -386,327 +385,188 @@ async function extractStyleData(
   page: any,
   config: StyleExtractionConfig
 ): Promise<StyleData> {
-  return await page.evaluate((config: StyleExtractionConfig) => {
-    interface ExtractedElementInner {
-      selector: string;
-      tagName: string;
-      type: string;
-      classes: string[];
-      id?: string;
-      boundingBox: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      };
-      styles?: {
-        color?: string;
-        backgroundColor?: string;
-        fontSize?: string;
-        fontFamily?: string;
-        fontWeight?: string;
-        lineHeight?: string;
-        padding?: string;
-        margin?: string;
-        borderRadius?: string;
-        borderWidth?: string;
-        borderColor?: string;
-        borderStyle?: string;
-        display?: string;
-        position?: string;
-        width?: string;
-        height?: string;
-      };
-      text?: string;
-      href?: string;
-      ariaLabel?: string;
-      role?: string;
-    }
-
-    const elements: ExtractedElementInner[] = [];
-    const rawCssVariables: Record<string, string> = {};
-
-    // Extract CSS variables from all stylesheets and :root computed styles
-    try {
-      // Extract CSS variables from stylesheets (where they're usually defined)
-      const stylesheets = document.styleSheets;
-      for (let s = 0; s < stylesheets.length; s++) {
-        const sheet = stylesheets[s];
-        try {
-          // Skip stylesheets from different origins (CORS)
-          if (!sheet || !sheet.cssRules) continue;
-
-          const rules = sheet.cssRules;
-          for (let r = 0; r < rules.length; r++) {
-            const rule = rules[r];
-            // Check :root rules
-            if (rule instanceof CSSStyleRule && rule.selectorText === ":root") {
-              const style = rule.style;
-              for (let i = 0; i < style.length; i++) {
-                const propName = style[i];
-                if (propName && propName.indexOf("--") === 0) {
-                  const value = style.getPropertyValue(propName).trim();
-                  if (value) {
-                    rawCssVariables[propName] = value;
-                  }
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // Ignore CORS errors for external stylesheets
-          console.log("Could not access stylesheet:", e);
-        }
-      }
-
-      // Also get computed CSS variables from :root (fallback)
-      const rootStyle = getComputedStyle(document.documentElement);
-      for (let i = 0; i < rootStyle.length; i++) {
-        const propName = rootStyle[i];
-        if (propName && propName.indexOf("--") === 0) {
-          // Only add if not already found in stylesheets
-          if (!rawCssVariables[propName]) {
-            const value = rootStyle.getPropertyValue(propName).trim();
-            if (value) {
-              rawCssVariables[propName] = value;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Error extracting CSS variables:", e);
-    }
-
-    // Categorize CSS variables by type and separate primitives from aliases
-    interface CategorizedVariables {
-      colors: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      spacing: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      typography: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      sizing: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      borders: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      shadows: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-      other: {
-        primitives: Record<string, string>;
-        aliases: Record<string, string>;
-      };
-    }
-
-    const cssVariables: CategorizedVariables = {
-      colors: { primitives: {}, aliases: {} },
-      spacing: { primitives: {}, aliases: {} },
-      typography: { primitives: {}, aliases: {} },
-      sizing: { primitives: {}, aliases: {} },
-      borders: { primitives: {}, aliases: {} },
-      shadows: { primitives: {}, aliases: {} },
-      other: { primitives: {}, aliases: {} },
-    };
-
-    // Categorization patterns
-    const colorPatterns = /color|background|bg|fill|stroke|border-color|text/i;
-    const spacingPatterns = /spacing|padding|margin|gap|inset/i;
-    const typographyPatterns = /font|text-|letter|line-height|heading/i;
-    const sizingPatterns = /width|height|size|scale|dimension/i;
-    const borderPatterns = /border|outline|radius/i;
-    const shadowPatterns = /shadow|elevation/i;
-
-    // Categorize each variable - use plain for loop to avoid TypeScript helpers
-    const varNames = Object.keys(rawCssVariables);
-    for (let i = 0; i < varNames.length; i++) {
-      const name = varNames[i];
-      const value = rawCssVariables[name];
-      if (!name || !value) continue;
-
-      // Check if value is an alias (references another variable)
-      const isAliasValue = value.indexOf("var(--") !== -1;
-      const targetBucket = isAliasValue ? "aliases" : "primitives";
-
-      if (colorPatterns.test(name)) {
-        cssVariables.colors[targetBucket][name] = value;
-      } else if (spacingPatterns.test(name)) {
-        cssVariables.spacing[targetBucket][name] = value;
-      } else if (typographyPatterns.test(name)) {
-        cssVariables.typography[targetBucket][name] = value;
-      } else if (sizingPatterns.test(name)) {
-        cssVariables.sizing[targetBucket][name] = value;
-      } else if (borderPatterns.test(name) && !colorPatterns.test(name)) {
-        cssVariables.borders[targetBucket][name] = value;
-      } else if (shadowPatterns.test(name)) {
-        cssVariables.shadows[targetBucket][name] = value;
-      } else {
-        cssVariables.other[targetBucket][name] = value;
-      }
-    }
-
-    // Build selector for each element type
-    const selectors: string[] = [];
-
-    if (config.extractInteractiveElements) {
-      selectors.push("a", "button", '[role="button"]', "[onclick]");
-    }
-    if (config.extractStructuralElements) {
-      selectors.push(
-        "header",
-        "nav",
-        "main",
-        "section",
-        "article",
-        "aside",
-        "footer",
-        "div[class]",
-        "div[id]"
-      );
-    }
-    if (config.extractTextElements) {
-      selectors.push("h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "label");
-    }
-    if (config.extractFormElements) {
-      selectors.push("form", "input", "textarea", "select", "option");
-    }
-    if (config.extractMediaElements) {
-      selectors.push("img", "picture", "svg", "video", "canvas");
-    }
-
-    // If no selectors specified, return early
-    if (selectors.length === 0) {
-      console.log("No element types selected for extraction");
-      return { elements, cssVariables };
-    }
-
-    // Collect all matching elements
-    const allElements = document.querySelectorAll(selectors.join(", "));
-
-    // Limit to first 500 elements to prevent massive payloads
-    const maxElements = Math.min(allElements.length, 500);
-
-    for (let i = 0; i < maxElements; i++) {
-      const el = allElements[i] as HTMLElement;
-      if (!el) continue;
-
-      // Skip hidden elements
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 && rect.height === 0) continue;
-
-      // Build unique selector
-      let selector = el.tagName.toLowerCase();
-      if (config.includeSelectors) {
-        if (el.id) {
-          selector = `#${el.id}`;
-        } else if (el.className && typeof el.className === "string") {
-          const classes = el.className.trim().split(/\s+/).filter(Boolean);
-          if (classes.length > 0) {
-            selector = `${el.tagName.toLowerCase()}.${classes.join(".")}`;
-          }
-        }
-      }
-
-      const extractedElement: ExtractedElementInner = {
-        selector,
-        tagName: el.tagName.toLowerCase(),
-        type: (el as HTMLInputElement).type || el.tagName.toLowerCase(),
-        classes:
-          el.className && typeof el.className === "string"
-            ? el.className.trim().split(/\s+/).filter(Boolean)
-            : [],
-        id: el.id || undefined,
+  return await page.evaluate(
+    (evaluateConfig: StyleExtractionConfig, styleProperties: string[]) => {
+      interface ExtractedElementInner {
+        selector: string;
+        tagName: string;
+        type: string;
+        classes: string[];
+        id?: string;
         boundingBox: {
-          x: Math.round(rect.x),
-          y: Math.round(rect.y),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        },
-      };
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        };
+        styles?: Record<string, string>;
+        styleTokens?: string[];
+        text?: string;
+        href?: string;
+        ariaLabel?: string;
+        role?: string;
+        value?: string;
+        placeholder?: string;
+        checked?: boolean;
+        src?: string;
+        alt?: string;
+      }
 
-      // Extract computed styles if requested
-      if (config.includeComputedStyles) {
+      const elements: ExtractedElementInner[] = [];
+      const allTokens = new Set<string>();
+
+      const allElements = Array.from(
+        document.querySelectorAll<HTMLElement>("*")
+      );
+      const maxElements = Math.min(allElements.length, 1000);
+
+      for (let i = 0; i < maxElements; i++) {
+        const el = allElements[i];
+        if (!el) continue;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+          continue;
+        }
+
+        // Build selector (prefer id, fallback to classes/tag)
+        let selector = el.tagName.toLowerCase();
+        if (evaluateConfig.includeSelectors) {
+          if (el.id) {
+            selector = `#${el.id}`;
+          } else if (el.className && typeof el.className === "string") {
+            const classes = el.className.trim().split(/\s+/).filter(Boolean);
+            if (classes.length > 0) {
+              selector = `${el.tagName.toLowerCase()}.${classes.join(".")}`;
+            }
+          }
+        }
+
         const computed = getComputedStyle(el);
-        const styles: ExtractedElementInner["styles"] = {};
+        const styles: Record<string, string> = {};
+        const elementTokens = new Set<string>();
 
-        if (config.extractColors) {
-          styles.color = computed.color;
-          styles.backgroundColor = computed.backgroundColor;
-        }
-        if (config.extractTypography) {
-          styles.fontSize = computed.fontSize;
-          styles.fontFamily = computed.fontFamily;
-          styles.fontWeight = computed.fontWeight;
-          styles.lineHeight = computed.lineHeight;
-        }
-        if (config.extractSpacing) {
-          styles.padding = computed.padding;
-          styles.margin = computed.margin;
-        }
-        if (config.extractLayout) {
-          styles.display = computed.display;
-          styles.position = computed.position;
-          styles.width = computed.width;
-          styles.height = computed.height;
-        }
-        if (config.extractBorders) {
-          styles.borderRadius = computed.borderRadius;
-          styles.borderWidth = computed.borderWidth;
-          styles.borderColor = computed.borderColor;
-          styles.borderStyle = computed.borderStyle;
+        for (let p = 0; p < styleProperties.length; p++) {
+          const propertyName = styleProperties[p] as string;
+          if (!propertyName) {
+            continue;
+          }
+          const inlineValue = el.style.getPropertyValue(propertyName)?.trim();
+
+          if (inlineValue) {
+            styles[propertyName] = inlineValue;
+            if (inlineValue.startsWith("var(--")) {
+              elementTokens.add(inlineValue);
+            }
+            continue;
+          }
+
+          if (!evaluateConfig.includeComputedStyles) {
+            continue;
+          }
+
+          const computedValue = computed.getPropertyValue(propertyName)?.trim();
+          if (computedValue) {
+            styles[propertyName] = computedValue;
+            if (computedValue.startsWith("var(--")) {
+              elementTokens.add(computedValue);
+            }
+          }
         }
 
-        extractedElement.styles = styles;
+        elementTokens.forEach((token) => allTokens.add(token));
+
+        const element: ExtractedElementInner = {
+          selector,
+          tagName: el.tagName.toLowerCase(),
+          type: (el as HTMLInputElement).type || el.tagName.toLowerCase(),
+          classes:
+            el.className && typeof el.className === "string"
+              ? el.className.trim().split(/\s+/).filter(Boolean)
+              : [],
+          id: el.id || undefined,
+          boundingBox: {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
+        };
+
+        if (Object.keys(styles).length > 0) {
+          element.styles = styles;
+        }
+        if (elementTokens.size > 0) {
+          element.styleTokens = Array.from(elementTokens);
+        }
+
+        const textContent = el.textContent?.trim();
+        if (textContent) {
+          element.text = textContent.substring(0, 200);
+        }
+
+        if (el.tagName === "A") {
+          element.href = (el as HTMLAnchorElement).href;
+        }
+
+        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
+          const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
+          element.value = inputEl.value || undefined;
+          element.placeholder = inputEl.placeholder || undefined;
+          if (el.tagName === "INPUT") {
+            element.checked = (el as HTMLInputElement).checked || undefined;
+          }
+        }
+
+        if (el.tagName === "IMG") {
+          const imgEl = el as HTMLImageElement;
+          element.src = imgEl.src || undefined;
+          element.alt = imgEl.alt || undefined;
+        }
+
+        element.ariaLabel = el.getAttribute("aria-label") || undefined;
+        element.role = el.getAttribute("role") || undefined;
+
+        elements.push(element);
       }
 
-      // Extract text content (first 100 chars)
-      const textContent = el.textContent?.trim();
-      if (textContent && textContent.length > 0) {
-        extractedElement.text = textContent.substring(0, 100);
-      }
+      // Collect CSS custom properties from :root (and fallback to inline definitions)
+      const rootComputed = getComputedStyle(document.documentElement);
+      const cssVariables: Record<string, string> = {};
 
-      // Extract href for links
-      if (el.tagName === "A") {
-        extractedElement.href = (el as HTMLAnchorElement).href;
-      }
-
-      // Extract input-specific attributes
-      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-        const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
-        extractedElement.value = inputEl.value || undefined;
-        extractedElement.placeholder = inputEl.placeholder || undefined;
-        if (el.tagName === "INPUT") {
-          extractedElement.checked =
-            (el as HTMLInputElement).checked || undefined;
+      for (let i = 0; i < rootComputed.length; i++) {
+        const propName = rootComputed[i];
+        if (propName && propName.startsWith("--")) {
+          const value = rootComputed.getPropertyValue(propName).trim();
+          if (value) {
+            cssVariables[propName] = value;
+          }
         }
       }
 
-      // Extract image attributes
-      if (el.tagName === "IMG") {
-        const imgEl = el as HTMLImageElement;
-        extractedElement.src = imgEl.src || undefined;
-        extractedElement.alt = imgEl.alt || undefined;
+      // Also include any inline :root variables defined via style attribute
+      const rootElement = document.documentElement as HTMLElement;
+      if (rootElement && rootElement.style) {
+        for (let i = 0; i < rootElement.style.length; i++) {
+          const prop = rootElement.style[i];
+          if (prop && prop.startsWith("--")) {
+            const value = rootElement.style.getPropertyValue(prop).trim();
+            if (value) {
+              cssVariables[prop] = value;
+            }
+          }
+        }
       }
 
-      // Extract ARIA attributes
-      extractedElement.ariaLabel = el.getAttribute("aria-label") || undefined;
-      extractedElement.role = el.getAttribute("role") || undefined;
-
-      elements.push(extractedElement);
-    }
-
-    return { elements, cssVariables };
-  }, config);
+      return {
+        elements,
+        cssVariables,
+        tokens: Array.from(allTokens),
+      };
+    },
+    config,
+    ELEMENT_STYLE_PROPERTIES
+  );
 }
 
 function buildTree(pages: PageData[], startUrl: string): PageData | null {
@@ -795,6 +655,7 @@ export async function runCrawler(
   showBrowser: boolean = false,
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
+  projectId?: string,
   auth?: {
     method: "credentials" | "cookies";
     loginUrl?: string;
@@ -1504,7 +1365,7 @@ export async function runCrawler(
             includeComputedStyles: styleExtraction.includeComputedStyles,
           });
           log.info(
-            `Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables || {}).length} CSS variables from ${request.url}`
+            `Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables).length} CSS variables from ${request.url}`
           );
         }
 
