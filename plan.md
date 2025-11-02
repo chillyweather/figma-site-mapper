@@ -21,7 +21,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Create `src/models/Page.ts` (schema: `{ projectId: ObjectId, url: String, title: String, screenshotPaths: [String], globalStyles: Object }`). Add a `unique` index to `[projectId, url]`.
     - [x] Create `src/models/Element.ts` (schema: `{ pageId: ObjectId, projectId: ObjectId, type: String, bbox: Object, href: String, text: String, styles: Object }`).
 4.  **API Scaffolding:**
-    - [ ] In `src/index.ts`, implement the `POST /projects` and `GET /projects` endpoints. These are the first requirement for the plugin refactor.
+    - [x] In `src/index.ts`, implement the `POST /projects` and `GET /projects` endpoints. These are the first requirement for the plugin refactor.
 
 ## Phase 2: Crawler Upgrade (Data Gathering)
 
