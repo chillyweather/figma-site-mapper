@@ -37,7 +37,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     2. [x] `await Element.deleteMany({ pageId: page._id });`
     3. [x] `await Element.insertMany(elementsData.map(e => ({ ...e, pageId: page.\_id, projectId }));
 
-3.  **Update API Endpoints:** - [ ] Modify `POST /crawl` to require `projectId` and pass it to `runCrawler`. - [ ] Create `POST /recrawl-page` that does the same but with `maxRequestsPerCrawl: 1`. - [ ] Remove the `manifestUrl` from the `/status/:jobId` response. - [ ] Implement `GET /page`, `GET /elements`, `GET /styles/global`, `GET /styles/element` to query the new collections.
+3.  **Update API Endpoints:** - [x] Modify `POST /crawl` to require `projectId` and pass it to `runCrawler`. - [x] Create `POST /recrawl-page` that does the same but with `maxRequestsPerCrawl: 1`. - [x] Remove the `manifestUrl` from the `/status/:jobId` response. - [x] Implement `GET /page`, `GET /elements`, `GET /styles/global`, `GET /styles/element` to query the new collections.
 
 ## Phase 3: Plugin Refactoring (Adapting to DB)
 
