@@ -8,10 +8,12 @@
  * 4. Renders below current page
  */
 
-import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { startCrawl, getJobStatus } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
+import { buildManifestFromProject } from "../utils/buildManifestFromProject";
+import type { TreeNode } from "../../types";
 
 async function getActiveProjectId(): Promise<string | null> {
   try {
@@ -145,7 +147,7 @@ export async function handleShowStylingElements(): Promise<void> {
     console.log(`Started crawl job ${jobId} for styling page`);
 
     // Poll for completion
-    await pollForStylingPageCompletion(jobId, currentPage);
+    await pollForStylingPageCompletion(jobId, currentPage, pageUrl);
   } catch (error) {
     console.error("Failed to create styling page:", error);
     figma.notify("Error creating styling page", { error: true });
@@ -157,7 +159,8 @@ export async function handleShowStylingElements(): Promise<void> {
  */
 async function pollForStylingPageCompletion(
   jobId: string,
-  sourcePage: PageNode
+  sourcePage: PageNode,
+  pageUrl: string
 ): Promise<void> {
   let attempts = 0;
   const maxAttempts = POLLING_CONFIG.MAX_ATTEMPTS;
@@ -172,11 +175,37 @@ async function pollForStylingPageCompletion(
       const status = await getJobStatus(jobId);
       console.log(`Polling attempt ${attempts}: ${status.status}`);
 
-      if (status.status === "completed" && status.result?.manifestUrl) {
+      if (
+        status.status === "completed" &&
+        status.result?.projectId &&
+        status.result?.startUrl
+      ) {
         console.log("Crawl completed, creating styling page");
 
-        // Fetch manifest
-        const manifestData = await fetchManifest(status.result.manifestUrl);
+        const detectInteractiveElements =
+          status.result?.detectInteractiveElements !== false;
+
+        const manifestData = await buildManifestFromProject(
+          status.result.projectId,
+          status.result.startUrl,
+          {
+            detectInteractiveElements,
+          }
+        );
+
+        const targetPageNode = findPageByUrl(manifestData.tree, pageUrl);
+
+        if (!targetPageNode) {
+          figma.notify("Could not locate crawled page in project data", {
+            error: true,
+          });
+          return;
+        }
+
+        const manifestForPage = {
+          ...manifestData,
+          tree: targetPageNode,
+        };
 
         // Create new page with 🎨 prefix
         const stylingPage = figma.createPage();
@@ -200,7 +229,7 @@ async function pollForStylingPageCompletion(
         // Render the page with ALL element types highlighted
         await renderTargetPage(
           stylingPage,
-          manifestData,
+          manifestForPage,
           0, // x position
           0, // y position
           true, // highlightAllElements = true
@@ -231,4 +260,37 @@ async function pollForStylingPageCompletion(
   }
 
   figma.notify("Timeout waiting for crawl to complete", { error: true });
+}
+
+function canonicalizeUrl(url: string): string {
+  try {
+    return new URL(url).toString();
+  } catch (error) {
+    console.warn("Unable to canonicalize URL", url, error);
+    return url;
+  }
+}
+
+function findPageByUrl(
+  root: TreeNode | null,
+  targetUrl: string
+): TreeNode | null {
+  if (!root) {
+    return null;
+  }
+
+  const canonicalTarget = canonicalizeUrl(targetUrl);
+  const stack: TreeNode[] = [root];
+
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (canonicalizeUrl(node.url) === canonicalTarget) {
+      return node;
+    }
+    if (node.children && node.children.length > 0) {
+      stack.push(...node.children);
+    }
+  }
+
+  return null;
 }

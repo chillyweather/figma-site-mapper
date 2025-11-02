@@ -130,6 +130,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       result: {
         projectId: jobData.projectId ?? null,
         detectInteractiveElements: jobData.detectInteractiveElements !== false,
+        startUrl: jobData.url ?? null,
       },
     };
   });

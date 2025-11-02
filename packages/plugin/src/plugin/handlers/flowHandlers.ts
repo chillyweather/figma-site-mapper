@@ -9,11 +9,12 @@
  */
 
 import { FlowLink } from "../types";
-import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { startCrawl, getJobStatus } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
 import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
+import { buildManifestFromProject } from "../utils/buildManifestFromProject";
 
 async function getActiveProjectId(): Promise<string | null> {
   try {
@@ -1028,7 +1029,8 @@ async function pollForCompletion(
 
       if (
         statusResult.status === "completed" &&
-        statusResult.result?.manifestUrl
+        statusResult.result?.projectId &&
+        statusResult.result?.startUrl
       ) {
         clearInterval(pollInterval);
 
@@ -1048,9 +1050,24 @@ async function pollForCompletion(
           ],
         });
 
-        const manifestData = await fetchManifest(
-          statusResult.result.manifestUrl
+        const detectInteractiveElements =
+          statusResult.result?.detectInteractiveElements !== false;
+
+        const manifestData = await buildManifestFromProject(
+          statusResult.result.projectId,
+          statusResult.result.startUrl,
+          {
+            detectInteractiveElements,
+          }
         );
+
+        if (!manifestData.tree) {
+          figma.notify("No crawl data returned for target page", {
+            error: true,
+          });
+          return;
+        }
+
         console.log("Target page crawl completed, rendering...");
 
         // Update flow page name with target title

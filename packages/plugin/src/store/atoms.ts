@@ -9,6 +9,7 @@ import {
   Project,
 } from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
+import type { ManifestData } from "../plugin/types";
 
 // Settings atoms
 export const settingsAtom = atom<PluginSettings>(DEFAULT_SETTINGS);
@@ -46,7 +47,7 @@ export const flowProgressAtom = atom<FlowProgress>({
 });
 
 // Manifest data atom
-export const manifestDataAtom = atom<any>(null);
+export const manifestDataAtom = atom<ManifestData | null>(null);
 
 // Element filters atoms
 export const elementFiltersAtom = atom<ElementFilters>({

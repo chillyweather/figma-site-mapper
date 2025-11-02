@@ -11,7 +11,6 @@ import { buildTokensTable } from "../../figmaRendering/buildTokensTable";
 import {
   startCrawl,
   getJobStatus,
-  fetchManifest,
   openAuthSession,
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
@@ -19,149 +18,236 @@ import {
   handleShowStylingElements,
   handleGetCurrentPageUrl,
 } from "./stylingHandlers";
+import { buildManifestFromProject } from "../utils/buildManifestFromProject";
+import type { ManifestData } from "../types";
 
-let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
 let activeProjectIdRef: string | null = null;
 
-/**
- * Extract domain from URL string without using URL constructor
- * (URL constructor is not available in Figma plugin sandbox)
- */
+async function getActiveProjectId(): Promise<string | null> {
+  if (activeProjectIdRef !== null) {
+    return activeProjectIdRef;
+  }
+  try {
+    const stored = await figma.clientStorage.getAsync("activeProjectId");
+    activeProjectIdRef = stored ?? null;
+    return activeProjectIdRef;
+  } catch (error) {
+    console.error("Failed to load active project id", error);
+    return null;
+  }
+}
+
 function extractDomain(url: string): string | null {
   try {
-    // Remove protocol
-    let domain = url.replace(/^https?:\/\//, "");
-    // Remove path and query string
-    domain = domain.split("/")[0];
-    domain = domain.split("?")[0];
-    // Remove port if present
-    domain = domain.split(":")[0];
-    return domain;
-  } catch (error) {
-    console.error("Failed to extract domain from URL:", error);
+    const urlObj = new URL(url);
+    return urlObj.hostname;
+  } catch {
     return null;
   }
 }
 
-/**
- * Store cookies for a specific domain
- */
-async function storeDomainCookies(
-  domain: string,
-  cookies: Array<{ name: string; value: string; domain: string }>
-): Promise<void> {
-  try {
-    const domainCookies =
-      (await figma.clientStorage.getAsync("domainCookies")) || {};
-    domainCookies[domain] = {
-      cookies,
-      timestamp: Date.now(),
-    };
-    await figma.clientStorage.setAsync("domainCookies", domainCookies);
-  } catch (error) {
-    console.error("Failed to store domain cookies:", error);
-  }
-}
-
-/**
- * Load cookies for a specific domain
- */
 export async function loadDomainCookies(
   domain: string
-): Promise<Array<{ name: string; value: string }> | null> {
+): Promise<Array<{ name: string; value: string; domain: string }> | null> {
   try {
-    const domainCookies =
-      (await figma.clientStorage.getAsync("domainCookies")) || {};
-    const cookieData = domainCookies[domain];
-
-    if (!cookieData) {
-      return null;
-    }
-
-    // Check if cookies are less than 24 hours old
-    const age = Date.now() - cookieData.timestamp;
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-
-    if (age > maxAge) {
-      console.log(
-        `🍪 Cookies for ${domain} are stale (${Math.round(age / 1000 / 60)} minutes old), ignoring`
-      );
-      return null;
-    }
-
-    console.log(
-      `🍪 Found ${cookieData.cookies.length} cached cookies for ${domain}`
-    );
-    return cookieData.cookies;
+    const key = `cookies_${domain}`;
+    const stored = await figma.clientStorage.getAsync(key);
+    return stored ?? null;
   } catch (error) {
-    console.error("Failed to load domain cookies:", error);
+    console.error(`Failed to load cookies for ${domain}`, error);
     return null;
   }
 }
 
-/**
- * Handle start-crawl message from UI
- */
-export async function handleStartCrawl(msg: any): Promise<void> {
-  const {
-    url,
-    maxRequestsPerCrawl,
-    screenshotWidth: width,
-    deviceScaleFactor,
-    delay,
-    requestDelay,
-    maxDepth,
-    defaultLanguageOnly,
-    sampleSize,
-    showBrowser,
-    detectInteractiveElements,
-    captureOnlyVisibleElements,
-    auth,
-    extractStyles,
-    styleExtractionPreset,
-    extractInteractiveElements,
-    extractStructuralElements,
-    extractTextElements,
-    extractFormElements,
-    extractMediaElements,
-    extractColors,
-    extractTypography,
-    extractSpacing,
-    extractLayout,
-    extractBorders,
-    includeSelectors,
-    includeComputedStyles,
-    highlightAllElements,
-    projectId,
-  } = msg;
+export async function handleGetStatus(
+  jobId: string,
+  screenshotWidth: number,
+  detectInteractiveElements: boolean
+): Promise<void> {
+  try {
+    const result = await getJobStatus(jobId);
+    const projectId = result.projectId;
+    const startUrl = result.startUrl;
 
-  console.log("📡 Received crawl request for URL:", url);
+    if (result.status === "completed" && projectId && startUrl) {
+      if (hasRenderedSitemap) {
+        console.log("⚠️ Skipping duplicate sitemap rendering");
+        return;
+      }
 
-  screenshotWidth = width || 1440;
-  hasRenderedSitemap = false;
+      hasRenderedSitemap = true;
+      console.log("🎉 Job completed, rendering sitemap");
 
-  let resolvedProjectId: string | null = projectId ?? activeProjectIdRef;
+      figma.ui.postMessage({
+        type: "status-update",
+        jobId,
+        status: "rendering",
+        detailedProgress: {
+          stage: "Fetching crawl data...",
+          progress: 5,
+        },
+      });
 
-  if (!resolvedProjectId) {
-    try {
-      const stored = await figma.clientStorage.getAsync("activeProjectId");
-      resolvedProjectId = stored ?? null;
-      activeProjectIdRef = resolvedProjectId;
-    } catch (error) {
-      console.error("Failed to read active project id from storage", error);
+      try {
+        const manifestData = await buildManifestFromProject(
+          projectId,
+          startUrl,
+          {
+            detectInteractiveElements,
+          }
+        );
+        console.log("Successfully built manifest from project data");
+
+        if (!manifestData.tree) {
+          figma.ui.postMessage({
+            type: "status-update",
+            jobId,
+            status: "error",
+            detailedProgress: {
+              stage: "No pages available in crawl",
+              progress: 100,
+            },
+          });
+          figma.notify("Error: No crawled pages found for this project.", {
+            error: true,
+          });
+          hasRenderedSitemap = false;
+          return;
+        }
+
+        await figma.clientStorage.setAsync("lastProjectId", projectId);
+        await figma.clientStorage.setAsync("lastStartUrl", startUrl);
+        await figma.clientStorage.setAsync("lastJobId", jobId);
+        await figma.clientStorage.setAsync(
+          "lastDetectInteractiveElements",
+          detectInteractiveElements
+        );
+        console.log("💾 Stored crawl metadata in clientStorage");
+
+        figma.ui.postMessage({
+          type: "manifest-data",
+          manifestData,
+        });
+
+        let highlightAllElements = false;
+        let highlightElementFilters = null;
+        try {
+          const storedSettings = await figma.clientStorage.getAsync("settings");
+          const merged = storedSettings
+            ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
+            : DEFAULT_SETTINGS;
+          highlightAllElements = !!merged.highlightAllElements;
+          highlightElementFilters = merged.highlightElementFilters || null;
+          console.log(
+            `� Highlight all elements setting: ${highlightAllElements}`
+          );
+          console.log(`� Element filters:`, highlightElementFilters);
+        } catch (e) {
+          console.log("Could not load settings for highlightAllElements");
+        }
+
+        await renderSitemap(
+          manifestData,
+          screenshotWidth,
+          detectInteractiveElements,
+          highlightAllElements,
+          (stage: string, progress: number) => {
+            figma.ui.postMessage({
+              type: "status-update",
+              jobId,
+              status: "rendering",
+              detailedProgress: {
+                stage,
+                progress,
+              },
+            });
+          },
+          highlightElementFilters
+        );
+
+        figma.ui.postMessage({
+          type: "status-update",
+          jobId,
+          status: "completed",
+          detailedProgress: {
+            stage: "Complete!",
+            progress: 100,
+          },
+        });
+
+        figma.notify("Sitemap created successfully!");
+        return;
+      } catch (error) {
+        hasRenderedSitemap = false;
+        console.error("Failed to assemble manifest data:", error);
+        figma.notify("Error: Could not fetch crawl results from backend.", {
+          error: true,
+        });
+        figma.ui.postMessage({
+          type: "status-update",
+          jobId,
+          status: "error",
+          detailedProgress: {
+            stage: "Failed to build sitemap",
+            progress: 100,
+          },
+        });
+        return;
+      }
     }
-  }
 
-  if (!resolvedProjectId) {
-    console.warn("❌ Missing projectId in crawl request");
-    figma.notify("Select a project before starting a crawl.", {
-      error: true,
+    figma.ui.postMessage({
+      type: "status-update",
+      jobId,
+      status: result.status,
+      progress: result.progress,
+      detailedProgress: result.detailedProgress,
     });
-    return;
+  } catch (error) {
+    console.error("Failed to get job status:", error);
+    figma.ui.postMessage({
+      type: "status-update",
+      jobId,
+      status: "error",
+      detailedProgress: {
+        stage: "Failed to get job status",
+        progress: 100,
+      },
+    });
   }
+}
 
-  activeProjectIdRef = resolvedProjectId;
+export async function handleStartCrawl(
+  url: string,
+  maxRequestsPerCrawl: number,
+  width: number,
+  maxDepth: number,
+  sampleSize: number,
+  showBrowser: boolean,
+  auth: any,
+  deviceScaleFactor: number,
+  delay: number,
+  requestDelay: number,
+  defaultLanguageOnly: boolean,
+  detectInteractiveElements: boolean,
+  captureOnlyVisibleElements: boolean,
+  extractStyles: boolean,
+  styleExtractionPreset: string,
+  extractInteractiveElements: boolean,
+  extractStructuralElements: boolean,
+  extractTextElements: boolean,
+  extractFormElements: boolean,
+  extractMediaElements: boolean,
+  extractColors: boolean,
+  extractTypography: boolean,
+  extractSpacing: boolean,
+  extractLayout: boolean,
+  extractBorders: boolean,
+  includeSelectors: boolean,
+  includeComputedStyles: boolean
+): Promise<void> {
+  const resolvedProjectId = await getActiveProjectId();
 
   try {
     // If auth method is manual, load cookies from storage
@@ -262,167 +348,145 @@ export async function handleSaveSettings(msg: any): Promise<void> {
 }
 
 /**
- * Handle load-settings message from UI
- */
-export async function handleLoadSettings(): Promise<void> {
-  try {
-    const storedSettings = await figma.clientStorage.getAsync("settings");
-    // Merge stored settings with defaults to ensure new fields have default values
-    const settings = storedSettings
-      ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
-      : DEFAULT_SETTINGS;
-    figma.ui.postMessage({
-      type: "settings-loaded",
-      settings: settings,
-    });
-  } catch (error) {
-    console.error("Failed to load settings:", error);
-    figma.ui.postMessage({
-      type: "settings-loaded",
-      settings: DEFAULT_SETTINGS,
-    });
-  }
-}
-
-/**
- * Handle get-status message from UI
- */
 export async function handleGetStatus(msg: any): Promise<void> {
   const { jobId } = msg;
 
   try {
     const result = await getJobStatus(jobId);
+    const projectId = result.result?.projectId ?? null;
+    const startUrl = result.result?.startUrl ?? null;
+    const detectInteractiveElements =
+      result.result?.detectInteractiveElements !== false;
 
-    // Check if job is completed and needs rendering
-    if (
-      result.status === "completed" &&
-      result.result?.manifestUrl &&
-      !hasRenderedSitemap
-    ) {
+    if (result.status === "completed" && projectId && startUrl) {
+      if (hasRenderedSitemap) {
+        console.log("⚠️ Skipping duplicate sitemap rendering");
+        return;
+      }
+
       hasRenderedSitemap = true;
       console.log("🎉 Job completed, rendering sitemap");
 
-      // Update progress: Fetching manifest
       figma.ui.postMessage({
         type: "status-update",
         jobId,
         status: "rendering",
         detailedProgress: {
-          stage: "Fetching manifest...",
+          stage: "Fetching crawl data...",
           progress: 5,
         },
       });
 
-      const manifestData = await fetchManifest(result.result.manifestUrl);
-      console.log("Successfully fetched manifest");
-
-      // Store manifest URL in clientStorage for persistence
-      await figma.clientStorage.setAsync(
-        "lastManifestUrl",
-        result.result.manifestUrl
-      );
-      await figma.clientStorage.setAsync("lastJobId", jobId);
-      console.log("💾 Stored manifest URL in clientStorage");
-
-      // Send manifest data to UI for storage
-      figma.ui.postMessage({
-        type: "manifest-data",
-        manifestData,
-      });
-
-      // Store cookies for this domain if available
-      if (manifestData.cookies && manifestData.cookies.length > 0) {
-        try {
-          const domain = extractDomain(manifestData.startUrl);
-          if (domain) {
-            await storeDomainCookies(domain, manifestData.cookies);
-            console.log(
-              `🍪 Stored ${manifestData.cookies.length} cookies for domain ${domain}`
-            );
-          }
-        } catch (error) {
-          console.error("Failed to store domain cookies:", error);
-        }
-      }
-
-      const detectInteractiveElements =
-        result.result?.detectInteractiveElements !== false;
-
-      // Render sitemap with progress updates
-      // Determine highlight setting from stored settings
-      let highlightAllElements = false;
-      let highlightElementFilters = null;
       try {
-        const storedSettings = await figma.clientStorage.getAsync("settings");
-        const merged = storedSettings
-          ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
-          : DEFAULT_SETTINGS;
-        highlightAllElements = !!merged.highlightAllElements;
-        highlightElementFilters = merged.highlightElementFilters || null;
-        console.log(
-          `🎨 Highlight all elements setting: ${highlightAllElements}`
-        );
-        console.log(`🎨 Element filters:`, highlightElementFilters);
-      } catch (e) {
-        console.log("Could not load settings for highlightAllElements");
-      }
+        const manifestData = await buildManifestFromProject(projectId, startUrl, {
+          detectInteractiveElements,
+        });
 
-      await renderSitemap(
-        manifestData,
-        screenshotWidth,
-        detectInteractiveElements,
-        highlightAllElements,
-        (stage: string, progress: number) => {
-          // Send progress update to UI
+        if (!manifestData.tree) {
           figma.ui.postMessage({
             type: "status-update",
             jobId,
-            status: "rendering",
+            status: "error",
             detailedProgress: {
-              stage,
-              progress,
+              stage: "No pages available in crawl",
+              progress: 100,
             },
           });
-        },
-        highlightElementFilters
-      );
+          figma.notify("Error: No crawled pages found for this project.", {
+            error: true,
+          });
+          hasRenderedSitemap = false;
+          return;
+        }
 
-      // Final completion - now set status to completed
-      figma.ui.postMessage({
-        type: "status-update",
-        jobId,
-        status: "completed",
-        detailedProgress: {
-          stage: "Complete!",
-          progress: 100,
-        },
-      });
+        await figma.clientStorage.setAsync("lastProjectId", projectId);
+        await figma.clientStorage.setAsync("lastStartUrl", startUrl);
+        await figma.clientStorage.setAsync("lastJobId", jobId);
+        await figma.clientStorage.setAsync(
+          "lastDetectInteractiveElements",
+          detectInteractiveElements
+        );
 
-      figma.notify("Sitemap created successfully!");
+        figma.ui.postMessage({
+          type: "manifest-data",
+          manifestData,
+        });
 
-      // Don't send the backend status update since we've handled rendering
-      return;
-    } else if (result.status === "completed" && hasRenderedSitemap) {
-      console.log("⚠️ Skipping duplicate sitemap rendering");
-      // Don't send duplicate updates
-      return;
+        let highlightAllElements = false;
+        let highlightElementFilters = null;
+        try {
+          const storedSettings = await figma.clientStorage.getAsync("settings");
+          const merged = storedSettings
+            ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
+            : DEFAULT_SETTINGS;
+          highlightAllElements = !!merged.highlightAllElements;
+          highlightElementFilters = merged.highlightElementFilters || null;
+        } catch {
+          console.log("Could not load settings for highlightAllElements");
+        }
+
+        await renderSitemap(
+          manifestData,
+          screenshotWidth,
+          detectInteractiveElements,
+          highlightAllElements,
+          (stage: string, progress: number) => {
+            figma.ui.postMessage({
+              type: "status-update",
+              jobId,
+              status: "rendering",
+              detailedProgress: {
+                stage,
+                progress,
+              },
+            });
+          },
+          highlightElementFilters
+        );
+
+        figma.ui.postMessage({
+          type: "status-update",
+          jobId,
+          status: "completed",
+          detailedProgress: {
+            stage: "Complete!",
+            progress: 100,
+          },
+        });
+
+        figma.notify("Sitemap created successfully!");
+        return;
+      } catch (error) {
+        hasRenderedSitemap = false;
+        console.error("Failed to assemble manifest data:", error);
+        figma.notify("Error: Could not fetch crawl results from backend.", {
+          error: true,
+        });
+        figma.ui.postMessage({
+          type: "status-update",
+          jobId,
+          status: "error",
+          detailedProgress: {
+            stage: "Failed to build sitemap",
+            progress: 100,
+          },
+        });
+        return;
+      }
     }
 
-    // Send status update to UI (only if not handled above)
     figma.ui.postMessage({
       type: "status-update",
       jobId,
       status: result.status,
       progress: result.progress,
       detailedProgress: result.detailedProgress,
-      manifestUrl: result.result?.manifestUrl,
     });
   } catch (error) {
     console.error("Failed to get job status:", error);
     figma.notify("Error: Could not get job status.", { error: true });
   }
 }
-
 /**
  * Handle close message from UI
  */
@@ -494,21 +558,37 @@ export async function handleOpenAuthSession(msg: any): Promise<void> {
  */
 async function handleGetLastManifest(): Promise<void> {
   try {
-    const lastManifestUrl =
-      await figma.clientStorage.getAsync("lastManifestUrl");
-    const lastJobId = await figma.clientStorage.getAsync("lastJobId");
+    const lastProjectId = await figma.clientStorage.getAsync("lastProjectId");
+    const lastStartUrl = await figma.clientStorage.getAsync("lastStartUrl");
+    const lastDetectInteractiveElements =
+      (await figma.clientStorage.getAsync("lastDetectInteractiveElements")) ??
+      true;
+
+    if (!lastProjectId || !lastStartUrl) {
+      figma.ui.postMessage({
+        type: "manifest-error",
+        message: "No previous crawl found",
+      });
+      return;
+    }
+
+    const manifestData = await buildManifestFromProject(
+      lastProjectId,
+      lastStartUrl,
+      {
+        detectInteractiveElements: !!lastDetectInteractiveElements,
+      }
+    );
 
     figma.ui.postMessage({
-      type: "last-manifest-url",
-      manifestUrl: lastManifestUrl || null,
-      jobId: lastJobId || null,
+      type: "manifest-data",
+      manifestData,
     });
   } catch (error) {
     console.error("Failed to get last manifest URL:", error);
     figma.ui.postMessage({
-      type: "last-manifest-url",
-      manifestUrl: null,
-      jobId: null,
+      type: "manifest-error",
+      message: "Failed to fetch previous crawl",
     });
   }
 }

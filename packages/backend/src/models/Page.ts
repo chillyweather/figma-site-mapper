@@ -5,6 +5,15 @@ export interface IPage extends Document {
   url: string;
   title: string;
   screenshotPaths: string[];
+  interactiveElements?: Array<{
+    type: "link" | "button";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    href?: string;
+    text?: string;
+  }>;
   globalStyles?: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
@@ -30,6 +39,27 @@ const PageSchema = new Schema<IPage>(
     },
     screenshotPaths: {
       type: [String],
+      default: [],
+    },
+    interactiveElements: {
+      type: [
+        new Schema(
+          {
+            type: {
+              type: String,
+              required: true,
+              enum: ["link", "button"],
+            },
+            x: { type: Number, required: true },
+            y: { type: Number, required: true },
+            width: { type: Number, required: true },
+            height: { type: Number, required: true },
+            href: { type: String, trim: true },
+            text: { type: String, trim: true },
+          },
+          { _id: false }
+        ),
+      ],
       default: [],
     },
     globalStyles: {

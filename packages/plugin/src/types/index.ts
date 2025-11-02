@@ -43,17 +43,10 @@ export interface Project {
   updatedAt?: string;
 }
 
-export interface BadgeLink {
-  id: string;
-  text: string;
-  url: string;
-}
-
 export interface FlowProgress {
   status: "idle" | "building" | "complete" | "error";
   message: string;
   progress: number;
-  currentStep: number;
   totalSteps: number;
   steps: FlowStep[];
 }
@@ -62,6 +55,18 @@ export interface FlowStep {
   name: string;
   status: "pending" | "in-progress" | "complete" | "error";
 }
+
+export type ElementType =
+  | "heading"
+  | "button"
+  | "input"
+  | "textarea"
+  | "select"
+  | "image"
+  | "link"
+  | "paragraph"
+  | "div"
+  | "other";
 
 export interface CrawlProgress {
   status: "idle" | "crawling" | "rendering" | "complete" | "error";
@@ -97,29 +102,11 @@ export interface TreeNode {
   children: TreeNode[];
   interactiveElements?: InteractiveElement[];
   styleData?: {
-    elements?: Array<{
-      type?: string;
-      text?: string;
-      value?: string;
-      boundingBox?: { x: number; y: number; width: number; height: number };
-    }>;
+    elements?: ExtractedElement[];
+    cssVariables?: Record<string, unknown> | null;
+    tokens?: string[] | null;
   };
 }
-
-// Element extraction types
-export type ElementMode = "flow" | "styling";
-
-export type ElementType =
-  | "heading"
-  | "button"
-  | "input"
-  | "textarea"
-  | "select"
-  | "image"
-  | "link"
-  | "paragraph"
-  | "div"
-  | "other";
 
 export interface ElementFilters {
   headings: boolean;
@@ -138,7 +125,7 @@ export interface ExtractedElement {
   selector: string;
   tagName: string;
   type: string;
-  elementType: ElementType; // Categorized type
+  elementType?: ElementType; // Categorized type
   classes: string[];
   id?: string;
   boundingBox: {
@@ -162,7 +149,6 @@ export interface ExtractedElement {
     borderStyle?: string;
     display?: string;
     position?: string;
-    width?: string;
     height?: string;
   };
   text?: string;
@@ -172,8 +158,10 @@ export interface ExtractedElement {
   // Additional properties for future expansion
   value?: string;
   placeholder?: string;
+  checked?: boolean;
   src?: string;
   alt?: string;
+  styleTokens?: string[];
 }
 
 export interface CategorizedElements {

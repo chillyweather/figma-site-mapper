@@ -16,7 +16,9 @@ export interface FlowLink {
 }
 
 export interface ManifestData {
-  tree: TreeNode;
+  tree: TreeNode | null;
+  projectId: string;
+  startUrl: string;
 }
 
 export type InteractiveElement = SharedInteractiveElement;

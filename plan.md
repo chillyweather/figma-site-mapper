@@ -50,14 +50,42 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Remove credential inputs from `SettingsView.tsx`.
 2.  **Update Crawl Workflow:**
     - [x] Update `useCrawl.ts` to pass the `activeProjectId` in the `start-crawl` message.
-    - [ ] Refactor the `get-status` handler in `uiMessageHandlers.ts`. On job "completed", it must now:
-      1.  [ ] `figma.notify("Crawl complete! Fetching data...")`
-      2.  [ ] Call `apiClient.getPages(activeProjectId)`.
-      3.  [ ] Pass this page data to `renderSitemap`.
+    - [x] Refactor the `get-status` handler in `uiMessageHandlers.ts`. On job "completed", it now:
+      1.  [x] `figma.notify("Crawl complete! Fetching data...")`
+      2.  [x] Calls `buildManifestFromProject(projectId, startUrl, options)` which fetches pages and elements from the API.
+      3.  [x] Passes this manifest data to `renderSitemap`.
 3.  **Data Linking & Markup Decoupling:**
-    - [ ] Modify `renderSitemap.ts`: It should _only_ create the index and the screenshot pages.
-    - [ ] Inside `createScreenshotPages.ts`, **remove all logic** for creating highlights and badges.
-    - [ ] Add the `frame.setPluginData("projectId", ...)` and `frame.setPluginData("pageId", ...)` calls inside this function.
+    - [x] Modified `renderSitemap.ts`: It now creates the index and screenshot pages using database-sourced manifest.
+    - [x] Added `buildManifestFromProject.ts` utility to reconstruct the manifest tree from database pages and elements.
+    - [x] Backend now persists `interactiveElements` on Page documents for flow visualization.
+    - [x] Plugin handlers (`stylingHandlers.ts`, `flowHandlers.ts`) now rebuild manifests on demand from database.
+    - [x] Fixed type definitions in `types/index.ts` to properly support `TreeNode.styleData` with `ExtractedElement[]`, `cssVariables`, and `tokens`.
+    - [x] Fixed corrupted import statements and missing helper functions in `uiMessageHandlers.ts`.
+    - [x] Added `FlowProgress` interface and removed duplicate type definitions.
+    - [x] Added `checked` and `styleTokens` properties to `ExtractedElement` interface.
+
+## Current Status (November 2, 2025)
+
+**Recently Completed:**
+
+- Fixed TypeScript type errors in `buildManifestFromProject.ts` by correcting `TreeNode.styleData` interface to include `cssVariables` and `tokens`.
+- Resolved corrupted type definitions in `types/index.ts` (duplicate `ElementType`, broken `BadgeLink`, missing `FlowProgress`).
+- Fixed broken import statement in `uiMessageHandlers.ts` and added missing helper functions (`getActiveProjectId`, `extractDomain`, `loadDomainCookies`).
+- Added `interactiveElements` support to Page schema and manifest builder to preserve interactive overlay data.
+
+**Known Issues:**
+
+- TypeScript still has errors in components using old `BadgeLink` type (should use `FlowLink` instead).
+- Missing `storeDomainCookies` and `handleLoadSettings` functions in `uiMessageHandlers.ts`.
+- Parameter count mismatches in message handlers need to be resolved.
+- `useElementData` hook has TreeNode type mismatch (missing `screenshot`/`thumbnail`).
+
+**Next Steps:**
+
+- Fix remaining TypeScript errors in flow/mapping components.
+- Add missing cookie storage and settings loading functions.
+- Test end-to-end: run crawl → verify database manifest reconstruction → test styling/flow tabs.
+- Clean up backup files and obsolete manifest download logic.
 
 ## Phase 4: New Feature Implementation
 

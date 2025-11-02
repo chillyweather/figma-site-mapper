@@ -1408,6 +1408,7 @@ export async function runCrawler(
             const pageUpdate: Record<string, unknown> = {
               title,
               screenshotPaths: screenshotSlices,
+              interactiveElements,
             };
 
             if (styleData) {
