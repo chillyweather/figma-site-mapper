@@ -26,6 +26,7 @@ export async function startCrawl(
       detectInteractiveElements: params.detectInteractiveElements !== false,
       styleExtraction: params.styleExtraction,
       captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
+      projectId: params.projectId,
     }),
   });
 

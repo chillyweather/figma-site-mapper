@@ -15,6 +15,16 @@ import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 
+async function getActiveProjectId(): Promise<string | null> {
+  try {
+    const stored = await figma.clientStorage.getAsync("activeProjectId");
+    return stored ?? null;
+  } catch (error) {
+    console.error("Failed to load active project id", error);
+    return null;
+  }
+}
+
 /**
  * Extract domain from URL string without using URL constructor
  * (URL constructor is not available in Figma plugin sandbox)
@@ -925,6 +935,15 @@ async function fetchAndRenderTargetPage(
       );
     }
 
+    const projectId = await getActiveProjectId();
+    if (!projectId) {
+      figma.notify(
+        "Select a project in the plugin UI before crawling target pages.",
+        { error: true }
+      );
+      return;
+    }
+
     const result = await startCrawl({
       url,
       maxRequestsPerCrawl: 1,
@@ -938,6 +957,7 @@ async function fetchAndRenderTargetPage(
       showBrowser: showBrowser, // Use setting from storage
       detectInteractiveElements: true,
       auth: auth, // Pass cookies if available
+      projectId,
     });
 
     const jobId = result.jobId;

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useAtom } from "jotai";
 import {
   currentViewAtom,
@@ -11,6 +11,7 @@ import { useSettings } from "../hooks/useSettings";
 import { useCrawl } from "../hooks/useCrawl";
 import { useFlowMapping } from "../hooks/useFlowMapping";
 import { useElementData } from "../hooks/useElementData";
+import { useProjects } from "../hooks/useProjects";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
 import { StylingView } from "./StylingView";
@@ -22,6 +23,16 @@ export const App: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { isLoading, status, jobId, authStatus, handleSubmit, crawlProgress } =
     useCrawl();
+  const {
+    projects,
+    activeProjectId,
+    setActiveProjectId,
+    isLoading: isProjectLoading,
+    isCreating: isCreatingProject,
+    error: projectError,
+    refresh,
+    createProject,
+  } = useProjects();
   const {
     badgeLinks,
     checkedLinks,
@@ -57,6 +68,20 @@ export const App: React.FC = () => {
       setSelectedPageUrl(pageUrl);
     },
     [setSelectedPageUrl]
+  );
+
+  const handleProjectChange = useCallback(
+    (projectId: string | null) => {
+      setActiveProjectId(projectId);
+    },
+    [setActiveProjectId]
+  );
+
+  const handleCreateProject = useCallback(
+    async (name: string) => {
+      await createProject(name);
+    },
+    [createProject]
   );
 
   // Styling mode handler
@@ -339,6 +364,18 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  useEffect(() => {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "set-active-project",
+          projectId: activeProjectId ?? null,
+        },
+      },
+      "*"
+    );
+  }, [activeProjectId]);
+
   return currentView === "styling" ? (
     <StylingView onBack={switchToMain} />
   ) : currentView === "settings" ? (
@@ -376,14 +413,6 @@ export const App: React.FC = () => {
       }
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
-      loginUrl={settings.loginUrl}
-      handleLoginUrlChange={handleLoginUrlChange}
-      username={settings.username}
-      handleUsernameChange={handleUsernameChange}
-      password={settings.password}
-      handlePasswordChange={handlePasswordChange}
-      cookies={settings.cookies}
-      handleCookiesChange={handleCookiesChange}
       authStatus={authStatus}
       isLoading={isLoading}
       jobId={jobId}
@@ -419,6 +448,14 @@ export const App: React.FC = () => {
     />
   ) : (
     <MainView
+      projects={projects}
+      activeProjectId={activeProjectId}
+      onProjectChange={handleProjectChange}
+      onCreateProject={handleCreateProject}
+      onRefreshProjects={refresh}
+      isProjectLoading={isProjectLoading}
+      isCreatingProject={isCreatingProject}
+      projectError={projectError}
       url={settings.url}
       handleUrlChange={handleUrlChange}
       isLoading={isLoading}

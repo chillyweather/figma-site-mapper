@@ -13,6 +13,16 @@ import { POLLING_CONFIG } from "../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 
+async function getActiveProjectId(): Promise<string | null> {
+  try {
+    const stored = await figma.clientStorage.getAsync("activeProjectId");
+    return stored ?? null;
+  } catch (error) {
+    console.error("Failed to load active project id", error);
+    return null;
+  }
+}
+
 /**
  * Extract domain from URL string
  */
@@ -48,9 +58,9 @@ async function loadSettings(): Promise<any> {
 export async function handleGetCurrentPageUrl(): Promise<void> {
   const currentPage = figma.currentPage;
   const url = currentPage.getPluginData("URL");
-  
+
   console.log("Current page URL:", url || "not set");
-  
+
   figma.ui.postMessage({
     type: "current-page-url",
     url: url || null,
@@ -104,7 +114,16 @@ export async function handleShowStylingElements(): Promise<void> {
 
     // Start crawl with limit 1 and highlight elements enabled
     figma.notify("Crawling page for styling...");
-    
+
+    const projectId = await getActiveProjectId();
+    if (!projectId) {
+      figma.notify(
+        "Select a project in the plugin UI before creating styling pages.",
+        { error: true }
+      );
+      return;
+    }
+
     const result = await startCrawl({
       url: pageUrl,
       maxRequestsPerCrawl: 1,
@@ -119,6 +138,7 @@ export async function handleShowStylingElements(): Promise<void> {
       detectInteractiveElements: true,
       captureOnlyVisibleElements: true,
       auth: auth,
+      projectId,
     });
 
     const jobId = result.jobId;
@@ -212,4 +232,3 @@ async function pollForStylingPageCompletion(
 
   figma.notify("Timeout waiting for crawl to complete", { error: true });
 }
-

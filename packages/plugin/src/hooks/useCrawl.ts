@@ -7,9 +7,9 @@ import {
   authStatusAtom,
   crawlProgressAtom,
   manifestDataAtom,
+  activeProjectIdAtom,
 } from "../store/atoms";
 import { useSettings } from "./useSettings";
-import { startCrawl } from "../utils/api";
 import {
   parseMaxRequests,
   parseScreenshotWidth,
@@ -29,6 +29,7 @@ export function useCrawl() {
   const [authStatus, setAuthStatus] = useAtom(authStatusAtom);
   const [crawlProgress, setCrawlProgress] = useAtom(crawlProgressAtom);
   const setManifestData = useSetAtom(manifestDataAtom);
+  const activeProjectId = useAtomValue(activeProjectIdAtom);
   const intervalRef = useRef<number | null>(null);
 
   const handleSubmit = useCallback(
@@ -37,6 +38,11 @@ export function useCrawl() {
       e.stopPropagation();
 
       if (!settings.url.trim()) return;
+
+      if (!activeProjectId) {
+        setStatus("Select or create a project before starting a crawl.");
+        return;
+      }
 
       console.log("Starting crawl with URL:", settings.url.trim());
 
@@ -89,6 +95,7 @@ export function useCrawl() {
               extractBorders: settings.extractBorders,
               includeSelectors: settings.detectPatterns, // using detectPatterns as includeSelectors
               includeComputedStyles: true, // always include computed styles when enabled
+              projectId: activeProjectId,
             },
           },
           "*"
@@ -98,7 +105,7 @@ export function useCrawl() {
         setIsLoading(false);
       }
     },
-    [settings, setIsLoading, setStatus]
+    [settings, setIsLoading, setStatus, activeProjectId]
   );
 
   // Listen for crawl started message

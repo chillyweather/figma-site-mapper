@@ -36,6 +36,13 @@ export interface PluginSettings {
   detectPatterns: boolean;
 }
 
+export interface Project {
+  _id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface BadgeLink {
   id: string;
   text: string;
@@ -70,6 +77,33 @@ export interface FlowLink {
   id: string;
   text: string;
   url: string;
+}
+
+export interface InteractiveElement {
+  type: "link" | "button";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  href?: string;
+  text?: string;
+}
+
+export interface TreeNode {
+  url: string;
+  title: string;
+  screenshot: string[];
+  thumbnail: string;
+  children: TreeNode[];
+  interactiveElements?: InteractiveElement[];
+  styleData?: {
+    elements?: Array<{
+      type?: string;
+      text?: string;
+      value?: string;
+      boundingBox?: { x: number; y: number; width: number; height: number };
+    }>;
+  };
 }
 
 // Element extraction types
@@ -198,15 +232,7 @@ export interface SettingsViewProps {
   ) => void;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  loginUrl: string;
-  handleLoginUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  username: string;
-  handleUsernameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  password: string;
-  handlePasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  cookies: string;
-  handleCookiesChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  authStatus: "idle" | "authenticating" | "success" | "failed";
+  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
   isLoading: boolean;
   jobId: string | null;
   switchToMain: () => void;
@@ -259,6 +285,14 @@ export interface SettingsViewProps {
 }
 
 export interface MainViewProps {
+  projects: Project[];
+  activeProjectId: string | null;
+  onProjectChange: (projectId: string | null) => void;
+  onCreateProject: (name: string) => Promise<void>;
+  onRefreshProjects: () => Promise<void>;
+  isProjectLoading: boolean;
+  isCreatingProject: boolean;
+  projectError: string | null;
   url: string;
   handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
@@ -295,6 +329,7 @@ export interface CrawlingTabProps {
   status: string;
   handleClose: () => void;
   crawlProgress: CrawlProgress;
+  projectSelected: boolean;
 }
 
 export interface MappingTabProps {

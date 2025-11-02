@@ -44,12 +44,12 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 **Goal:** Update the plugin to use the "Project" model and fetch data from the API.
 
 1.  **Project UI:**
-    - [ ] Add `projectsAtom` and `activeProjectAtom` to `store/atoms.ts`.
-    - [ ] Update `App.tsx` to fetch projects from `GET /projects` on load and display a "Project Selector" dropdown.
-    - [ ] Disable all tabs until a project is selected.
-    - [ ] Remove credential inputs from `SettingsView.tsx`.
+    - [x] Add `projectsAtom` and `activeProjectAtom` to `store/atoms.ts`.
+    - [x] Update `App.tsx` to fetch projects from `GET /projects` on load and display a "Project Selector" dropdown.
+    - [x] Disable all tabs until a project is selected.
+    - [x] Remove credential inputs from `SettingsView.tsx`.
 2.  **Update Crawl Workflow:**
-    - [ ] Update `useCrawl.ts` to pass the `activeProjectId` in the `start-crawl` message.
+    - [x] Update `useCrawl.ts` to pass the `activeProjectId` in the `start-crawl` message.
     - [ ] Refactor the `get-status` handler in `uiMessageHandlers.ts`. On job "completed", it must now:
       1.  [ ] `figma.notify("Crawl complete! Fetching data...")`
       2.  [ ] Call `apiClient.getPages(activeProjectId)`.

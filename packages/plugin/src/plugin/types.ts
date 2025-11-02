@@ -1,3 +1,8 @@
+import type {
+  InteractiveElement as SharedInteractiveElement,
+  TreeNode,
+} from "../types";
+
 export interface BadgeLink {
   id: string;
   text: string;
@@ -11,25 +16,10 @@ export interface FlowLink {
 }
 
 export interface ManifestData {
-  tree: {
-    url: string;
-    title: string;
-    screenshot: string[];
-    thumbnail: string;
-    children: any[];
-    interactiveElements?: InteractiveElement[];
-  };
+  tree: TreeNode;
 }
 
-export interface InteractiveElement {
-  type: "link" | "button";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  href?: string;
-  text?: string;
-}
+export type InteractiveElement = SharedInteractiveElement;
 
 export interface StyleExtractionSettings {
   enabled: boolean;
@@ -64,4 +54,5 @@ export interface CrawlParams {
   captureOnlyVisibleElements?: boolean;
   auth: any;
   styleExtraction?: StyleExtractionSettings;
+  projectId: string;
 }

@@ -22,6 +22,7 @@ import {
 
 let screenshotWidth = 1440;
 let hasRenderedSitemap = false;
+let activeProjectIdRef: string | null = null;
 
 /**
  * Extract domain from URL string without using URL constructor
@@ -132,12 +133,35 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     includeSelectors,
     includeComputedStyles,
     highlightAllElements,
+    projectId,
   } = msg;
 
   console.log("📡 Received crawl request for URL:", url);
 
   screenshotWidth = width || 1440;
   hasRenderedSitemap = false;
+
+  let resolvedProjectId: string | null = projectId ?? activeProjectIdRef;
+
+  if (!resolvedProjectId) {
+    try {
+      const stored = await figma.clientStorage.getAsync("activeProjectId");
+      resolvedProjectId = stored ?? null;
+      activeProjectIdRef = resolvedProjectId;
+    } catch (error) {
+      console.error("Failed to read active project id from storage", error);
+    }
+  }
+
+  if (!resolvedProjectId) {
+    console.warn("❌ Missing projectId in crawl request");
+    figma.notify("Select a project before starting a crawl.", {
+      error: true,
+    });
+    return;
+  }
+
+  activeProjectIdRef = resolvedProjectId;
 
   try {
     // If auth method is manual, load cookies from storage
@@ -202,6 +226,7 @@ export async function handleStartCrawl(msg: any): Promise<void> {
       captureOnlyVisibleElements,
       auth: authData,
       styleExtraction,
+      projectId: resolvedProjectId,
     });
 
     figma.ui.postMessage({
@@ -213,6 +238,15 @@ export async function handleStartCrawl(msg: any): Promise<void> {
     figma.notify("Error: Could not connect to the backend server.", {
       error: true,
     });
+  }
+}
+
+async function handleSetActiveProject(projectId: string | null): Promise<void> {
+  activeProjectIdRef = projectId ?? null;
+  try {
+    await figma.clientStorage.setAsync("activeProjectId", projectId ?? null);
+  } catch (error) {
+    console.error("Failed to persist active project id", error);
   }
 }
 
@@ -576,6 +610,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "build-all-tokens-tables":
       await handleBuildAllTokensTables(msg);
+      break;
+
+    case "set-active-project":
+      await handleSetActiveProject(msg.projectId ?? null);
       break;
 
     case "close":
