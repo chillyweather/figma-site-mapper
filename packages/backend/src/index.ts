@@ -7,6 +7,9 @@ import fastifyStatic from "@fastify/static";
 import path from "path";
 import { fileURLToPath } from "url";
 import { connectDB } from "./db.js";
+import { Project } from "./models/Project.js";
+import { Page } from "./models/Page.js";
+import { Element } from "./models/Element.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +36,34 @@ await server.register(async function (fastify) {
 
 server.get("/", async (request, reply) => {
   return { hello: "world" };
+});
+
+// Project endpoints
+server.get("/projects", async (request, reply) => {
+  try {
+    const projects = await Project.find().sort({ createdAt: -1 });
+    return { projects };
+  } catch (error) {
+    server.log.error(`Error fetching projects: ${error}`);
+    return reply.status(500).send({ error: "Failed to fetch projects" });
+  }
+});
+
+server.post("/projects", async (request, reply) => {
+  const { name } = request.body as { name: string };
+
+  if (!name || !name.trim()) {
+    return reply.status(400).send({ error: "Project name is required" });
+  }
+
+  try {
+    const project = new Project({ name: name.trim() });
+    await project.save();
+    return { project };
+  } catch (error) {
+    server.log.error(`Error creating project: ${error}`);
+    return reply.status(500).send({ error: "Failed to create project" });
+  }
 });
 
 server.post("/progress/:jobId", async (request, reply) => {
