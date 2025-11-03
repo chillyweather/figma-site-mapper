@@ -276,6 +276,13 @@ export async function handleStartCrawl(config: {
 }): Promise<void> {
   const resolvedProjectId = await getActiveProjectId();
 
+  if (!resolvedProjectId) {
+    figma.notify("Select or create a project before starting a crawl.", {
+      error: true,
+    });
+    return;
+  }
+
   try {
     const {
       url,

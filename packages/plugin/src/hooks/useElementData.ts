@@ -2,21 +2,12 @@ import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { manifestDataAtom, categorizedElementsAtom } from "../store/atoms";
 import { categorizeElements } from "../utils/elementCategorization";
-
-interface PageNode {
-  url: string;
-  title?: string;
-  styleData?: {
-    elements?: any[];
-    cssVariables?: any;
-  };
-  children?: PageNode[];
-}
+import type { TreeNode } from "../types";
 
 /**
  * Find a page by URL in the page tree
  */
-function findPageByUrl(node: PageNode, url: string): PageNode | null {
+function findPageByUrl(node: TreeNode, url: string): TreeNode | null {
   if (node.url === url) return node;
   if (node.children) {
     for (const child of node.children) {
@@ -45,9 +36,15 @@ export function useElementData(selectedPageUrl?: string) {
     }
 
     // Find the selected page or use the root page
-    let targetPage = manifestData.tree;
+    const rootPage = manifestData.tree;
+    if (!rootPage) {
+      setCategorizedElements(null);
+      return;
+    }
+
+    let targetPage: TreeNode = rootPage;
     if (selectedPageUrl) {
-      const foundPage = findPageByUrl(manifestData.tree, selectedPageUrl);
+      const foundPage = findPageByUrl(rootPage, selectedPageUrl);
       if (foundPage) {
         targetPage = foundPage;
       }

@@ -2,6 +2,26 @@ import React from "react";
 import { useAtomValue } from "jotai";
 import { manifestDataAtom } from "../store/atoms";
 
+type CssVarGroup = {
+  primitives?: Record<string, unknown>;
+  aliases?: Record<string, unknown>;
+};
+
+type CssVariableSnapshot = {
+  colors?: CssVarGroup;
+  spacing?: CssVarGroup;
+  typography?: CssVarGroup;
+  sizing?: CssVarGroup;
+  borders?: CssVarGroup;
+  shadows?: CssVarGroup;
+  other?: CssVarGroup;
+};
+
+type CategoryCount = {
+  primitives: number;
+  aliases: number;
+};
+
 interface StylingViewProps {
   onBack: () => void;
 }
@@ -20,10 +40,17 @@ export const StylingView: React.FC<StylingViewProps> = ({ onBack }) => {
     console.log("Current page title:", currentPage.title || "No title");
 
     if (currentPage.styleData && currentPage.styleData.cssVariables) {
-      const cssVars = currentPage.styleData.cssVariables;
+      const rawCssVars = currentPage.styleData.cssVariables;
+
+      if (!rawCssVars || typeof rawCssVars !== "object") {
+        console.log("CSS variables payload is empty or malformed");
+        return;
+      }
+
+      const cssVars = rawCssVars as CssVariableSnapshot;
 
       // Count variables by category
-      const counts = {
+      const counts: Record<string, CategoryCount> = {
         colors: {
           primitives: Object.keys(cssVars.colors?.primitives || {}).length,
           aliases: Object.keys(cssVars.colors?.aliases || {}).length,

@@ -68,32 +68,26 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 
 **Recently Completed:**
 
-- ✅ Fixed all TypeScript type errors - replaced `BadgeLink` with `FlowLink` across components and atoms.
-- ✅ Added missing helper functions: `storeDomainCookies`, `handleLoadSettings`, `getActiveProjectId`, `extractDomain`, `loadDomainCookies`.
-- ✅ Resolved Figma plugin sandbox compatibility issues:
-  - Removed optional catch binding (`catch {` → `catch (error) {`)
-  - Replaced optional chaining (`?.`) and nullish coalescing (`??`) with ES5-compatible equivalents
-  - Configured Vite to target ES2018 for both UI and code builds
-- ✅ Fixed `handleStartCrawl` variable initialization order issue (auth reference before destructuring).
-- ✅ Fixed `extractStyleData` function in crawler to pass arguments as single config object to `page.evaluate()`.
-- ✅ End-to-end crawl tested successfully:
-  - Plugin loads without syntax errors
-  - Project creation works
-  - Crawl starts and completes successfully
-  - Style extraction working (502-747 elements per page)
-  - Data persisted to MongoDB
+- [x] Fixed all TypeScript type errors by replacing `BadgeLink` with `FlowLink` throughout the plugin.
+- [x] Added missing helper utilities (`storeDomainCookies`, `handleLoadSettings`, `getActiveProjectId`, `extractDomain`, `loadDomainCookies`).
+- [x] Resolved Figma plugin sandbox incompatibilities by targeting ES2018 and replacing optional chaining, nullish coalescing, and optional catch bindings.
+- [x] Corrected `handleStartCrawl` initialization order so manual auth works reliably.
+- [x] Updated `extractStyleData` to pass a single config object into `page.evaluate`.
+- [x] Verified end-to-end crawl: plugin builds, project creation works, crawls complete with screenshots, interactive elements, and style data stored in MongoDB.
+- [x] Tightened plugin type safety by defining CSS variable snapshots, reusing `TreeNode` traversal helpers, and enforcing project selection before starting crawls.
 
 **Known Issues:**
 
-- Minor styleq warnings in UI (undefined style values passed to components) - non-blocking.
-- Legacy backup files still present (can be cleaned up).
+- No frames are rendered on the Figma canvas after a crawl despite data being available.
+- styleq warnings indicate some UI style definitions receive `undefined` values.
+- Legacy backup files (e.g., `main.ts.backup`, `ui.tsx.backup`) are still in the repo.
 
 **Next Steps:**
 
-- Test sitemap rendering in Figma from database-backed manifest.
-- Test Styling and Flow tabs with extracted data.
-- Clean up backup files and obsolete code.
-- Move to Phase 4 feature implementation (Markup tab, Flow updates, Styling enhancements).
+- [ ] Debug sitemap rendering pipeline so frames and overlays are generated in Figma using the DB-backed manifest.
+- [ ] Address styleq warnings by normalizing dynamic style props within React components.
+- [ ] Remove backup files and any obsolete manifest download code.
+- [ ] Proceed to Phase 4 features once rendering and styling workflows are stable (Markup tab, Flow updates, Styling enhancements).
 
 ## Phase 4: New Feature Implementation
 
