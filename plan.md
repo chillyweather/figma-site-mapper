@@ -79,15 +79,16 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 
 **Known Issues:**
 
-- No frames are rendered on the Figma canvas after a crawl despite data being available.
+- Screenshot frames rely on HTTPS assets; placeholder fallback appears when the backend serves images over HTTP.
 - styleq warnings indicate some UI style definitions receive `undefined` values.
 - Legacy backup files (e.g., `main.ts.backup`, `ui.tsx.backup`) are still in the repo.
 
 **Next Steps:**
 
-- [ ] Debug sitemap rendering pipeline so frames and overlays are generated in Figma using the DB-backed manifest.
+- [ ] Stand up an HTTPS endpoint for the backend (tunnel or prod deploy) so Figma can fetch real screenshots.
 - [ ] Address styleq warnings by normalizing dynamic style props within React components.
 - [ ] Remove backup files and any obsolete manifest download code.
+- [ ] Validate full-refresh crawl path now that the toggle exists (ensure stale pages are pruned, partial crawls remain additive).
 - [ ] Proceed to Phase 4 features once rendering and styling workflows are stable (Markup tab, Flow updates, Styling enhancements).
 
 ## Phase 4: New Feature Implementation

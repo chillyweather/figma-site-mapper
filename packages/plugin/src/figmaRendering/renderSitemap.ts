@@ -5,16 +5,63 @@ import {
   updateNavigationLinks,
 } from "./utils/createScreenshotPages";
 
+function findExistingIndexPage(): PageNode | null {
+  const matches: PageNode[] = [];
+  const pages = figma.root.children;
+
+  for (const pageNode of pages) {
+    if (pageNode.type !== "PAGE") {
+      continue;
+    }
+    const role = pageNode.getPluginData("SITEMAP_ROLE");
+    if (role === "index") {
+      matches.push(pageNode);
+    }
+  }
+
+  if (matches.length === 0) {
+    for (const pageNode of pages) {
+      if (pageNode.type === "PAGE" && pageNode.name === "Index") {
+        matches.push(pageNode);
+      }
+    }
+  }
+
+  if (matches.length > 1) {
+    for (let i = 1; i < matches.length; i++) {
+      try {
+        matches[i].remove();
+      } catch (error) {
+        console.warn(
+          "Failed to remove duplicate index page:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+  }
+
+  return matches.length > 0 ? matches[0] : null;
+}
+
+function clearIndexPageContents(page: PageNode): void {
+  while (page.children.length > 0) {
+    page.children[0]?.remove();
+  }
+}
+
 async function createIndexPage(
   tree: TreeNode,
   pageIdMap: Map<string, string>
 ): Promise<string> {
-  // Create index page as the first page
-  const indexPage = figma.createPage();
+  const existingIndexPage = findExistingIndexPage();
+  const indexPage =
+    existingIndexPage !== null ? existingIndexPage : figma.createPage();
   indexPage.name = "Index";
+  indexPage.setPluginData("SITEMAP_ROLE", "index");
 
-  // Move index page to the beginning
+  // Ensure index page stays at the beginning of the document
   figma.root.insertChild(0, indexPage);
+  clearIndexPageContents(indexPage);
 
   // Create main frame for the index
   const indexFrame = figma.createFrame();

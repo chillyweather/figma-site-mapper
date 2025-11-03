@@ -131,7 +131,7 @@ export const MainView: React.FC<MainViewProps> = ({
           </label>
           <select
             id="project-select"
-            value={activeProjectId ?? ""}
+            value={activeProjectId ? activeProjectId : ""}
             onChange={handleProjectSelect}
             disabled={isProjectLoading}
             style={{

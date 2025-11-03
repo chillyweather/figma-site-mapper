@@ -129,6 +129,41 @@ function isImageTooLarge(imageBytes: Uint8Array): boolean {
   return imageBytes.length > MAX_SIZE;
 }
 
+function findExistingPageByUrl(url: string): PageNode | null {
+  const matches: PageNode[] = [];
+  const pages = figma.root.children;
+  for (const pageNode of pages) {
+    if (pageNode.type !== "PAGE") {
+      continue;
+    }
+    if (pageNode.getPluginData("URL") === url) {
+      matches.push(pageNode);
+    }
+  }
+
+  if (matches.length > 1) {
+    // Preserve the first occurrence, remove subsequent duplicates
+    for (let i = 1; i < matches.length; i++) {
+      try {
+        matches[i].remove();
+      } catch (error) {
+        console.warn(
+          `Failed to remove duplicate page for ${url}:`,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+  }
+
+  return matches.length > 0 ? matches[0] : null;
+}
+
+function clearPageContents(page: PageNode): void {
+  while (page.children.length > 0) {
+    page.children[0]?.remove();
+  }
+}
+
 function parseHostname(url: string): string | null {
   try {
     // Remove protocol
@@ -554,12 +589,14 @@ export async function createScreenshotPages(
   }
 
   for (const page of pages) {
-    const newPage = figma.createPage();
-    newPage.name = page.title.substring(0, 50);
-    pageIdMap.set(page.url, newPage.id);
+    const existingPage = findExistingPageByUrl(page.url);
+    const newPage = existingPage !== null ? existingPage : figma.createPage();
 
-    // Store URL in plugin data for later reference
+    newPage.name = page.title.substring(0, 50);
     newPage.setPluginData("URL", page.url);
+    clearPageContents(newPage);
+
+    pageIdMap.set(page.url, newPage.id);
 
     try {
       const screenshots = Array.isArray(page.screenshot) ? page.screenshot : [];

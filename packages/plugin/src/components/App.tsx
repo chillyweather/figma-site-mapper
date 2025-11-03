@@ -376,7 +376,7 @@ export const App: React.FC = () => {
       {
         pluginMessage: {
           type: "set-active-project",
-          projectId: activeProjectId ?? null,
+          projectId: activeProjectId != null ? activeProjectId : null,
         },
       },
       "*"
