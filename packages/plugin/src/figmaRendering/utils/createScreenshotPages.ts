@@ -474,7 +474,7 @@ export async function createScreenshotPages(
     const newPage = figma.createPage();
     newPage.name = page.title.substring(0, 50);
     pageIdMap.set(page.url, newPage.id);
-    
+
     // Store URL in plugin data for later reference
     newPage.setPluginData("URL", page.url);
 
@@ -939,7 +939,7 @@ export async function createScreenshotPages(
           badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
           // Add hyperlink to badge text for links (needed for flow building)
-          if (isLink && linkMeta?.href) {
+          if (isLink && linkMeta && linkMeta.href) {
             try {
               let validUrl = linkMeta.href;
 
@@ -1005,9 +1005,10 @@ export async function createScreenshotPages(
             id: el.id,
             classes,
             text: el.text,
-            href: linkMeta?.href,
-            linkNumber: currentLinkNumber || linkMeta?.linkNumber,
-            isExternal: linkMeta?.isExternal,
+            href: linkMeta ? linkMeta.href : undefined,
+            linkNumber:
+              currentLinkNumber || (linkMeta ? linkMeta.linkNumber : undefined),
+            isExternal: linkMeta ? linkMeta.isExternal : undefined,
           });
 
           elementCounter++;

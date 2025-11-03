@@ -19,7 +19,7 @@ import { buildManifestFromProject } from "../utils/buildManifestFromProject";
 async function getActiveProjectId(): Promise<string | null> {
   try {
     const stored = await figma.clientStorage.getAsync("activeProjectId");
-    return stored ?? null;
+    return stored || null;
   } catch (error) {
     console.error("Failed to load active project id", error);
     return null;
@@ -1029,8 +1029,10 @@ async function pollForCompletion(
 
       if (
         statusResult.status === "completed" &&
-        statusResult.result?.projectId &&
-        statusResult.result?.startUrl
+        statusResult.result &&
+        statusResult.result.projectId &&
+        statusResult.result &&
+        statusResult.result.startUrl
       ) {
         clearInterval(pollInterval);
 
@@ -1051,7 +1053,8 @@ async function pollForCompletion(
         });
 
         const detectInteractiveElements =
-          statusResult.result?.detectInteractiveElements !== false;
+          statusResult.result &&
+          statusResult.result.detectInteractiveElements !== false;
 
         const manifestData = await buildManifestFromProject(
           statusResult.result.projectId,
@@ -1071,7 +1074,7 @@ async function pollForCompletion(
         console.log("Target page crawl completed, rendering...");
 
         // Update flow page name with target title
-        if (manifestData.tree?.title) {
+        if (manifestData.tree && manifestData.tree.title) {
           const cleanTitle = manifestData.tree.title.replace(/^\d+_/, "");
           flowPage.name = flowPage.name.replace(
             "_Loading...",
@@ -1081,9 +1084,14 @@ async function pollForCompletion(
 
         // Load settings to check if element highlights should be shown
         const settings = await loadSettings();
-        const highlightAllElements = settings?.highlightAllElements || false;
+        const highlightAllElements =
+          settings && settings.highlightAllElements
+            ? settings.highlightAllElements
+            : false;
         const highlightElementFilters =
-          settings?.highlightElementFilters || null;
+          settings && settings.highlightElementFilters
+            ? settings.highlightElementFilters
+            : null;
         console.log(
           `🎨 Highlight all elements setting: ${highlightAllElements}`
         );

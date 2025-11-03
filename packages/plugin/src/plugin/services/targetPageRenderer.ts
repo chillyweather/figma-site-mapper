@@ -301,7 +301,8 @@ function normalizeUrl(href: string, pageUrl: string): string {
     !validUrl.startsWith("https://") &&
     !validUrl.startsWith("mailto:")
   ) {
-    const baseUrl = pageUrl.match(/^https?:\/\/[^\/]+/)?.[0];
+    const match = pageUrl.match(/^https?:\/\/[^\/]+/);
+    const baseUrl = match ? match[0] : undefined;
     if (baseUrl) {
       if (!validUrl.startsWith("/")) {
         validUrl = "/" + validUrl;
@@ -507,7 +508,7 @@ async function createElementBadge(
   badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
   // Add hyperlink to badge text for links
-  if (isLink && linkMeta?.href) {
+  if (isLink && linkMeta && linkMeta.href) {
     try {
       const validUrl = normalizeUrl(linkMeta.href, pageUrl);
       const urlPattern = /^https?:\/\/[^\s]+$/;

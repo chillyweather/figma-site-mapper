@@ -21,6 +21,33 @@ import {
 import { buildManifestFromProject } from "../utils/buildManifestFromProject";
 import type { ManifestData } from "../types";
 
+/** Persist cookies for a domain */
+async function storeDomainCookies(
+  domain: string,
+  cookies: Array<{ name: string; value: string; domain: string }>
+): Promise<void> {
+  try {
+    const key = `cookies_${domain}`;
+    await figma.clientStorage.setAsync(key, cookies);
+  } catch (error) {
+    console.error(`Failed to store cookies for ${domain}`, error);
+  }
+}
+
+/** Load settings and send to UI */
+async function handleLoadSettings(): Promise<void> {
+  try {
+    const stored = await figma.clientStorage.getAsync("settings");
+    const settings = stored
+      ? Object.assign({}, DEFAULT_SETTINGS, stored)
+      : DEFAULT_SETTINGS;
+    figma.ui.postMessage({ type: "settings-loaded", settings });
+  } catch (error) {
+    console.error("Failed to load settings", error);
+    figma.ui.postMessage({ type: "settings-error" });
+  }
+}
+
 let hasRenderedSitemap = false;
 let activeProjectIdRef: string | null = null;
 
@@ -30,7 +57,7 @@ async function getActiveProjectId(): Promise<string | null> {
   }
   try {
     const stored = await figma.clientStorage.getAsync("activeProjectId");
-    activeProjectIdRef = stored ?? null;
+    activeProjectIdRef = stored || null;
     return activeProjectIdRef;
   } catch (error) {
     console.error("Failed to load active project id", error);
@@ -42,7 +69,7 @@ function extractDomain(url: string): string | null {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname;
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -53,7 +80,7 @@ export async function loadDomainCookies(
   try {
     const key = `cookies_${domain}`;
     const stored = await figma.clientStorage.getAsync(key);
-    return stored ?? null;
+    return stored || null;
   } catch (error) {
     console.error(`Failed to load cookies for ${domain}`, error);
     return null;
@@ -218,40 +245,70 @@ export async function handleGetStatus(
   }
 }
 
-export async function handleStartCrawl(
-  url: string,
-  maxRequestsPerCrawl: number,
-  width: number,
-  maxDepth: number,
-  sampleSize: number,
-  showBrowser: boolean,
-  auth: any,
-  deviceScaleFactor: number,
-  delay: number,
-  requestDelay: number,
-  defaultLanguageOnly: boolean,
-  detectInteractiveElements: boolean,
-  captureOnlyVisibleElements: boolean,
-  extractStyles: boolean,
-  styleExtractionPreset: string,
-  extractInteractiveElements: boolean,
-  extractStructuralElements: boolean,
-  extractTextElements: boolean,
-  extractFormElements: boolean,
-  extractMediaElements: boolean,
-  extractColors: boolean,
-  extractTypography: boolean,
-  extractSpacing: boolean,
-  extractLayout: boolean,
-  extractBorders: boolean,
-  includeSelectors: boolean,
-  includeComputedStyles: boolean
-): Promise<void> {
+export async function handleStartCrawl(config: {
+  url: string;
+  maxRequestsPerCrawl: number;
+  width: number;
+  maxDepth: number;
+  sampleSize: number;
+  showBrowser: boolean;
+  auth: any;
+  deviceScaleFactor: number;
+  delay: number;
+  requestDelay: number;
+  defaultLanguageOnly: boolean;
+  detectInteractiveElements: boolean;
+  captureOnlyVisibleElements: boolean;
+  extractStyles: boolean;
+  styleExtractionPreset: "smart" | "minimal" | "complete" | "custom";
+  extractInteractiveElements: boolean;
+  extractStructuralElements: boolean;
+  extractTextElements: boolean;
+  extractFormElements: boolean;
+  extractMediaElements: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractLayout: boolean;
+  extractBorders: boolean;
+  includeSelectors: boolean;
+  includeComputedStyles: boolean;
+}): Promise<void> {
   const resolvedProjectId = await getActiveProjectId();
 
   try {
     // If auth method is manual, load cookies from storage
     let authData = auth;
+    const {
+      url,
+      maxRequestsPerCrawl,
+      width,
+      maxDepth,
+      sampleSize,
+      showBrowser,
+      auth,
+      deviceScaleFactor,
+      delay,
+      requestDelay,
+      defaultLanguageOnly,
+      detectInteractiveElements,
+      captureOnlyVisibleElements,
+      extractStyles,
+      styleExtractionPreset,
+      extractInteractiveElements,
+      extractStructuralElements,
+      extractTextElements,
+      extractFormElements,
+      extractMediaElements,
+      extractColors,
+      extractTypography,
+      extractSpacing,
+      extractLayout,
+      extractBorders,
+      includeSelectors,
+      includeComputedStyles,
+    } = config;
+
     if (auth && auth.method === "manual") {
       const domain = extractDomain(url);
       if (domain) {
@@ -328,9 +385,9 @@ export async function handleStartCrawl(
 }
 
 async function handleSetActiveProject(projectId: string | null): Promise<void> {
-  activeProjectIdRef = projectId ?? null;
+  activeProjectIdRef = projectId || null;
   try {
-    await figma.clientStorage.setAsync("activeProjectId", projectId ?? null);
+    await figma.clientStorage.setAsync("activeProjectId", projectId || null);
   } catch (error) {
     console.error("Failed to persist active project id", error);
   }
@@ -352,11 +409,11 @@ export async function handleGetStatus(msg: any): Promise<void> {
   const { jobId } = msg;
 
   try {
-    const result = await getJobStatus(jobId);
-    const projectId = result.result?.projectId ?? null;
-    const startUrl = result.result?.startUrl ?? null;
+    const result = await getJobStatus(lastJobId);
+    const projectId = (result.result && result.result.projectId) || null;
+    const startUrl = (result.result && result.result.startUrl) || null;
     const detectInteractiveElements =
-      result.result?.detectInteractiveElements !== false;
+      result.result && result.result.detectInteractiveElements !== false;
 
     if (result.status === "completed" && projectId && startUrl) {
       if (hasRenderedSitemap) {
@@ -421,7 +478,7 @@ export async function handleGetStatus(msg: any): Promise<void> {
             : DEFAULT_SETTINGS;
           highlightAllElements = !!merged.highlightAllElements;
           highlightElementFilters = merged.highlightElementFilters || null;
-        } catch {
+        } catch (error) {
           console.log("Could not load settings for highlightAllElements");
         }
 
@@ -561,8 +618,12 @@ async function handleGetLastManifest(): Promise<void> {
     const lastProjectId = await figma.clientStorage.getAsync("lastProjectId");
     const lastStartUrl = await figma.clientStorage.getAsync("lastStartUrl");
     const lastDetectInteractiveElements =
-      (await figma.clientStorage.getAsync("lastDetectInteractiveElements")) ??
-      true;
+      (await figma.clientStorage.getAsync("lastDetectInteractiveElements")) !==
+        null &&
+      (await figma.clientStorage.getAsync("lastDetectInteractiveElements")) !==
+        undefined
+        ? await figma.clientStorage.getAsync("lastDetectInteractiveElements")
+        : true;
 
     if (!lastProjectId || !lastStartUrl) {
       figma.ui.postMessage({
@@ -661,7 +722,11 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
 
     case "get-status":
-      await handleGetStatus(msg);
+      await handleGetStatus(
+        msg.jobId,
+        msg.screenshotWidth,
+        msg.detectInteractiveElements !== false
+      );
       break;
 
     case "show-flow":
@@ -693,7 +758,7 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
 
     case "set-active-project":
-      await handleSetActiveProject(msg.projectId ?? null);
+      await handleSetActiveProject(msg.projectId || null);
       break;
 
     case "close":

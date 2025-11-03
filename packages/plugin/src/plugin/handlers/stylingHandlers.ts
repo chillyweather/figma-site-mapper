@@ -18,7 +18,7 @@ import type { TreeNode } from "../../types";
 async function getActiveProjectId(): Promise<string | null> {
   try {
     const stored = await figma.clientStorage.getAsync("activeProjectId");
-    return stored ?? null;
+    return stored || null;
   } catch (error) {
     console.error("Failed to load active project id", error);
     return null;
@@ -177,13 +177,15 @@ async function pollForStylingPageCompletion(
 
       if (
         status.status === "completed" &&
-        status.result?.projectId &&
-        status.result?.startUrl
+        status.result &&
+        status.result.projectId &&
+        status.result &&
+        status.result.startUrl
       ) {
         console.log("Crawl completed, creating styling page");
 
         const detectInteractiveElements =
-          status.result?.detectInteractiveElements !== false;
+          status.result && status.result.detectInteractiveElements !== false;
 
         const manifestData = await buildManifestFromProject(
           status.result.projectId,
@@ -203,8 +205,9 @@ async function pollForStylingPageCompletion(
         }
 
         const manifestForPage = {
-          ...manifestData,
           tree: targetPageNode,
+          projectId: manifestData.projectId,
+          startUrl: manifestData.startUrl,
         };
 
         // Create new page with 🎨 prefix

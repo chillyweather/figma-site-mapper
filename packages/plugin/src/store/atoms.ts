@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 import {
   PluginSettings,
-  BadgeLink,
+  FlowLink,
   FlowProgress,
   CrawlProgress,
   ElementFilters,
@@ -29,7 +29,7 @@ export const crawlProgressAtom = atom<CrawlProgress>({
 });
 
 // Flow mapping atoms
-export const badgeLinksAtom = atom<BadgeLink[]>([]);
+export const badgeLinksAtom = atom<FlowLink[]>([]);
 export const checkedLinksAtom = atom<Set<string>>(new Set<string>());
 export const flowProgressAtom = atom<FlowProgress>({
   status: "idle",

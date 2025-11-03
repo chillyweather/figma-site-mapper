@@ -38,7 +38,7 @@ export function useElementData(selectedPageUrl?: string) {
   );
 
   useEffect(() => {
-    if (!manifestData?.tree) {
+    if (!manifestData || !manifestData.tree) {
       console.log("No manifest tree data");
       setCategorizedElements(null);
       return;
@@ -59,7 +59,7 @@ export function useElementData(selectedPageUrl?: string) {
     );
     console.log("Target page styleData:", targetPage.styleData);
 
-    if (!targetPage.styleData?.elements) {
+    if (!targetPage.styleData || !targetPage.styleData.elements) {
       console.log("No elements in styleData for this page");
       setCategorizedElements(null);
       return;

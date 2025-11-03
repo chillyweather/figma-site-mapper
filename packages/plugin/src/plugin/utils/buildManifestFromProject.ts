@@ -198,7 +198,7 @@ function transformElement(record: ElementRecord): ExtractedElement | null {
     role: record.role,
     value: record.value,
     placeholder: record.placeholder,
-    checked: record.checked ?? undefined,
+    checked: record.checked !== undefined ? record.checked : undefined,
     src: record.src,
     alt: record.alt,
     styleTokens: Array.isArray(record.styleTokens)
@@ -238,17 +238,23 @@ function buildTreeFromPages(
       ? page.screenshotPaths
       : [];
 
-    const elements = elementsByPageId.get(page._id) ?? [];
+    const elements = elementsByPageId.get(page._id) || [];
     const persistedInteractive = normalizePersistedInteractive(
       page.interactiveElements
     );
     const interactive =
       persistedInteractive.length > 0
         ? persistedInteractive
-        : (interactiveByPageId.get(page._id) ?? []);
+        : interactiveByPageId.get(page._id) || [];
 
-    const cssVariables = (page.globalStyles as any)?.cssVariables;
-    const tokens = (page.globalStyles as any)?.tokens;
+    const cssVariables =
+      page.globalStyles && (page.globalStyles as any).cssVariables
+        ? (page.globalStyles as any).cssVariables
+        : undefined;
+    const tokens =
+      page.globalStyles && (page.globalStyles as any).tokens
+        ? (page.globalStyles as any).tokens
+        : undefined;
 
     const node: TreeNode & { children: TreeNode[] } = {
       url: canonicalUrl,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { MappingTabProps, BadgeLink, ElementFilters } from "../types/index";
+import { MappingTabProps, FlowLink, ElementFilters } from "../types/index";
 import { FlowProgress } from "./FlowProgress";
 
 interface PageNode {
@@ -156,7 +156,7 @@ export const MappingTab: React.FC<MappingTabProps> = ({
                   Found {badgeLinks.length} element
                   {badgeLinks.length !== 1 ? "s" : ""}
                 </h4>
-                {badgeLinks.map((link: BadgeLink) => (
+                {badgeLinks.map((link: FlowLink) => (
                   <div
                     key={link.id}
                     style={{

@@ -47,6 +47,7 @@ export interface FlowProgress {
   status: "idle" | "building" | "complete" | "error";
   message: string;
   progress: number;
+  currentStep?: number; // Optional pointer to current step index
   totalSteps: number;
   steps: FlowStep[];
 }
@@ -83,6 +84,9 @@ export interface FlowLink {
   text: string;
   url: string;
 }
+
+// Mode for the Mapping/Flows view
+export type ElementMode = "flow" | "styling";
 
 export interface InteractiveElement {
   type: "link" | "button";
@@ -289,7 +293,7 @@ export interface MainViewProps {
   status: string;
   handleClose: () => void;
   switchToSettings: () => void;
-  badgeLinks: BadgeLink[];
+  badgeLinks: FlowLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -321,7 +325,7 @@ export interface CrawlingTabProps {
 }
 
 export interface MappingTabProps {
-  badgeLinks: BadgeLink[];
+  badgeLinks: FlowLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;

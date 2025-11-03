@@ -43,7 +43,9 @@ export function useProjects(): UseProjectsResult {
         activeProjectId &&
         result.projects.some((project) => project._id === activeProjectId);
       if (!hasActive) {
-        const nextProjectId = result.projects[0]?._id ?? null;
+        const nextProjectId = result.projects[0]
+          ? result.projects[0]._id
+          : null;
         setProjectId(nextProjectId);
       }
     } catch (err) {
