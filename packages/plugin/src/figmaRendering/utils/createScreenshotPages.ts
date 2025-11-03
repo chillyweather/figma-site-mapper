@@ -76,7 +76,9 @@ async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch image: ${response.status} ${response.statusText}`
+      );
     }
     const arrayBuffer = await response.arrayBuffer();
     return new Uint8Array(arrayBuffer);
@@ -560,9 +562,7 @@ export async function createScreenshotPages(
     newPage.setPluginData("URL", page.url);
 
     try {
-      const screenshots = Array.isArray(page.screenshot)
-        ? page.screenshot
-        : [];
+      const screenshots = Array.isArray(page.screenshot) ? page.screenshot : [];
 
       const loadedScreenshots: LoadedScreenshot[] = [];
       const failedScreenshots: string[] = [];
@@ -725,7 +725,9 @@ export async function createScreenshotPages(
           `Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`
         );
       } else {
-        console.log(`No reference screenshot width found; defaulting scale factor to 1`);
+        console.log(
+          `No reference screenshot width found; defaulting scale factor to 1`
+        );
       }
 
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)

@@ -143,6 +143,11 @@ export async function renderSitemap(
   // Update navigation links with index page ID
   if (indexPageId) {
     updateNavigationLinks(indexPageId);
+
+    const indexPageNode = figma.getNodeById(indexPageId);
+    if (indexPageNode && indexPageNode.type === "PAGE") {
+      figma.currentPage = indexPageNode;
+    }
   }
 
   if (onProgress) onProgress("Complete!", 100);

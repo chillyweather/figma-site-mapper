@@ -94,8 +94,15 @@ export async function handleGetStatus(
 ): Promise<void> {
   try {
     const result = await getJobStatus(jobId);
-    const projectId = result.projectId;
-    const startUrl = result.startUrl;
+    const jobResult = (result && typeof result === "object"
+      ? (result as { result?: any }).result
+      : undefined) || {};
+    const projectId = jobResult.projectId as string | undefined;
+    const startUrl = jobResult.startUrl as string | undefined;
+    const detectInteractiveFromJob =
+      jobResult.detectInteractiveElements !== undefined
+        ? !!jobResult.detectInteractiveElements
+        : detectInteractiveElements;
 
     if (result.status === "completed" && projectId && startUrl) {
       if (hasRenderedSitemap) {
@@ -121,7 +128,7 @@ export async function handleGetStatus(
           projectId,
           startUrl,
           {
-            detectInteractiveElements,
+            detectInteractiveElements: detectInteractiveFromJob,
           }
         );
         console.log("Successfully built manifest from project data");
@@ -177,7 +184,7 @@ export async function handleGetStatus(
         await renderSitemap(
           manifestData,
           screenshotWidth,
-          detectInteractiveElements,
+          detectInteractiveFromJob,
           highlightAllElements,
           (stage: string, progress: number) => {
             figma.ui.postMessage({
@@ -282,6 +289,9 @@ export async function handleStartCrawl(config: {
     });
     return;
   }
+
+  // Reset render guard so the next completed crawl can draw a new sitemap
+  hasRenderedSitemap = false;
 
   try {
     const {
