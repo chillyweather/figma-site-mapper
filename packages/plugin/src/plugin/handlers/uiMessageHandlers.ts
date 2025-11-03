@@ -94,9 +94,10 @@ export async function handleGetStatus(
 ): Promise<void> {
   try {
     const result = await getJobStatus(jobId);
-    const jobResult = (result && typeof result === "object"
-      ? (result as { result?: any }).result
-      : undefined) || {};
+    const jobResult =
+      (result && typeof result === "object"
+        ? (result as { result?: any }).result
+        : undefined) || {};
     const projectId = jobResult.projectId as string | undefined;
     const startUrl = jobResult.startUrl as string | undefined;
     const detectInteractiveFromJob =
