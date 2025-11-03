@@ -277,8 +277,6 @@ export async function handleStartCrawl(config: {
   const resolvedProjectId = await getActiveProjectId();
 
   try {
-    // If auth method is manual, load cookies from storage
-    let authData = auth;
     const {
       url,
       maxRequestsPerCrawl,
@@ -308,6 +306,9 @@ export async function handleStartCrawl(config: {
       includeSelectors,
       includeComputedStyles,
     } = config;
+
+    // If auth method is manual, load cookies from storage
+    let authData = auth;
 
     if (auth && auth.method === "manual") {
       const domain = extractDomain(url);

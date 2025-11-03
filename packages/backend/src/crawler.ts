@@ -389,7 +389,9 @@ async function extractStyleData(
   config: StyleExtractionConfig
 ): Promise<StyleData> {
   return await page.evaluate(
-    (evaluateConfig: StyleExtractionConfig, styleProperties: string[]) => {
+    (params: { config: StyleExtractionConfig; styleProperties: string[] }) => {
+      const evaluateConfig = params.config;
+      const styleProperties = params.styleProperties;
       interface ExtractedElementInner {
         selector: string;
         tagName: string;
@@ -567,8 +569,7 @@ async function extractStyleData(
         tokens: Array.from(allTokens),
       };
     },
-    config,
-    ELEMENT_STYLE_PROPERTIES
+    { config, styleProperties: ELEMENT_STYLE_PROPERTIES }
   );
 }
 
