@@ -16,6 +16,7 @@ const processor = async (job: Job) => {
     requestDelay,
     maxDepth,
     defaultLanguageOnly,
+    fullRefresh,
     sampleSize,
     showBrowser,
     detectInteractiveElements,
@@ -26,7 +27,7 @@ const processor = async (job: Job) => {
   } = job.data;
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
   console.log(
-    `📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, sampleSize=${sampleSize}`
+    `📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`
   );
   console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
   if (auth) {
@@ -53,6 +54,7 @@ const processor = async (job: Job) => {
       showBrowser,
       detectInteractiveElements,
       highlightAllElements,
+      fullRefresh === true,
       projectId,
       auth,
       styleExtraction

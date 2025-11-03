@@ -70,6 +70,7 @@ export async function startCrawl(
       delay: params.delay || 0,
       requestDelay: params.requestDelay || 1000,
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
+      fullRefresh: params.fullRefresh === true,
       detectInteractiveElements: params.detectInteractiveElements !== false,
       styleExtraction: params.styleExtraction,
       captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
@@ -115,15 +116,17 @@ export async function fetchProjectElements(
   projectId: string,
   options: { pageId?: string; url?: string } = {}
 ): Promise<ElementResponseItem[]> {
-  const params = new URLSearchParams({ projectId });
+  const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
   if (options.pageId) {
-    params.set("pageId", options.pageId);
+    queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
   }
   if (options.url) {
-    params.set("url", options.url);
+    queryParts.push(`url=${encodeURIComponent(options.url)}`);
   }
 
-  const response = await fetch(`${BACKEND_URL}/elements?${params.toString()}`);
+  const response = await fetch(
+    `${BACKEND_URL}/elements?${queryParts.join("&")}`
+  );
 
   if (!response.ok) {
     throw new Error(

@@ -139,6 +139,7 @@ export async function handleShowStylingElements(): Promise<void> {
       showBrowser: showBrowser,
       detectInteractiveElements: true,
       captureOnlyVisibleElements: true,
+      fullRefresh: false,
       auth: auth,
       projectId,
     });

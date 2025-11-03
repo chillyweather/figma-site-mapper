@@ -7,6 +7,7 @@ export interface PluginSettings {
   requestDelay: string;
   maxDepth: string;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   sampleSize: string;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
@@ -200,9 +201,11 @@ export interface SettingsViewProps {
   sampleSize: string;
   handleSampleSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   handleDefaultLanguageOnlyChange: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => void;
+  handleFullRefreshChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showBrowser: boolean;
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   detectInteractiveElements: boolean;

@@ -32,6 +32,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleSampleSizeChange,
   defaultLanguageOnly,
   handleDefaultLanguageOnlyChange,
+  fullRefresh,
+  handleFullRefreshChange,
   showBrowser,
   handleShowBrowserChange,
   detectInteractiveElements,
@@ -299,6 +301,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </label>
       <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
         Detects language from URL patterns like /en/, /fr/, ?lang=de, etc.
+      </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          cursor: "pointer",
+          marginTop: "8px",
+        }}
+      >
+        <input
+          id="full-refresh-checkbox"
+          type="checkbox"
+          checked={fullRefresh}
+          onChange={handleFullRefreshChange}
+          disabled={isLoading || !!jobId}
+          style={{ marginRight: "8px" }}
+        />
+        Treat this crawl as a full refresh
+      </label>
+      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+        When enabled, pages not visited in this crawl are removed from the
+        project.
       </div>
       <label
         style={{

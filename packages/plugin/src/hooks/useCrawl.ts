@@ -73,6 +73,7 @@ export function useCrawl() {
               requestDelay: parseRequestDelay(settings.requestDelay),
               maxDepth: parseMaxDepth(settings.maxDepth),
               defaultLanguageOnly: settings.defaultLanguageOnly,
+              fullRefresh: settings.fullRefresh,
               sampleSize: parseSampleSize(settings.sampleSize),
               showBrowser: settings.showBrowser,
               detectInteractiveElements: settings.detectInteractiveElements,

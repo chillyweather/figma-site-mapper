@@ -659,6 +659,7 @@ export async function runCrawler(
   showBrowser: boolean = false,
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
+  fullRefresh: boolean = false,
   projectId?: string,
   auth?: {
     method: "credentials" | "cookies";
@@ -739,6 +740,7 @@ export async function runCrawler(
   const defaultLanguage = getDefaultLanguage(canonicalStartUrl);
 
   const crawledPages: PageData[] = [];
+  const visitedPageIds = new Set<string>();
   let currentPage = 0;
   let totalPages = 0;
   let isTerminating = false; // Flag to prevent multiple termination attempts
@@ -1412,6 +1414,9 @@ export async function runCrawler(
               interactiveElements,
             };
 
+            pageUpdate.lastCrawledAt = new Date();
+            pageUpdate.lastCrawlJobId = jobId ?? null;
+
             if (styleData) {
               pageUpdate.globalStyles = {
                 cssVariables: styleData.cssVariables,
@@ -1440,6 +1445,7 @@ export async function runCrawler(
             }
 
             const pageId = pageDoc._id as Types.ObjectId;
+            visitedPageIds.add(pageId.toString());
 
             await Element.deleteMany({ pageId });
 
@@ -1739,6 +1745,44 @@ export async function runCrawler(
   await updateProgress("starting", 0, totalPages, canonicalStartUrl);
 
   await crawler.run([canonicalStartUrl]);
+
+  if (projectObjectId && fullRefresh) {
+    if (visitedPageIds.size === 0) {
+      console.log(
+        "⚠️ Full refresh requested but no pages were crawled; skipping cleanup."
+      );
+    } else {
+      try {
+        const keepIds = Array.from(visitedPageIds).map(
+          (id) => new Types.ObjectId(id)
+        );
+        const stalePages = await Page.find({
+          projectId: projectObjectId,
+          _id: { $nin: keepIds },
+        }).select({ _id: 1 });
+
+        if (stalePages.length > 0) {
+          const staleIds = stalePages.map((doc) => doc._id as Types.ObjectId);
+          console.log(
+            `🧹 Full refresh: removing ${staleIds.length} stale page(s) not visited in job ${jobId}`
+          );
+          await Page.deleteMany({ _id: { $in: staleIds } });
+          await Element.deleteMany({
+            projectId: projectObjectId,
+            pageId: { $in: staleIds },
+          });
+        } else {
+          console.log(
+            "🧹 Full refresh enabled but no stale pages were found for cleanup."
+          );
+        }
+      } catch (cleanupError) {
+        console.error(
+          `❌ Full refresh cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`
+        );
+      }
+    }
+  }
 
   // Capture cookies from browser context BEFORE teardown
   let capturedCookies: Array<{ name: string; value: string; domain: string }> =

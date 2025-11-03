@@ -15,6 +15,8 @@ export interface IPage extends Document {
     text?: string;
   }>;
   globalStyles?: Record<string, any>;
+  lastCrawledAt?: Date;
+  lastCrawlJobId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +67,15 @@ const PageSchema = new Schema<IPage>(
     globalStyles: {
       type: Schema.Types.Mixed,
       default: {},
+    },
+    lastCrawledAt: {
+      type: Date,
+      default: null,
+    },
+    lastCrawlJobId: {
+      type: String,
+      default: null,
+      trim: true,
     },
   },
   {

@@ -176,6 +176,13 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleFullRefreshChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateSetting("fullRefresh", e.target.checked);
+    },
+    [updateSetting]
+  );
+
   const handleShowBrowserChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateSetting("showBrowser", e.target.checked);
@@ -397,6 +404,8 @@ export const App: React.FC = () => {
       handleSampleSizeChange={handleSampleSizeChange}
       defaultLanguageOnly={settings.defaultLanguageOnly}
       handleDefaultLanguageOnlyChange={handleDefaultLanguageOnlyChange}
+      fullRefresh={settings.fullRefresh}
+      handleFullRefreshChange={handleFullRefreshChange}
       showBrowser={settings.showBrowser}
       handleShowBrowserChange={handleShowBrowserChange}
       detectInteractiveElements={settings.detectInteractiveElements}

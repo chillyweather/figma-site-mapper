@@ -49,6 +49,7 @@ export interface CrawlParams {
   requestDelay: number;
   maxDepth: number;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;

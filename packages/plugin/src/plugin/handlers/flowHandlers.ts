@@ -957,6 +957,7 @@ async function fetchAndRenderTargetPage(
       sampleSize: 1,
       showBrowser: showBrowser, // Use setting from storage
       detectInteractiveElements: true,
+      fullRefresh: false,
       auth: auth, // Pass cookies if available
       projectId,
     });

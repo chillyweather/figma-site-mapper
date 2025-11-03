@@ -281,6 +281,7 @@ export async function handleStartCrawl(config: {
   extractBorders: boolean;
   includeSelectors: boolean;
   includeComputedStyles: boolean;
+  fullRefresh: boolean;
 }): Promise<void> {
   const resolvedProjectId = await getActiveProjectId();
 
@@ -323,6 +324,7 @@ export async function handleStartCrawl(config: {
       extractBorders,
       includeSelectors,
       includeComputedStyles,
+      fullRefresh,
     } = config;
 
     // If auth method is manual, load cookies from storage
@@ -385,6 +387,7 @@ export async function handleStartCrawl(config: {
       sampleSize,
       showBrowser,
       detectInteractiveElements,
+      fullRefresh,
       captureOnlyVisibleElements,
       auth: authData,
       styleExtraction,

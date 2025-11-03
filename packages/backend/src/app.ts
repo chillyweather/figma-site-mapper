@@ -131,6 +131,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         projectId: jobData.projectId ?? null,
         detectInteractiveElements: jobData.detectInteractiveElements !== false,
         startUrl: jobData.url ?? null,
+        fullRefresh: jobData.fullRefresh === true,
       },
     };
   });
@@ -152,6 +153,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       projectId,
       auth,
       styleExtraction,
+      fullRefresh,
     } = request.body as {
       url: string;
       publicUrl: string;
@@ -162,6 +164,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       maxDepth?: number;
       defaultLanguageOnly?: boolean;
       sampleSize?: number;
+      fullRefresh?: boolean;
       showBrowser?: boolean;
       detectInteractiveElements?: boolean;
       highlightAllElements?: boolean;
@@ -228,6 +231,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       projectId,
       auth,
       styleExtraction,
+      fullRefresh: !!fullRefresh,
     });
 
     return { message: "Crawl job successfully queued.", jobId: job.id };
