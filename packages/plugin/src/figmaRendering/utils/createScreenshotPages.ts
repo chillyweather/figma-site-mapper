@@ -47,13 +47,43 @@ const DEFAULT_ELEMENT_FILTERS: ElementFilters = {
   other: false,
 };
 
+interface LoadedScreenshot {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+  sourceUrl: string;
+  usedFallback: boolean;
+}
+
+let insecureProtocolWarned = false;
+let missingScreenshotsWarned = false;
+
 async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${response.statusText}`);
+  if (!url) {
+    throw new Error("Empty screenshot URL");
   }
-  const arrayBuffer = await response.arrayBuffer();
-  return new Uint8Array(arrayBuffer);
+
+  if (url.startsWith("http://") && !insecureProtocolWarned) {
+    insecureProtocolWarned = true;
+    if (typeof figma !== "undefined" && "notify" in figma) {
+      figma.notify(
+        "Screenshots are served over HTTP. Configure an HTTPS backend so Figma can fetch them.",
+        { error: true }
+      );
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  } catch (error) {
+    console.error(`Failed to fetch image bytes from ${url}`, error);
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 async function getImageDimensions(
@@ -129,6 +159,57 @@ function isExternalLink(href: string, baseUrl: string): boolean {
     // If URL parsing fails, assume it's internal (relative link)
     return false;
   }
+}
+
+async function loadScreenshotWithFallback(
+  primaryUrl: string,
+  fallbackUrl?: string
+): Promise<LoadedScreenshot | null> {
+  const candidates: Array<{ url: string; usedFallback: boolean }> = [];
+
+  if (primaryUrl) {
+    candidates.push({ url: primaryUrl, usedFallback: false });
+  }
+
+  if (fallbackUrl && fallbackUrl !== primaryUrl) {
+    candidates.push({ url: fallbackUrl, usedFallback: true });
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const bytes = await fetchImageAsUint8Array(candidate.url);
+
+      if (isImageTooLarge(bytes)) {
+        console.warn(
+          `Image at ${candidate.url} is larger than 4MB. Trying fallback...`
+        );
+        continue;
+      }
+
+      const { width, height } = await getImageDimensions(bytes);
+      if (width <= 0 || height <= 0) {
+        console.warn(
+          `Dimension parsing failed for ${candidate.url} (width: ${width}, height: ${height})`
+        );
+        continue;
+      }
+
+      return {
+        bytes,
+        width,
+        height,
+        sourceUrl: candidate.url,
+        usedFallback: candidate.usedFallback,
+      };
+    } catch (error) {
+      console.error(
+        `Failed to load screenshot from ${candidate.url}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -479,7 +560,94 @@ export async function createScreenshotPages(
     newPage.setPluginData("URL", page.url);
 
     try {
-      const screenshots = page.screenshot;
+      const screenshots = Array.isArray(page.screenshot)
+        ? page.screenshot
+        : [];
+
+      const loadedScreenshots: LoadedScreenshot[] = [];
+      const failedScreenshots: string[] = [];
+
+      for (let i = 0; i < screenshots.length; i++) {
+        const screenshotUrl = screenshots[i];
+        const loaded = await loadScreenshotWithFallback(
+          screenshotUrl,
+          page.thumbnail
+        );
+
+        if (!loaded) {
+          failedScreenshots.push(screenshotUrl || `slice_${i + 1}`);
+          continue;
+        }
+
+        if (loaded.usedFallback) {
+          console.log(
+            `Using thumbnail fallback for slice ${i + 1} on ${page.url}`
+          );
+        }
+
+        loadedScreenshots.push(loaded);
+      }
+
+      if (loadedScreenshots.length === 0) {
+        console.warn(`No screenshots available for ${page.url}`);
+
+        if (!missingScreenshotsWarned) {
+          missingScreenshotsWarned = true;
+          if (typeof figma !== "undefined" && "notify" in figma) {
+            figma.notify(
+              "Screenshots could not be fetched. Verify the backend URL and HTTPS setup.",
+              { error: true }
+            );
+          }
+        }
+
+        const placeholderContainer = figma.createFrame();
+        placeholderContainer.name = `${page.title} Placeholder`;
+        placeholderContainer.layoutMode = "VERTICAL";
+        placeholderContainer.primaryAxisAlignItems = "MIN";
+        placeholderContainer.counterAxisAlignItems = "MIN";
+        placeholderContainer.itemSpacing = 16;
+        placeholderContainer.paddingTop = 24;
+        placeholderContainer.paddingBottom = 24;
+        placeholderContainer.paddingLeft = 24;
+        placeholderContainer.paddingRight = 24;
+        placeholderContainer.fills = [
+          { type: "SOLID", color: { r: 0.97, g: 0.97, b: 0.97 } },
+        ];
+        placeholderContainer.strokes = [
+          { type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } },
+        ];
+        placeholderContainer.strokeWeight = 1;
+
+        const navFrame = createNavigationFrame(page.title, page.url);
+        navFrame.layoutAlign = "STRETCH";
+        placeholderContainer.appendChild(navFrame);
+
+        const warningText = figma.createText();
+        warningText.fontName = fontName;
+        warningText.fontSize = 14;
+        warningText.characters = `Screenshots unavailable for ${page.title}`;
+        warningText.fills = [
+          { type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } },
+        ];
+        placeholderContainer.appendChild(warningText);
+
+        if (failedScreenshots.length > 0) {
+          const detailText = figma.createText();
+          detailText.fontName = fontName;
+          detailText.fontSize = 11;
+          const displayed = failedScreenshots.slice(0, 3);
+          const suffix = failedScreenshots.length > 3 ? " …" : "";
+          detailText.characters = `Attempted sources: ${displayed.join(
+            ", "
+          )}${suffix}`;
+          detailText.opacity = 0.7;
+          placeholderContainer.appendChild(detailText);
+        }
+
+        newPage.appendChild(placeholderContainer);
+        continue;
+      }
 
       // Create a vertical autolayout frame for screenshots only (no navigation)
       const screenshotsFrame = figma.createFrame();
@@ -487,65 +655,30 @@ export async function createScreenshotPages(
       screenshotsFrame.layoutMode = "VERTICAL";
       screenshotsFrame.primaryAxisAlignItems = "MIN";
       screenshotsFrame.counterAxisAlignItems = "MIN";
-      screenshotsFrame.itemSpacing = 0; // No overlap, so no negative spacing needed
+      screenshotsFrame.itemSpacing = 0;
       screenshotsFrame.paddingTop = 0;
       screenshotsFrame.paddingBottom = 0;
       screenshotsFrame.paddingLeft = 0;
       screenshotsFrame.paddingRight = 0;
       screenshotsFrame.fills = [];
 
-      // Handle multiple screenshot slices
-      for (let i = 0; i < screenshots.length; i++) {
-        const screenshotUrl = screenshots[i];
-        let imageBytes: Uint8Array;
-        let imageUrl = screenshotUrl;
-
-        try {
-          imageBytes = await fetchImageAsUint8Array(screenshotUrl);
-
-          // Check if image is too large for Figma
-          if (isImageTooLarge(imageBytes)) {
-            console.log(
-              `Image slice ${i + 1} too large for ${page.url}, trying thumbnail...`
-            );
-            imageBytes = await fetchImageAsUint8Array(page.thumbnail);
-            imageUrl = page.thumbnail;
-          }
-        } catch (sliceError) {
-          console.log(
-            `Failed to fetch slice ${i + 1} for ${page.url}, trying thumbnail...`
-          );
-          imageBytes = await fetchImageAsUint8Array(page.thumbnail);
-          imageUrl = page.thumbnail;
-        }
-
-        const imageHash = figma.createImage(imageBytes).hash;
-
-        // Get actual image dimensions to calculate proper height
-        let calculatedHeight = 1024; // fallback height
-        try {
-          const dimensions = await getImageDimensions(imageBytes);
-          const aspectRatio = dimensions.width / dimensions.height;
-          calculatedHeight = screenshotWidth / aspectRatio;
-        } catch (error) {
-          console.log(
-            `Failed to get dimensions for ${imageUrl}, using fallback height:`,
-            error
-          );
-        }
+      for (let i = 0; i < loadedScreenshots.length; i++) {
+        const shot = loadedScreenshots[i];
+        const imageHash = figma.createImage(shot.bytes).hash;
+        const widthScale = screenshotWidth / shot.width;
+        const scaledHeight = Math.max(1, Math.round(shot.height * widthScale));
 
         const rect = figma.createRectangle();
-        rect.resize(screenshotWidth, calculatedHeight);
+        rect.resize(screenshotWidth, scaledHeight);
         rect.fills = [{ type: "IMAGE", scaleMode: "FIT", imageHash }];
 
         screenshotsFrame.appendChild(rect);
 
         console.log(
-          `Successfully created slice ${i + 1} for ${page.url} using ${imageUrl}`
+          `Added slice ${i + 1}/${loadedScreenshots.length} for ${page.url} from ${shot.sourceUrl}`
         );
       }
 
-      // Resize frame to fit content
       screenshotsFrame.layoutAlign = "STRETCH";
       screenshotsFrame.primaryAxisSizingMode = "AUTO";
       screenshotsFrame.counterAxisSizingMode = "AUTO";
@@ -563,43 +696,13 @@ export async function createScreenshotPages(
       overlayContainer.clipsContent = false; // Allow children to extend beyond bounds
 
       // Calculate the total height needed for the overlay (screenshots only, nav is above)
-      let totalHeight = 0;
-      for (let i = 0; i < screenshots.length; i++) {
-        const screenshotUrl = screenshots[i];
-        let imageBytes: Uint8Array;
-        let imageUrl = screenshotUrl;
+      const totalHeight = loadedScreenshots.reduce((sum, shot) => {
+        const widthScale = screenshotWidth / shot.width;
+        const scaledHeight = Math.max(1, Math.round(shot.height * widthScale));
+        return sum + scaledHeight;
+      }, 0);
 
-        try {
-          imageBytes = await fetchImageAsUint8Array(screenshotUrl);
-        } catch (sliceError) {
-          console.log(
-            `Failed to fetch slice ${i + 1} for height calculation, trying thumbnail...`
-          );
-          try {
-            imageBytes = await fetchImageAsUint8Array(page.thumbnail);
-            imageUrl = page.thumbnail;
-          } catch (thumbError) {
-            console.log(
-              `Failed to fetch thumbnail too, skipping height calculation`
-            );
-            continue;
-          }
-        }
-
-        try {
-          const dimensions = await getImageDimensions(imageBytes);
-          const aspectRatio = dimensions.width / dimensions.height;
-          const calculatedHeight = screenshotWidth / aspectRatio;
-          totalHeight += calculatedHeight;
-        } catch (error) {
-          console.log(
-            `Failed to get dimensions for ${imageUrl}, using fallback height`
-          );
-          totalHeight += 1024; // fallback height
-        }
-      }
-
-      overlayContainer.resize(screenshotWidth, totalHeight);
+      overlayContainer.resize(screenshotWidth, Math.max(totalHeight, 1));
 
       // Define navigation height constant
       const navHeight = 48; // Fixed height for navigation frame
@@ -612,25 +715,17 @@ export async function createScreenshotPages(
       overlayContainer.appendChild(navFrame);
 
       // Compute scaling factor once (for both interactive and style elements)
-      let originalWidth = screenshotWidth; // fallback
-      let scaleFactor = 1;
-      if (screenshots.length > 0) {
-        try {
-          const firstScreenshotBytes = await fetchImageAsUint8Array(
-            screenshots[0]
-          );
-          const dimensions = await getImageDimensions(firstScreenshotBytes);
-          originalWidth = dimensions.width;
-          scaleFactor = screenshotWidth / originalWidth;
-          console.log(
-            `Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`
-          );
-        } catch (error) {
-          console.log(
-            `Could not calculate scaling factor, using 1:1 scaling:`,
-            error
-          );
-        }
+      const referenceShot = loadedScreenshots[0];
+      const originalWidth = referenceShot?.width || screenshotWidth;
+      const scaleFactor =
+        originalWidth > 0 ? screenshotWidth / originalWidth : 1;
+
+      if (referenceShot) {
+        console.log(
+          `Calculated scaling factor: ${scaleFactor} (original: ${originalWidth}px, target: ${screenshotWidth}px)`
+        );
+      } else {
+        console.log(`No reference screenshot width found; defaulting scale factor to 1`);
       }
 
       // Add red frames around interactive elements - with absolute positioning and scaling (if enabled)

@@ -75,6 +75,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 - [x] Updated `extractStyleData` to pass a single config object into `page.evaluate`.
 - [x] Verified end-to-end crawl: plugin builds, project creation works, crawls complete with screenshots, interactive elements, and style data stored in MongoDB.
 - [x] Tightened plugin type safety by defining CSS variable snapshots, reusing `TreeNode` traversal helpers, and enforcing project selection before starting crawls.
+- [x] Hardened Figma rendering pipeline: added resilient screenshot loading, HTTPS guidance, and placeholder output when assets cannot be fetched.
 
 **Known Issues:**
 
