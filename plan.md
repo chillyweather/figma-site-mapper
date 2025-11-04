@@ -85,13 +85,27 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 
 **Next Steps:**
 
+- [ ] Implement job-scoped rendering: capture visited pages per crawl, expose them via the status API, and render only those frames in the current document.
+- [ ] Add an optional "Render project snapshot" action that rebuilds the full sitemap from Atlas on demand.
 - [ ] Stand up an HTTPS endpoint for the backend (tunnel or prod deploy) so Figma can fetch real screenshots.
 - [ ] Address styleq warnings by normalizing dynamic style props within React components.
 - [ ] Remove backup files and any obsolete manifest download code.
 - [ ] Validate full-refresh crawl path now that the toggle exists (ensure stale pages are pruned, partial crawls remain additive).
-- [ ] Proceed to Phase 4 features once rendering and styling workflows are stable (Markup tab, Flow updates, Styling enhancements).
 
-## Phase 4: New Feature Implementation
+## Phase 4: Job-Scoped Rendering
+
+**Goal:** Limit automatic rendering to the pages processed in the most recent crawl while keeping full-project rebuilds available on demand.
+
+1.  **Backend Tracking & APIs:**
+    - [ ] Record visited URLs/IDs during each crawl job and include them in job status responses.
+    - [ ] Provide lightweight endpoints to fetch page snapshots by job or by ID list.
+2.  **Plugin Rendering:**
+    - [ ] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
+    - [ ] Cache the last job subset locally for quick re-renders.
+3.  **Snapshot Control:**
+    - [ ] Expose a "Render project snapshot" button that invokes the full-project manifest when needed.
+
+## Phase 5: New Feature Implementation
 
 **Goal:** Build the new on-demand workflows using the database.
 
@@ -109,7 +123,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [ ] Implement the "Global Styles" button and its handler to fetch from `GET /styles/global` and render a new Figma frame with text nodes.
     - [ ] Implement the "Element Style" selection logic (similar to the "Flows" tab list) to fetch from `GET /styles/element` and render a style table.
 
-## Phase 5: Deployment (DigitalOcean)
+## Phase 6: Deployment (DigitalOcean)
 
 **Goal:** Deploy the backend to a public server.
 
