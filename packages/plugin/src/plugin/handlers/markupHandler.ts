@@ -228,7 +228,7 @@ export async function handleRenderMarkupRequest({
       const highlightNumber = created + 1;
 
       const highlightRect = figma.createRectangle();
-      highlightRect.name = `markup_${elementType}_${highlightNumber}`;
+      highlightRect.name = `${elementType}_${highlightNumber}_highlight`;
       highlightRect.x = scaledX;
       highlightRect.y = scaledY;
       highlightRect.resize(scaledWidth, scaledHeight);
@@ -257,7 +257,7 @@ export async function handleRenderMarkupRequest({
       const badgeSize = 16;
       const badgeColor = getElementColor(elementType);
       const badgeCircle = figma.createEllipse();
-      badgeCircle.name = `markup_badge_${highlightNumber}_circle`;
+      badgeCircle.name = `${elementType}_${highlightNumber}_badge_circle`;
       badgeCircle.x = scaledX + scaledWidth - badgeSize - 2;
       badgeCircle.y = scaledY - 2;
       badgeCircle.resize(badgeSize, badgeSize);
@@ -282,7 +282,7 @@ export async function handleRenderMarkupRequest({
         badgeText.fontName = badgeFont;
         badgeText.fontSize = 9;
         badgeText.characters = highlightNumber.toString();
-        badgeText.name = `markup_badge_${highlightNumber}_label`;
+        badgeText.name = `${elementType}_${highlightNumber}_badge_text`;
         badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
         badgeText.x = badgeCircle.x + (badgeSize - badgeText.width) / 2;
         badgeText.y = badgeCircle.y + (badgeSize - badgeText.height) / 2;
@@ -293,7 +293,7 @@ export async function handleRenderMarkupRequest({
         : [badgeCircle];
 
       const badgeGroup = figma.group(badgeNodes, figma.currentPage);
-      badgeGroup.name = `markup_badge_${highlightNumber}`;
+      badgeGroup.name = `${elementType}_${highlightNumber}_badge`;
       badgeGroup.setPluginData(
         "MARKUP_ELEMENT",
         JSON.stringify(Object.assign({}, metadata, { kind: "badge" }))
