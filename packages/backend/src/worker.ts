@@ -40,7 +40,7 @@ const processor = async (job: Job) => {
   }
 
   try {
-    await runCrawler(
+    const result = await runCrawler(
       url,
       publicUrl,
       maxRequestsPerCrawl,
@@ -59,7 +59,15 @@ const processor = async (job: Job) => {
       auth,
       styleExtraction
     );
+    await job.updateData({
+      ...job.data,
+      visitedUrls: result.visitedUrls,
+      visitedPageIds: result.visitedPageIds,
+      pageCount: result.pageCount,
+      lastCompletedAt: new Date().toISOString(),
+    });
     console.log(`✅ Finished job ${job.id}`);
+    return result;
   } catch (error) {
     console.error(`❌ Job ${job.id} failed:`, error);
     throw error;

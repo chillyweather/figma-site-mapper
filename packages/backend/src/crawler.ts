@@ -684,7 +684,13 @@ export async function runCrawler(
     includeSelectors: boolean;
     includeComputedStyles: boolean;
   }
-) {
+): Promise<{
+  visitedUrls: string[];
+  visitedPageIds: string[];
+  pageCount: number;
+  startUrl: string;
+  capturedCookies: Array<{ name: string; value: string; domain: string }>;
+}> {
   console.log("🚀 Starting the crawler with URL:", startUrl);
   console.log("📊 Crawler settings:", {
     maxRequestsPerCrawl,
@@ -1838,6 +1844,28 @@ export async function runCrawler(
   console.log(
     "✅ Crawler finished. Data persisted to MongoDB (if configured)."
   );
+
+  const toCanonicalUrl = (url: string): string => {
+    try {
+      const normalized = new URL(url);
+      normalized.hash = "";
+      return normalized.toString();
+    } catch (error) {
+      console.warn("Failed to canonicalize URL for job result", url, error);
+      return url;
+    }
+  };
+
+  const visitedUrls = crawledPages.map((page) => toCanonicalUrl(page.url));
+  const visitedPageIdsArray = Array.from(visitedPageIds);
+
+  return {
+    visitedUrls,
+    visitedPageIds: visitedPageIdsArray,
+    pageCount: crawledPages.length,
+    startUrl: canonicalStartUrl,
+    capturedCookies,
+  };
 }
 
 /**

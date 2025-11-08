@@ -132,6 +132,19 @@ export async function buildServer(): Promise<FastifyInstance> {
         detectInteractiveElements: jobData.detectInteractiveElements !== false,
         startUrl: jobData.url ?? null,
         fullRefresh: jobData.fullRefresh === true,
+        visitedUrls: Array.isArray(jobData.visitedUrls)
+          ? jobData.visitedUrls
+          : [],
+        visitedPageIds: Array.isArray(jobData.visitedPageIds)
+          ? jobData.visitedPageIds
+          : [],
+        pageCount:
+          typeof jobData.pageCount === "number"
+            ? jobData.pageCount
+            : Array.isArray(jobData.visitedUrls)
+              ? jobData.visitedUrls.length
+              : 0,
+        lastCompletedAt: jobData.lastCompletedAt ?? null,
       },
     };
   });

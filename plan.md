@@ -97,7 +97,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 **Goal:** Limit automatic rendering to the pages processed in the most recent crawl while keeping full-project rebuilds available on demand.
 
 1.  **Backend Tracking & APIs:**
-    - [ ] Record visited URLs/IDs during each crawl job and include them in job status responses.
+    - [x] Record visited URLs/IDs during each crawl job and include them in job status responses.
     - [ ] Provide lightweight endpoints to fetch page snapshots by job or by ID list.
 2.  **Plugin Rendering:**
     - [ ] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
