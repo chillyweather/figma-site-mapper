@@ -1,8 +1,7 @@
 import { BadgeLink } from "../types";
-import { BADGE_COLORS } from "../constants";
 
 /**
- * Scan current Figma page for badge-with-link elements (only internal links)
+ * Scan current Figma page for badge-with-link elements
  */
 export async function scanForBadgeLinks(): Promise<BadgeLink[]> {
   const badgeLinks: BadgeLink[] = [];
@@ -16,14 +15,10 @@ export async function scanForBadgeLinks(): Promise<BadgeLink[]> {
     );
 
     for (const group of badgeGroups) {
-      if (group.type === "GROUP") {
-        const isInternal = checkIfInternalBadge(group);
+      if (group.type !== "GROUP") continue;
 
-        if (!isInternal) continue;
-
-        const links = extractLinksFromBadge(group);
-        badgeLinks.push(...links);
-      }
+      const links = extractLinksFromBadge(group);
+      badgeLinks.push(...links);
     }
 
     console.log(`Found ${badgeLinks.length} internal badge links`);
@@ -32,40 +27,6 @@ export async function scanForBadgeLinks(): Promise<BadgeLink[]> {
     console.error("Error scanning for badge links:", error);
     return [];
   }
-}
-
-/**
- * Check if badge is for an internal link (orange badge)
- */
-function checkIfInternalBadge(group: GroupNode): boolean {
-  const ellipseNodes = group.findAll(
-    (node: SceneNode) => node.type === "ELLIPSE"
-  );
-
-  for (const node of ellipseNodes) {
-    if (
-      node.type === "ELLIPSE" &&
-      node.fills &&
-      Array.isArray(node.fills) &&
-      node.fills.length > 0
-    ) {
-      const fill = node.fills[0];
-      if (fill.type === "SOLID") {
-        const color = fill.color;
-        const internal = BADGE_COLORS.INTERNAL;
-
-        if (
-          Math.abs(color.r - internal.r) < 0.1 &&
-          Math.abs(color.g - internal.g) < 0.1 &&
-          Math.abs(color.b - internal.b) < 0.1
-        ) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
 }
 
 /**

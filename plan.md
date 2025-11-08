@@ -110,11 +110,11 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 **Goal:** Build the new on-demand workflows using the database.
 
 1.  **"Markup" Tab:**
-    - [ ] Create `MarkupTab.tsx` with element-type filter controls (buttons/links, inputs, etc.) scoped to the currently open screenshot page, and add it to `MainView.tsx`.
-    - [ ] Persist Mongo `pageId` on manifest tree nodes and screenshot pages so the plugin can identify the active page during markup rendering.
-    - [ ] Enhance `pageEventHandlers.ts` to watch Figma selection/current page changes, surface whether a screenshot page with a stored `pageId` is active, and enable/disable the Markup CTA accordingly.
-    - [ ] Implement `src/plugin/handlers/markupHandler.ts` that reads the active page + requested element categories, fetches highlight data from `GET /elements`, and draws the overlay rectangles/badges in place (re-using the previous highlight logic).
-    - [ ] Ensure rendered link highlights retain destination metadata for downstream flow-building.
+    - [x] Create `MarkupTab.tsx` with element-type filter controls (buttons/links, inputs, etc.) scoped to the currently open screenshot page, and add it to `MainView.tsx`.
+    - [x] Persist Mongo `pageId` on manifest tree nodes and screenshot pages so the plugin can identify the active page during markup rendering.
+    - [x] Enhance `pageEventHandlers.ts` to watch Figma selection/current page changes, surface whether a screenshot page with a stored `pageId` is active, and enable/disable the Markup CTA accordingly.
+    - [x] Implement `src/plugin/handlers/markupHandler.ts` that reads the active page + requested element categories, fetches highlight data from `GET /elements`, and draws the overlay rectangles/badges in place (re-using the previous highlight logic).
+    - [x] Ensure rendered link highlights retain destination metadata for downstream flow-building.
 2.  **"Flows" Tab Update:**
     - [ ] Refactor `flowHandlers.ts` to use the "Check DB first" logic.
     - [ ] `const page = await apiClient.getPage(url, activeProjectId);`
