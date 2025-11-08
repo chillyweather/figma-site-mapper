@@ -42,10 +42,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
         placeholder="https://example.com"
         required
         disabled={
-          isLoading ||
-          isRenderingSnapshot ||
-          !!jobId ||
-          !projectSelected
+          isLoading || isRenderingSnapshot || !!jobId || !projectSelected
         }
         style={{
           width: "100%",
@@ -74,18 +71,15 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
             : isRenderingSnapshot
               ? "Rendering Snapshot..."
               : !projectSelected
-              ? "Select a Project"
-              : "Start Crawl"}
+                ? "Select a Project"
+                : "Start Crawl"}
       </button>
 
       <button
         id="render-snapshot-button"
         onClick={handleRenderSnapshot}
         disabled={
-          isLoading ||
-          isRenderingSnapshot ||
-          !!jobId ||
-          !projectSelected
+          isLoading || isRenderingSnapshot || !!jobId || !projectSelected
         }
         style={{
           width: "100%",
@@ -96,7 +90,9 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           border: "none",
         }}
       >
-        {isRenderingSnapshot ? "Rendering Snapshot..." : "Render Project Snapshot"}
+        {isRenderingSnapshot
+          ? "Rendering Snapshot..."
+          : "Render Project Snapshot"}
       </button>
     </div>
 

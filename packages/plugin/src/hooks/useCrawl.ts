@@ -120,9 +120,7 @@ export function useCrawl() {
     }
 
     try {
-      const screenshotWidth = parseScreenshotWidth(
-        settings.screenshotWidth
-      );
+      const screenshotWidth = parseScreenshotWidth(settings.screenshotWidth);
 
       setIsRenderingSnapshot(true);
       setStatus("Rendering project snapshot...");

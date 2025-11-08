@@ -211,15 +211,37 @@ function transformElement(record: ElementRecord): ExtractedElement | null {
   };
 }
 
-function sortPages(pages: PageRecord[]): PageRecord[] {
+function sortPages(pages: PageRecord[], startUrl?: string): PageRecord[] {
+  const canonicalStart = startUrl ? canonicalizeUrl(startUrl) : null;
+
   return pages.slice().sort((a, b) => {
-    const aTs = a.createdAt ? Date.parse(a.createdAt) : 0;
-    const bTs = b.createdAt ? Date.parse(b.createdAt) : 0;
-    if (!Number.isNaN(aTs) && !Number.isNaN(bTs) && aTs !== bTs) {
-      return aTs - bTs;
+    const aUrl = canonicalizeUrl(a.url);
+    const bUrl = canonicalizeUrl(b.url);
+
+    if (canonicalStart) {
+      const aIsStart = aUrl === canonicalStart;
+      const bIsStart = bUrl === canonicalStart;
+      if (aIsStart && !bIsStart) {
+        return -1;
+      }
+      if (bIsStart && !aIsStart) {
+        return 1;
+      }
     }
-    return a.title.localeCompare(b.title);
+
+    return aUrl.localeCompare(bUrl);
   });
+}
+
+function sortTreeChildrenByUrl(node: TreeNode | null): void {
+  if (!node || !Array.isArray(node.children) || node.children.length === 0) {
+    return;
+  }
+
+  node.children.sort((a, b) => a.url.localeCompare(b.url));
+  for (const child of node.children) {
+    sortTreeChildrenByUrl(child);
+  }
 }
 
 function buildTreeFromPages(
@@ -234,7 +256,9 @@ function buildTreeFromPages(
   }
 
   const canonicalStartUrl = canonicalizeUrl(startUrl);
-  const sortedPages = preserveOrder ? pages.slice() : sortPages(pages);
+  const sortedPages = preserveOrder
+    ? pages.slice()
+    : sortPages(pages, canonicalStartUrl);
   const nodeMap = new Map<string, TreeNode & { children: TreeNode[] }>();
 
   for (const page of sortedPages) {
@@ -312,6 +336,10 @@ function buildTreeFromPages(
     } else {
       root.children.push(node);
     }
+  }
+
+  if (!preserveOrder) {
+    sortTreeChildrenByUrl(root);
   }
 
   return root;
