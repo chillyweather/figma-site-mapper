@@ -115,7 +115,9 @@ export async function renderTargetPage(
     try {
       const urlToPersist = pageData.url || manifestData.startUrl;
       flowPage.setPluginData("URL", urlToPersist);
-      console.log(`🧭 Stored URL=${urlToPersist} on flow page ${flowPage.name}`);
+      console.log(
+        `🧭 Stored URL=${urlToPersist} on flow page ${flowPage.name}`
+      );
     } catch (error) {
       console.warn("Unable to persist URL on flow page", error);
     }
@@ -136,8 +138,7 @@ export async function renderTargetPage(
     }
 
     try {
-      const originalWidth =
-        options?.originalViewportWidth ?? screenshotWidth;
+      const originalWidth = options?.originalViewportWidth ?? screenshotWidth;
       flowPage.setPluginData("ORIGINAL_VIEWPORT_WIDTH", String(originalWidth));
       console.log(
         `🧭 Stored ORIGINAL_VIEWPORT_WIDTH=${originalWidth} on flow page ${flowPage.name}`
@@ -166,7 +167,11 @@ export async function renderTargetPage(
     pageData.interactiveElements &&
     pageData.interactiveElements.length > 0
   ) {
-    await addInteractiveElementsOverlay(targetFrame, pageData, overlayContainer);
+    await addInteractiveElementsOverlay(
+      targetFrame,
+      pageData,
+      overlayContainer
+    );
   } else {
     console.log("🧭 Skipping interactive overlay population for target page");
   }
