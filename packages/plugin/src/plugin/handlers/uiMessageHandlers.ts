@@ -576,6 +576,7 @@ async function handleRenderProjectSnapshot(msg: {
       startUrl,
       {
         detectInteractiveElements,
+        preservePageOrder: true,
       }
     );
 

@@ -229,6 +229,13 @@ function sortPages(pages: PageRecord[], startUrl?: string): PageRecord[] {
       }
     }
 
+    const aDepth = new URL(aUrl).pathname.split('/').filter(Boolean).length;
+    const bDepth = new URL(bUrl).pathname.split('/').filter(Boolean).length;
+    
+    if (aDepth !== bDepth) {
+      return aDepth - bDepth;
+    }
+
     return aUrl.localeCompare(bUrl);
   });
 }
@@ -403,13 +410,14 @@ function assembleManifestData(
 export async function buildManifestFromProject(
   projectId: string,
   startUrl: string,
-  options: { detectInteractiveElements: boolean }
+  options: { detectInteractiveElements: boolean; preservePageOrder?: boolean }
 ): Promise<{ tree: TreeNode | null; projectId: string; startUrl: string }> {
   const pages = (await fetchProjectPages(projectId)) as PageRecord[];
   const elements = (await fetchProjectElements(projectId)) as ElementRecord[];
 
   return assembleManifestData(projectId, startUrl, pages, elements, {
     detectInteractiveElements: options.detectInteractiveElements,
+    preservePageOrder: options.preservePageOrder,
   });
 }
 
