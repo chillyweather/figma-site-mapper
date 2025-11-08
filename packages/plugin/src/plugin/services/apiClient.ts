@@ -48,6 +48,21 @@ interface ElementResponseItem {
   alt?: string;
 }
 
+interface GetPageOptions {
+  url?: string;
+  pageId?: string;
+}
+
+interface RecrawlParams {
+  url: string;
+  projectId: string;
+  deviceScaleFactor?: number;
+  delay?: number;
+  requestDelay?: number;
+  auth?: CrawlParams["auth"];
+  styleExtraction?: CrawlParams["styleExtraction"];
+}
+
 /**
  * Start a crawl job on the backend
  */
@@ -77,6 +92,36 @@ export async function startCrawl(
       projectId: params.projectId,
     }),
   });
+
+  return response.json();
+}
+
+/**
+ * Recrawl a single page
+ */
+export async function recrawlPage(
+  params: RecrawlParams
+): Promise<{ jobId: string }> {
+  const response = await fetch(`${BACKEND_URL}/recrawl-page`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: params.url,
+      publicUrl: BACKEND_URL,
+      projectId: params.projectId,
+      deviceScaleFactor: params.deviceScaleFactor || 1,
+      delay: params.delay || 0,
+      requestDelay: params.requestDelay || 1000,
+      auth: params.auth,
+      styleExtraction: params.styleExtraction,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to queue recrawl: ${response.status} ${response.statusText}`
+    );
+  }
 
   return response.json();
 }
@@ -136,6 +181,46 @@ export async function fetchProjectElements(
 
   const data = await response.json();
   return Array.isArray(data.elements) ? data.elements : [];
+}
+
+/**
+ * Fetch a single page by url or pageId
+ */
+export async function getPage(
+  projectId: string,
+  options: GetPageOptions = {}
+): Promise<PageResponseItem | null> {
+  const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
+  if (options.url) {
+    queryParts.push(`url=${encodeURIComponent(options.url)}`);
+  }
+  if (options.pageId) {
+    queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
+  }
+
+  const response = await fetch(`${BACKEND_URL}/page?${queryParts.join("&")}`);
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch page: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  if (data && data.page) {
+    return data.page as PageResponseItem;
+  }
+
+  const pages = Array.isArray(data.pages) ? data.pages : [];
+  if (pages.length > 0) {
+    return pages[0] as PageResponseItem;
+  }
+
+  return null;
 }
 
 interface PagesByIdsResponse {

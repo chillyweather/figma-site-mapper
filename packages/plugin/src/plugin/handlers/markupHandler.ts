@@ -10,6 +10,7 @@ import {
 } from "../../utils/elementCategorization";
 import { ELEMENT_HIGHLIGHT_COLORS } from "../../figmaRendering/utils/createScreenshotPages";
 import type { ElementFilters, ElementType } from "../../types";
+import { updateMappingTab } from "../services/badgeScanner";
 
 type RenderMarkupRequest = {
   projectId: string | null;
@@ -375,6 +376,8 @@ export async function handleRenderMarkupRequest({
         error instanceof Error ? error.message : "Unable to render highlights.",
     });
     figma.notify("Failed to render highlights.", { error: true });
+  } finally {
+    await updateMappingTab();
   }
 }
 
@@ -424,6 +427,8 @@ export async function handleClearMarkupRequest({
   while (markupContainer.children.length > 0) {
     markupContainer.children[0].remove();
   }
+
+  await updateMappingTab();
 
   figma.ui.postMessage({
     type: "markup-clear-complete",
