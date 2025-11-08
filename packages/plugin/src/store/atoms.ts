@@ -17,6 +17,7 @@ export const currentViewAtom = atom<"main" | "settings" | "styling">("main");
 
 // Crawl state atoms
 export const isLoadingAtom = atom(false);
+export const isRenderingSnapshotAtom = atom(false);
 export const statusAtom = atom("");
 export const jobIdAtom = atom<string | null>(null);
 export const authStatusAtom = atom<

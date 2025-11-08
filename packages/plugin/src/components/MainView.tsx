@@ -36,6 +36,8 @@ export const MainView: React.FC<MainViewProps> = ({
   manifestData: _manifestData,
   selectedPageUrl: _selectedPageUrl,
   onPageSelection: _onPageSelection,
+  handleRenderSnapshot,
+  isRenderingSnapshot,
 }) => {
   const [activeTab, setActiveTab] = useState<
     "crawling" | "flows" | "styling" | "tokens"
@@ -342,10 +344,12 @@ export const MainView: React.FC<MainViewProps> = ({
               isLoading={isLoading}
               jobId={jobId}
               handleSubmit={handleSubmit}
+              handleRenderSnapshot={handleRenderSnapshot}
               status={status}
               handleClose={handleClose}
               crawlProgress={crawlProgress}
               projectSelected={projectSelected}
+              isRenderingSnapshot={isRenderingSnapshot}
             />
           )}
 

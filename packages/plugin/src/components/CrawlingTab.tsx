@@ -9,10 +9,12 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   isLoading,
   jobId,
   handleSubmit,
+  handleRenderSnapshot,
   status,
   handleClose,
   crawlProgress,
   projectSelected,
+  isRenderingSnapshot,
 }) => (
   <div id="crawling-tab" style={{ padding: "0 16px 16px 16px" }}>
     {!projectSelected && (
@@ -39,7 +41,12 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
         onChange={handleUrlChange}
         placeholder="https://example.com"
         required
-        disabled={isLoading || !!jobId || !projectSelected}
+        disabled={
+          isLoading ||
+          isRenderingSnapshot ||
+          !!jobId ||
+          !projectSelected
+        }
         style={{
           width: "100%",
           padding: "8px",
@@ -51,16 +58,45 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
       <button
         id="start-crawl-button"
         onClick={handleSubmit}
-        disabled={isLoading || !!jobId || !url.trim() || !projectSelected}
+        disabled={
+          isLoading ||
+          isRenderingSnapshot ||
+          !!jobId ||
+          !url.trim() ||
+          !projectSelected
+        }
         style={{ width: "100%", padding: "8px 16px", marginBottom: "8px" }}
       >
         {isLoading
           ? "Starting..."
           : jobId
             ? "Crawl in Progress"
-            : !projectSelected
+            : isRenderingSnapshot
+              ? "Rendering Snapshot..."
+              : !projectSelected
               ? "Select a Project"
               : "Start Crawl"}
+      </button>
+
+      <button
+        id="render-snapshot-button"
+        onClick={handleRenderSnapshot}
+        disabled={
+          isLoading ||
+          isRenderingSnapshot ||
+          !!jobId ||
+          !projectSelected
+        }
+        style={{
+          width: "100%",
+          padding: "8px 16px",
+          marginBottom: "8px",
+          backgroundColor: isRenderingSnapshot ? "#adb5bd" : "#343a40",
+          color: "white",
+          border: "none",
+        }}
+      >
+        {isRenderingSnapshot ? "Rendering Snapshot..." : "Render Project Snapshot"}
       </button>
     </div>
 

@@ -103,7 +103,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
     - [x] Cache the last job subset locally for quick re-renders.
 3.  **Snapshot Control:**
-    - [ ] Expose a "Render project snapshot" button that invokes the full-project manifest when needed.
+    - [x] Expose a "Render project snapshot" button that invokes the full-project manifest when needed.
 
 ## Phase 5: New Feature Implementation
 

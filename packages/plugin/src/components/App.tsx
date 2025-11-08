@@ -21,8 +21,16 @@ import { ElementFilters } from "../types";
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
   const { settings, updateSetting } = useSettings();
-  const { isLoading, status, jobId, authStatus, handleSubmit, crawlProgress } =
-    useCrawl();
+  const {
+    isLoading,
+    isRenderingSnapshot,
+    status,
+    jobId,
+    authStatus,
+    handleSubmit,
+    handleRenderSnapshot,
+    crawlProgress,
+  } = useCrawl();
   const {
     projects,
     activeProjectId,
@@ -487,6 +495,8 @@ export const App: React.FC = () => {
       manifestData={manifestData}
       selectedPageUrl={selectedPageUrl}
       onPageSelection={handlePageSelection}
+      handleRenderSnapshot={handleRenderSnapshot}
+      isRenderingSnapshot={isRenderingSnapshot}
     />
   );
 };

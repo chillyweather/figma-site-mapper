@@ -8,6 +8,7 @@ import {
   crawlProgressAtom,
   manifestDataAtom,
   activeProjectIdAtom,
+  isRenderingSnapshotAtom,
 } from "../store/atoms";
 import { useSettings } from "./useSettings";
 import {
@@ -28,6 +29,9 @@ export function useCrawl() {
   const [jobId, setJobId] = useAtom(jobIdAtom);
   const [authStatus, setAuthStatus] = useAtom(authStatusAtom);
   const [crawlProgress, setCrawlProgress] = useAtom(crawlProgressAtom);
+  const [isRenderingSnapshot, setIsRenderingSnapshot] = useAtom(
+    isRenderingSnapshotAtom
+  );
   const setManifestData = useSetAtom(manifestDataAtom);
   const activeProjectId = useAtomValue(activeProjectIdAtom);
   const intervalRef = useRef<number | null>(null);
@@ -108,6 +112,51 @@ export function useCrawl() {
     },
     [settings, setIsLoading, setStatus, activeProjectId]
   );
+
+  const handleRenderSnapshot = useCallback(async () => {
+    if (!activeProjectId) {
+      setStatus("Select or create a project before rendering a snapshot.");
+      return;
+    }
+
+    try {
+      const screenshotWidth = parseScreenshotWidth(
+        settings.screenshotWidth
+      );
+
+      setIsRenderingSnapshot(true);
+      setStatus("Rendering project snapshot...");
+      setCrawlProgress({
+        status: "rendering",
+        message: "Rendering project snapshot...",
+        progress: 5,
+      });
+
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "render-project-snapshot",
+            projectId: activeProjectId,
+            startUrl: settings.url.trim(),
+            screenshotWidth,
+            detectInteractiveElements: settings.detectInteractiveElements,
+          },
+        },
+        "*"
+      );
+    } catch (error: any) {
+      setIsRenderingSnapshot(false);
+      setStatus(`Snapshot error: ${error.message || "Invalid configuration"}`);
+    }
+  }, [
+    activeProjectId,
+    setStatus,
+    settings.screenshotWidth,
+    settings.url,
+    settings.detectInteractiveElements,
+    setIsRenderingSnapshot,
+    setCrawlProgress,
+  ]);
 
   // Listen for crawl started message
   useEffect(() => {
@@ -216,11 +265,88 @@ export function useCrawl() {
         console.log("Received manifest data:", msg.manifestData);
         setManifestData(msg.manifestData);
       }
+
+      if (msg.type === "snapshot-render-started") {
+        setIsRenderingSnapshot(true);
+        setStatus("Rendering project snapshot...");
+        setCrawlProgress({
+          status: "rendering",
+          message: "Rendering project snapshot...",
+          progress: 5,
+        });
+      }
+
+      if (msg.type === "snapshot-status") {
+        const detailed = msg.detailedProgress;
+        const message = detailed?.stage
+          ? `Snapshot: ${detailed.stage}`
+          : `Snapshot status: ${msg.status || "rendering"}`;
+        const progress = detailed?.progress ?? msg.progress ?? 0;
+
+        setStatus(message);
+        setCrawlProgress((prev) => ({
+          status: "rendering",
+          message,
+          progress: typeof progress === "number" ? progress : prev.progress,
+          currentPage: detailed?.currentPage,
+          totalPages: detailed?.totalPages,
+          currentUrl: detailed?.currentUrl,
+          stage: detailed?.stage,
+        }));
+      }
+
+      if (msg.type === "snapshot-completed") {
+        setIsRenderingSnapshot(false);
+        const message = msg.message || "Project snapshot rendered.";
+        setStatus(message);
+        setCrawlProgress({
+          status: "complete",
+          message,
+          progress: 100,
+        });
+
+        setTimeout(() => {
+          setCrawlProgress({
+            status: "idle",
+            message: "",
+            progress: 0,
+          });
+        }, 3000);
+      }
+
+      if (msg.type === "snapshot-error") {
+        setIsRenderingSnapshot(false);
+        const errorMessage = msg.error
+          ? `Snapshot error: ${msg.error}`
+          : "Snapshot rendering failed.";
+        setStatus(errorMessage);
+        setCrawlProgress({
+          status: "error",
+          message: errorMessage,
+          progress: 100,
+        });
+
+        setTimeout(() => {
+          setCrawlProgress({
+            status: "idle",
+            message: "",
+            progress: 0,
+          });
+        }, 4000);
+      }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [setStatus, setJobId, setIsLoading, setCrawlProgress, setManifestData]);
+  }, [
+    setStatus,
+    setJobId,
+    setIsLoading,
+    setCrawlProgress,
+    setManifestData,
+    setIsRenderingSnapshot,
+    setAuthStatus,
+  ]);
 
   // Start polling when jobId is set
   useEffect(() => {
@@ -243,10 +369,12 @@ export function useCrawl() {
 
   return {
     isLoading,
+    isRenderingSnapshot,
     status,
     jobId,
     authStatus,
     handleSubmit,
+    handleRenderSnapshot,
     crawlProgress,
   };
 }

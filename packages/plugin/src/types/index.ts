@@ -321,10 +321,12 @@ export interface CrawlingTabProps {
   isLoading: boolean;
   jobId: string | null;
   handleSubmit: (e: React.FormEvent) => void;
+  handleRenderSnapshot: () => void;
   status: string;
   handleClose: () => void;
   crawlProgress: CrawlProgress;
   projectSelected: boolean;
+  isRenderingSnapshot: boolean;
 }
 
 export interface MappingTabProps {
@@ -346,6 +348,8 @@ export interface MappingTabProps {
   manifestData: any;
   selectedPageUrl: string;
   onPageSelection: (pageUrl: string) => void;
+  handleRenderSnapshot: () => void;
+  isRenderingSnapshot: boolean;
 }
 
 export interface FocusedInputProps {

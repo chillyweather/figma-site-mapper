@@ -498,6 +498,161 @@ async function handleSetActiveProject(projectId: string | null): Promise<void> {
   }
 }
 
+async function handleRenderProjectSnapshot(msg: {
+  projectId?: string | null;
+  startUrl?: string;
+  screenshotWidth?: number;
+  detectInteractiveElements?: boolean;
+}): Promise<void> {
+  const resolvedProjectId = msg.projectId
+    ? msg.projectId
+    : await getActiveProjectId();
+
+  if (!resolvedProjectId) {
+    figma.ui.postMessage({
+      type: "snapshot-error",
+      error: "Select a project before rendering a snapshot.",
+    });
+    figma.notify("Select a project before rendering a snapshot.", {
+      error: true,
+    });
+    return;
+  }
+
+  let startUrl = typeof msg.startUrl === "string" ? msg.startUrl.trim() : "";
+
+  if (!startUrl) {
+    try {
+      const storedStartUrl = await figma.clientStorage.getAsync("lastStartUrl");
+      if (typeof storedStartUrl === "string" && storedStartUrl.length > 0) {
+        startUrl = storedStartUrl;
+      }
+    } catch (error) {
+      console.warn("Failed to load last start URL for snapshot", error);
+    }
+  }
+
+  if (!startUrl) {
+    figma.ui.postMessage({
+      type: "snapshot-error",
+      error: "No start URL available for this project.",
+    });
+    figma.notify("Provide a start URL before rendering a snapshot.", {
+      error: true,
+    });
+    return;
+  }
+
+  let screenshotWidth =
+    typeof msg.screenshotWidth === "number" &&
+    Number.isFinite(msg.screenshotWidth) &&
+    msg.screenshotWidth > 0
+      ? msg.screenshotWidth
+      : parseInt(DEFAULT_SETTINGS.screenshotWidth, 10);
+
+  if (!Number.isFinite(screenshotWidth) || screenshotWidth <= 0) {
+    screenshotWidth = 1440;
+  }
+
+  const detectInteractiveElements =
+    msg.detectInteractiveElements !== undefined
+      ? !!msg.detectInteractiveElements
+      : true;
+
+  figma.ui.postMessage({ type: "snapshot-render-started" });
+
+  try {
+    figma.ui.postMessage({
+      type: "snapshot-status",
+      status: "fetching",
+      detailedProgress: {
+        stage: "Fetching project data...",
+        progress: 5,
+      },
+    });
+
+    const manifestData = await buildManifestFromProject(
+      resolvedProjectId,
+      startUrl,
+      {
+        detectInteractiveElements,
+      }
+    );
+
+    if (!manifestData.tree) {
+      figma.ui.postMessage({
+        type: "snapshot-error",
+        error: "No pages available to render.",
+      });
+      figma.notify("No pages available to render for this project.", {
+        error: true,
+      });
+      return;
+    }
+
+    await figma.clientStorage.setAsync("lastProjectId", resolvedProjectId);
+    await figma.clientStorage.setAsync("lastStartUrl", startUrl);
+    await figma.clientStorage.setAsync(
+      "lastDetectInteractiveElements",
+      detectInteractiveElements
+    );
+    await figma.clientStorage.setAsync("lastJobSubset", null);
+
+    figma.ui.postMessage({
+      type: "manifest-data",
+      manifestData,
+    });
+
+    let highlightAllElements = false;
+    let highlightElementFilters = null as null | Record<string, any>;
+
+    try {
+      const storedSettings = await figma.clientStorage.getAsync("settings");
+      const mergedSettings = storedSettings
+        ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
+        : DEFAULT_SETTINGS;
+      highlightAllElements = !!mergedSettings.highlightAllElements;
+      highlightElementFilters = mergedSettings.highlightElementFilters || null;
+    } catch (error) {
+      console.warn("Unable to load highlight settings for snapshot", error);
+    }
+
+    hasRenderedSitemap = true;
+
+    await renderSitemap(
+      manifestData,
+      screenshotWidth,
+      detectInteractiveElements,
+      highlightAllElements,
+      (stage: string, progress: number) => {
+        figma.ui.postMessage({
+          type: "snapshot-status",
+          status: "rendering",
+          detailedProgress: {
+            stage,
+            progress,
+          },
+        });
+      },
+      highlightElementFilters
+    );
+
+    figma.ui.postMessage({
+      type: "snapshot-completed",
+      message: "Project snapshot rendered successfully!",
+    });
+    figma.notify("Project snapshot rendered successfully!");
+  } catch (error) {
+    hasRenderedSitemap = false;
+    console.error("Failed to render project snapshot", error);
+    figma.ui.postMessage({
+      type: "snapshot-error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    figma.notify("Error: Failed to render project snapshot.", { error: true });
+  }
+}
+
 /**
  * Handle save-settings message from UI
  */
@@ -921,6 +1076,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "set-active-project":
       await handleSetActiveProject(msg.projectId || null);
+      break;
+
+    case "render-project-snapshot":
+      await handleRenderProjectSnapshot(msg);
       break;
 
     case "close":
