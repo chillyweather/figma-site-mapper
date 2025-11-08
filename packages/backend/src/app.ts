@@ -9,6 +9,7 @@ import { Types } from "mongoose";
 import { Project } from "./models/Project.js";
 import { Page } from "./models/Page.js";
 import { Element } from "./models/Element.js";
+import { buildManifestForPageIds } from "./services/manifestBuilder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -147,6 +148,63 @@ export async function buildServer(): Promise<FastifyInstance> {
         lastCompletedAt: jobData.lastCompletedAt ?? null,
       },
     };
+  });
+
+  server.get("/jobs/:jobId/pages", async (request, reply) => {
+    const { jobId } = request.params as { jobId: string };
+
+    const job = await crawlQueue.getJob(jobId);
+    if (!job) {
+      return reply.status(404).send({ error: "Job not found" });
+    }
+
+    const jobState = await job.getState();
+    if (jobState !== "completed") {
+      return reply.status(409).send({
+        error: "Job has not completed",
+        state: jobState,
+      });
+    }
+
+    const jobData = job.data as any;
+    const projectId = jobData.projectId;
+    if (!projectId || !Types.ObjectId.isValid(projectId)) {
+      return reply.status(400).send({
+        error: "Job is missing a valid projectId",
+      });
+    }
+
+    const visitedPageIds: string[] = Array.isArray(jobData.visitedPageIds)
+      ? jobData.visitedPageIds.filter(
+          (value: unknown): value is string => typeof value === "string"
+        )
+      : [];
+
+    if (visitedPageIds.length === 0) {
+      return {
+        jobId,
+        projectId,
+        pages: [],
+        elements: [],
+      };
+    }
+
+    try {
+      const manifest = await buildManifestForPageIds(projectId, visitedPageIds);
+      return {
+        jobId,
+        projectId,
+        pages: manifest.pages,
+        elements: manifest.elements,
+      };
+    } catch (error) {
+      request.log.error(
+        `Failed to build manifest for job ${jobId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return reply.status(500).send({
+        error: "Failed to load job pages",
+      });
+    }
   });
 
   server.post("/crawl", async (request, reply) => {
@@ -350,6 +408,49 @@ export async function buildServer(): Promise<FastifyInstance> {
       return reply.status(500).send({
         error: "Failed to open authentication session",
         message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  server.get("/pages/by-ids", async (request, reply) => {
+    const { projectId, ids } = request.query as {
+      projectId?: string;
+      ids?: string | string[];
+    };
+
+    if (!projectId) {
+      return reply.status(400).send({ error: "projectId is required" });
+    }
+
+    if (!Types.ObjectId.isValid(projectId)) {
+      return reply.status(400).send({ error: "Invalid projectId" });
+    }
+
+    let idList: string[] = [];
+    if (Array.isArray(ids)) {
+      idList = ids.filter(
+        (value): value is string => typeof value === "string"
+      );
+    } else if (typeof ids === "string") {
+      idList = ids
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+    }
+
+    if (idList.length === 0) {
+      return { pages: [], elements: [] };
+    }
+
+    try {
+      const manifest = await buildManifestForPageIds(projectId, idList);
+      return manifest;
+    } catch (error) {
+      request.log.error(
+        `Failed to fetch pages by ids: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return reply.status(500).send({
+        error: "Failed to fetch pages",
       });
     }
   });

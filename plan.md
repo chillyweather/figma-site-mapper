@@ -98,7 +98,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
 
 1.  **Backend Tracking & APIs:**
     - [x] Record visited URLs/IDs during each crawl job and include them in job status responses.
-    - [ ] Provide lightweight endpoints to fetch page snapshots by job or by ID list.
+          [x] Provide lightweight endpoints to fetch page snapshots by job or by ID list.
 2.  **Plugin Rendering:**
     - [ ] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
     - [ ] Cache the last job subset locally for quick re-renders.

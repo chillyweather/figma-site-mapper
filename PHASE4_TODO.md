@@ -4,8 +4,8 @@
 
 - [x] Capture `visitedUrls` and `visitedPageIds` inside the crawler/worker and include them in job completion data.
 - [x] Extend `/status/:jobId` to surface the new job fields and expose page counts.
-- [ ] Add lightweight endpoints for job-scoped page retrieval (`GET /jobs/:jobId/pages`) and arbitrary ID lookups (`GET /pages/by-ids`).
-- [ ] Create a shared manifest builder that accepts a list of page IDs.
+- [x] Add lightweight endpoints for job-scoped page retrieval (`GET /jobs/:jobId/pages`) and arbitrary ID lookups (`GET /pages/by-ids`).
+- [x] Create a shared manifest builder that accepts a list of page IDs.
 
 ## Plugin Rendering
 
