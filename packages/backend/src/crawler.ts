@@ -1581,7 +1581,7 @@ export async function runCrawler(
         const nearLimit =
           maxRequestsPerCrawl &&
           maxRequestsPerCrawl > 0 &&
-          currentPage >= maxRequestsPerCrawl - 1;
+          currentPage >= maxRequestsPerCrawl;
 
         if (
           !shouldTerminate() &&
