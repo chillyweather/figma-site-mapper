@@ -391,6 +391,9 @@ export async function buildManifestFromPageIds(
   pageIds: string[],
   options: { detectInteractiveElements: boolean }
 ): Promise<{ tree: TreeNode | null; projectId: string; startUrl: string }> {
+  console.log(`🔨 buildManifestFromPageIds called with ${pageIds.length} IDs`);
+  console.log(`🌐 Fetching pages from backend...`);
+
   const normalizedIds = (Array.isArray(pageIds) ? pageIds : [])
     .map((id) => String(id).trim())
     .filter((id) => id.length > 0);
@@ -401,13 +404,37 @@ export async function buildManifestFromPageIds(
 
   const response = await fetchPagesByIds(projectId, normalizedIds);
 
+  console.log(`📦 Received ${response.pages?.length || 0} pages from API`);
+  console.log(
+    `📝 Page URLs received:`,
+    response.pages?.map((p: PageRecord) => p.url) || []
+  );
+
   const pages = (response.pages || []) as PageRecord[];
   const elements = (response.elements || []) as ElementRecord[];
 
-  return assembleManifestData(projectId, startUrl, pages, elements, {
+  const result = assembleManifestData(projectId, startUrl, pages, elements, {
     detectInteractiveElements: options.detectInteractiveElements,
     preservePageOrder: true,
   });
+
+  // Count pages in tree
+  let pageCount = 0;
+  if (result.tree) {
+    const countPages = (node: TreeNode): number => {
+      let count = 1; // This node
+      if (node.children) {
+        for (const child of node.children) {
+          count += countPages(child);
+        }
+      }
+      return count;
+    };
+    pageCount = countPages(result.tree);
+  }
+  console.log(`🌲 Assembled tree contains ${pageCount} pages`);
+
+  return result;
 }
 
 export function buildManifestFromData(

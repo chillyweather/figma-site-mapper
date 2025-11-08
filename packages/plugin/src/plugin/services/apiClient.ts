@@ -163,12 +163,15 @@ export async function fetchPagesByIds(
     return { pages: [], elements: [] };
   }
 
-  const params = new URLSearchParams({ projectId });
+  // Build query string manually (URLSearchParams not available in Figma sandbox)
+  const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
   for (const id of normalizedIds) {
-    params.append("ids", id);
+    queryParts.push(`ids=${encodeURIComponent(id)}`);
   }
 
-  const response = await fetch(`${BACKEND_URL}/pages/by-ids?${params.toString()}`);
+  const response = await fetch(
+    `${BACKEND_URL}/pages/by-ids?${queryParts.join("&")}`
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -191,7 +194,9 @@ export async function fetchPagesByIds(
  * Fetch the manifest subset for a completed job.
  */
 export async function fetchJobPages(jobId: string): Promise<JobPagesResponse> {
-  const response = await fetch(`${BACKEND_URL}/jobs/${encodeURIComponent(jobId)}/pages`);
+  const response = await fetch(
+    `${BACKEND_URL}/jobs/${encodeURIComponent(jobId)}/pages`
+  );
 
   if (!response.ok) {
     throw new Error(

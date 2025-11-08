@@ -129,20 +129,80 @@ export async function handleGetStatus(
         jobId,
         status: "rendering",
         detailedProgress: {
-          stage: "Fetching crawl data...",
+          stage: hasSubsetPages
+            ? "Fetching job subset..."
+            : "Fetching crawl data...",
           progress: 5,
         },
       });
 
       try {
-        const manifestData = await buildManifestFromProject(
-          projectId,
-          startUrl,
-          {
-            detectInteractiveElements: detectInteractiveFromJob,
+        let manifestData: ManifestData | null = null;
+        let subsetUsed = false;
+
+        if (hasSubsetPages) {
+          try {
+            console.log(
+              `🔍 Attempting to build manifest from ${visitedPageIds.length} page IDs:`,
+              visitedPageIds
+            );
+            manifestData = await buildManifestFromPageIds(
+              projectId,
+              startUrl,
+              visitedPageIds,
+              {
+                detectInteractiveElements: detectInteractiveFromJob,
+              }
+            );
+            subsetUsed = true;
+            console.log(
+              `✅ Successfully built manifest from page subset (${visitedPageIds.length} pages)`
+            );
+            // Count actual pages in tree
+            let treePageCount = 0;
+            if (manifestData.tree) {
+              const countPages = (node: any): number => {
+                let count = 1;
+                if (node.children) {
+                  for (const child of node.children) {
+                    count += countPages(child);
+                  }
+                }
+                return count;
+              };
+              treePageCount = countPages(manifestData.tree);
+            }
+            console.log(`📊 Manifest tree contains ${treePageCount} pages`);
+          } catch (subsetError) {
+            subsetUsed = false;
+            manifestData = null;
+            console.error(
+              "❌ Failed to build manifest from job subset, falling back to full project"
+            );
+            console.error("Error details:", subsetError);
+            if (subsetError instanceof Error) {
+              console.error("Error stack:", subsetError.stack);
+            }
           }
-        );
-        console.log("Successfully built manifest from project data");
+        }
+
+        if (!manifestData) {
+          manifestData = await buildManifestFromProject(projectId, startUrl, {
+            detectInteractiveElements: detectInteractiveFromJob,
+          });
+          subsetUsed = false;
+          console.log("Successfully built manifest from project data");
+        }
+
+        if (subsetUsed && !manifestData.tree) {
+          console.warn(
+            "Subset manifest contained no pages, rebuilding from full project"
+          );
+          manifestData = await buildManifestFromProject(projectId, startUrl, {
+            detectInteractiveElements: detectInteractiveFromJob,
+          });
+          subsetUsed = false;
+        }
 
         if (!manifestData.tree) {
           figma.ui.postMessage({
@@ -166,8 +226,21 @@ export async function handleGetStatus(
         await figma.clientStorage.setAsync("lastJobId", jobId);
         await figma.clientStorage.setAsync(
           "lastDetectInteractiveElements",
-          detectInteractiveElements
+          detectInteractiveFromJob
         );
+        if (subsetUsed) {
+          await figma.clientStorage.setAsync("lastJobSubset", {
+            jobId,
+            projectId,
+            startUrl,
+            pageIds: visitedPageIds,
+            detectInteractiveElements: detectInteractiveFromJob,
+            storedAt: Date.now(),
+            manifestData,
+          });
+        } else {
+          await figma.clientStorage.setAsync("lastJobSubset", null);
+        }
         console.log("💾 Stored crawl metadata in clientStorage");
 
         figma.ui.postMessage({
