@@ -72,3 +72,29 @@ export const selectedPageUrlAtom = atom<string>("");
 // Project selection state
 export const projectsAtom = atom<Project[]>([]);
 export const activeProjectIdAtom = atom<string | null>(null);
+
+// Markup tab state
+export const markupFiltersAtom = atom<ElementFilters>({
+  headings: false,
+  buttons: true,
+  inputs: true,
+  textareas: false,
+  selects: false,
+  images: false,
+  links: true,
+  paragraphs: false,
+  divs: false,
+  other: false,
+});
+
+export const activeMarkupPageAtom = atom<
+  | {
+      pageId: string | null;
+      pageUrl: string | null;
+      pageName?: string;
+    }
+  | null
+>(null);
+
+export const isMarkupRenderingAtom = atom(false);
+export const markupStatusAtom = atom<string>("");

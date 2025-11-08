@@ -3,6 +3,7 @@ import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
+import { MarkupTab } from "./MarkupTab";
 import { ElementStylingTab } from "./ElementStylingTab";
 import { TokensTab } from "./TokensTab";
 
@@ -38,9 +39,18 @@ export const MainView: React.FC<MainViewProps> = ({
   onPageSelection: _onPageSelection,
   handleRenderSnapshot,
   isRenderingSnapshot,
+  markupFilters,
+  supportedMarkupFilters,
+  onMarkupFilterChange,
+  onRenderMarkup,
+  onClearMarkup,
+  isMarkupRendering,
+  markupStatus,
+  activeMarkupPage,
+  selectedMarkupFilterCount,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "flows" | "styling" | "tokens"
+    "crawling" | "flows" | "styling" | "markup" | "tokens"
   >("crawling");
   const [newProjectName, setNewProjectName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -279,6 +289,25 @@ export const MainView: React.FC<MainViewProps> = ({
               Crawling
             </button>
             <button
+              id="markup-tab-button"
+              onClick={() => setActiveTab("markup")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "markup" ? "600" : "400",
+                color: activeTab === "markup" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "markup"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Markup
+            </button>
+            <button
               id="flows-tab-button"
               onClick={() => setActiveTab("flows")}
               style={{
@@ -350,6 +379,20 @@ export const MainView: React.FC<MainViewProps> = ({
               crawlProgress={crawlProgress}
               projectSelected={projectSelected}
               isRenderingSnapshot={isRenderingSnapshot}
+            />
+          )}
+
+          {activeTab === "markup" && (
+            <MarkupTab
+              filters={markupFilters}
+              supportedFilters={supportedMarkupFilters}
+              onFilterChange={onMarkupFilterChange}
+              onRender={onRenderMarkup}
+              onClear={onClearMarkup}
+              isRendering={isMarkupRendering}
+              status={markupStatus}
+              activePage={activeMarkupPage}
+              selectedFilterCount={selectedMarkupFilterCount}
             />
           )}
 

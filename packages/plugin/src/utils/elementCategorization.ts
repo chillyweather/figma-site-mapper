@@ -66,7 +66,10 @@ export function categorizeElementType(
 /**
  * Maps ElementType to CategorizedElements keys
  */
-const elementTypeToCategoryKey: Record<ElementType, keyof CategorizedElements> =
+export const elementTypeToCategoryKey: Record<
+  ElementType,
+  keyof CategorizedElements
+> =
   {
     heading: "headings",
     button: "buttons",

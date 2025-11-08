@@ -104,6 +104,7 @@ export interface TreeNode {
   title: string;
   screenshot: string[];
   thumbnail: string;
+  pageId?: string;
   children: TreeNode[];
   interactiveElements?: InteractiveElement[];
   styleData?: {
@@ -313,6 +314,22 @@ export interface MainViewProps {
   manifestData: any;
   selectedPageUrl: string;
   onPageSelection: (pageUrl: string) => void;
+  markupFilters: ElementFilters;
+  supportedMarkupFilters: Array<keyof ElementFilters>;
+  onMarkupFilterChange: (
+    filter: keyof ElementFilters,
+    checked: boolean
+  ) => void;
+  onRenderMarkup: () => void;
+  onClearMarkup: () => void;
+  isMarkupRendering: boolean;
+  markupStatus: string;
+  activeMarkupPage: {
+    pageId: string | null;
+    pageUrl: string | null;
+    pageName?: string;
+  } | null;
+  selectedMarkupFilterCount: number;
 }
 
 export interface CrawlingTabProps {
@@ -327,6 +344,22 @@ export interface CrawlingTabProps {
   crawlProgress: CrawlProgress;
   projectSelected: boolean;
   isRenderingSnapshot: boolean;
+}
+
+export interface MarkupTabProps {
+  filters: ElementFilters;
+  supportedFilters: Array<keyof ElementFilters>;
+  onFilterChange: (filter: keyof ElementFilters, checked: boolean) => void;
+  onRender: () => void;
+  onClear: () => void;
+  isRendering: boolean;
+  status: string;
+  activePage: {
+    pageId: string | null;
+    pageUrl: string | null;
+    pageName?: string;
+  } | null;
+  selectedFilterCount: number;
 }
 
 export interface MappingTabProps {

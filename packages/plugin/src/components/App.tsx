@@ -12,6 +12,7 @@ import { useCrawl } from "../hooks/useCrawl";
 import { useFlowMapping } from "../hooks/useFlowMapping";
 import { useElementData } from "../hooks/useElementData";
 import { useProjects } from "../hooks/useProjects";
+import { useMarkup } from "../hooks/useMarkup";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
 import { StylingView } from "./StylingView";
@@ -58,6 +59,18 @@ export const App: React.FC = () => {
 
   const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
   const [categorizedElements] = useAtom(categorizedElementsAtom);
+
+  const {
+    filters: markupFilters,
+    activePage: activeMarkupPage,
+    isRendering: isMarkupRendering,
+    status: markupStatus,
+    handleFilterChange: handleMarkupFilterChange,
+    handleRenderMarkup,
+    handleClearMarkup,
+    supportedFilters: supportedMarkupFilters,
+    selectedFilterCount: selectedMarkupFilterCount,
+  } = useMarkup();
 
   // Element filter handler
   const handleElementFilterChange = useCallback(
@@ -497,6 +510,15 @@ export const App: React.FC = () => {
       onPageSelection={handlePageSelection}
       handleRenderSnapshot={handleRenderSnapshot}
       isRenderingSnapshot={isRenderingSnapshot}
+      markupFilters={markupFilters}
+      supportedMarkupFilters={supportedMarkupFilters}
+      onMarkupFilterChange={handleMarkupFilterChange}
+      onRenderMarkup={handleRenderMarkup}
+      onClearMarkup={handleClearMarkup}
+      isMarkupRendering={isMarkupRendering}
+      markupStatus={markupStatus}
+      activeMarkupPage={activeMarkupPage}
+      selectedMarkupFilterCount={selectedMarkupFilterCount}
     />
   );
 };

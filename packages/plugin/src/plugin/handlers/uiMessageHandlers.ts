@@ -23,6 +23,10 @@ import {
   buildManifestFromPageIds,
 } from "../utils/buildManifestFromProject";
 import type { ManifestData } from "../types";
+import {
+  handleRenderMarkupRequest,
+  handleClearMarkupRequest,
+} from "./markupHandler";
 
 /** Persist cookies for a domain */
 async function storeDomainCookies(
@@ -1082,6 +1086,25 @@ export async function handleUIMessage(msg: any): Promise<void> {
     case "render-project-snapshot":
       await handleRenderProjectSnapshot(msg);
       break;
+
+    case "render-markup": {
+      const projectId = await getActiveProjectId();
+      await handleRenderMarkupRequest({
+        projectId,
+        pageId: msg.pageId || null,
+        pageUrl: msg.pageUrl || null,
+        elementFilters: msg.elementFilters,
+      });
+      break;
+    }
+
+    case "clear-markup": {
+      await handleClearMarkupRequest({
+        pageId: msg.pageId || null,
+        pageUrl: msg.pageUrl || null,
+      });
+      break;
+    }
 
     case "close":
       handleClose();

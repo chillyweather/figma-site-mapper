@@ -176,7 +176,9 @@ function normalizePersistedInteractive(
     }));
 }
 
-function transformElement(record: ElementRecord): ExtractedElement | null {
+export function transformElement(
+  record: ElementRecord
+): ExtractedElement | null {
   const bbox = record.bbox;
   if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
     return null;
@@ -297,6 +299,7 @@ function buildTreeFromPages(
       title: page.title || canonicalUrl,
       screenshot: screenshotPaths,
       thumbnail: screenshotPaths[0] || "",
+      pageId: page._id,
       children: [],
       interactiveElements: interactive,
       styleData: {

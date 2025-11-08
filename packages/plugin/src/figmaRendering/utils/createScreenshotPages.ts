@@ -8,7 +8,7 @@ interface RGB {
   b: number;
 }
 
-const ELEMENT_HIGHLIGHT_COLORS: Record<ElementType, RGB> = {
+export const ELEMENT_HIGHLIGHT_COLORS: Record<ElementType, RGB> = {
   heading: { r: 111 / 255, g: 66 / 255, b: 193 / 255 }, // Purple #6F42C1
   button: { r: 40 / 255, g: 167 / 255, b: 69 / 255 }, // Green #28A745
   input: { r: 253 / 255, g: 126 / 255, b: 20 / 255 }, // Orange #FD7E14
@@ -594,6 +594,11 @@ export async function createScreenshotPages(
 
     newPage.name = page.title.substring(0, 50);
     newPage.setPluginData("URL", page.url);
+    if (page.pageId) {
+      newPage.setPluginData("PAGE_ID", page.pageId);
+    } else {
+      newPage.setPluginData("PAGE_ID", "");
+    }
     clearPageContents(newPage);
 
     pageIdMap.set(page.url, newPage.id);
@@ -756,6 +761,14 @@ export async function createScreenshotPages(
       const originalWidth = referenceShot?.width || screenshotWidth;
       const scaleFactor =
         originalWidth > 0 ? screenshotWidth / originalWidth : 1;
+
+      newPage.setPluginData("SCREENSHOT_WIDTH", String(screenshotWidth));
+      if (originalWidth && Number.isFinite(originalWidth)) {
+        newPage.setPluginData(
+          "ORIGINAL_VIEWPORT_WIDTH",
+          String(originalWidth)
+        );
+      }
 
       if (referenceShot) {
         console.log(
