@@ -87,14 +87,11 @@ export const markupFiltersAtom = atom<ElementFilters>({
   other: false,
 });
 
-export const activeMarkupPageAtom = atom<
-  | {
-      pageId: string | null;
-      pageUrl: string | null;
-      pageName?: string;
-    }
-  | null
->(null);
+export const activeMarkupPageAtom = atom<{
+  pageId: string | null;
+  pageUrl: string | null;
+  pageName?: string;
+} | null>(null);
 
 export const isMarkupRenderingAtom = atom(false);
 export const markupStatusAtom = atom<string>("");

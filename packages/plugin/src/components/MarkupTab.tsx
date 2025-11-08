@@ -106,9 +106,7 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
           width: "100%",
           padding: "10px 16px",
           backgroundColor:
-            !isPageReady || selectedFilterCount === 0
-              ? "#adb5bd"
-              : "#0066cc",
+            !isPageReady || selectedFilterCount === 0 ? "#adb5bd" : "#0066cc",
           border: "none",
           color: "white",
           fontSize: "12px",

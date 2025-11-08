@@ -231,9 +231,9 @@ function sortPages(pages: PageRecord[], startUrl?: string): PageRecord[] {
       }
     }
 
-    const aDepth = new URL(aUrl).pathname.split('/').filter(Boolean).length;
-    const bDepth = new URL(bUrl).pathname.split('/').filter(Boolean).length;
-    
+    const aDepth = new URL(aUrl).pathname.split("/").filter(Boolean).length;
+    const bDepth = new URL(bUrl).pathname.split("/").filter(Boolean).length;
+
     if (aDepth !== bDepth) {
       return aDepth - bDepth;
     }

@@ -7,9 +7,7 @@ import {
   categorizeElementType,
   elementTypeToCategoryKey,
 } from "../../utils/elementCategorization";
-import {
-  ELEMENT_HIGHLIGHT_COLORS,
-} from "../../figmaRendering/utils/createScreenshotPages";
+import { ELEMENT_HIGHLIGHT_COLORS } from "../../figmaRendering/utils/createScreenshotPages";
 import type { ElementFilters, ElementType } from "../../types";
 
 type RenderMarkupRequest = {
@@ -84,7 +82,9 @@ function findMarkupContainer(overlay: FrameNode): FrameNode | null {
 }
 
 function getOverlayContainer(page: PageNode): FrameNode | null {
-  return page.findOne((node) => node.type === "FRAME" && node.name === "Page Overlay") as FrameNode | null;
+  return page.findOne(
+    (node) => node.type === "FRAME" && node.name === "Page Overlay"
+  ) as FrameNode | null;
 }
 
 function mapElementTypeToFilterKey(
@@ -124,9 +124,7 @@ export async function handleRenderMarkupRequest({
 
   const currentPageId = figma.currentPage.getPluginData("PAGE_ID") || null;
   const pageId = requestedPageId ?? currentPageId;
-  const targetPage = pageId
-    ? findPageByStoredId(pageId)
-    : figma.currentPage;
+  const targetPage = pageId ? findPageByStoredId(pageId) : figma.currentPage;
 
   if (!targetPage || targetPage.type !== "PAGE") {
     figma.ui.postMessage({
@@ -152,7 +150,9 @@ export async function handleRenderMarkupRequest({
 
   const markupContainer = ensureMarkupContainer(overlay);
 
-  const storedScreenshotWidth = Number(targetPage.getPluginData("SCREENSHOT_WIDTH"));
+  const storedScreenshotWidth = Number(
+    targetPage.getPluginData("SCREENSHOT_WIDTH")
+  );
   const storedOriginalWidth = Number(
     targetPage.getPluginData("ORIGINAL_VIEWPORT_WIDTH")
   );
@@ -201,12 +201,16 @@ export async function handleRenderMarkupRequest({
           filterKey,
         };
       })
-      .filter((item): item is {
-        record: ElementRecord;
-        transformed: NonNullable<ReturnType<typeof transformElement>>;
-        elementType: ElementType;
-        filterKey: keyof ElementFilters;
-      } => Boolean(item));
+      .filter(
+        (
+          item
+        ): item is {
+          record: ElementRecord;
+          transformed: NonNullable<ReturnType<typeof transformElement>>;
+          elementType: ElementType;
+          filterKey: keyof ElementFilters;
+        } => Boolean(item)
+      );
 
     markupContainer.name = MARKUP_CONTAINER_NAME;
 
@@ -242,10 +246,7 @@ export async function handleRenderMarkupRequest({
         pageId,
       };
 
-      highlightRect.setPluginData(
-        "MARKUP_ELEMENT",
-        JSON.stringify(metadata)
-      );
+      highlightRect.setPluginData("MARKUP_ELEMENT", JSON.stringify(metadata));
       highlightRect.setPluginData("PAGE_ID", pageId ?? "");
 
       markupContainer.appendChild(highlightRect);
@@ -283,18 +284,19 @@ export async function handleClearMarkupRequest({
 }: ClearMarkupRequest): Promise<void> {
   const currentPageId = figma.currentPage.getPluginData("PAGE_ID") || null;
   const pageId = requestedPageId ?? currentPageId;
-  const targetPage = pageId
-    ? findPageByStoredId(pageId)
-    : figma.currentPage;
+  const targetPage = pageId ? findPageByStoredId(pageId) : figma.currentPage;
 
   if (!targetPage || targetPage.type !== "PAGE") {
     figma.ui.postMessage({
       type: "markup-clear-error",
       error: "Open a generated screenshot page before clearing highlights.",
     });
-    figma.notify("Open a generated screenshot page before clearing highlights.", {
-      error: true,
-    });
+    figma.notify(
+      "Open a generated screenshot page before clearing highlights.",
+      {
+        error: true,
+      }
+    );
     return;
   }
 

@@ -69,19 +69,18 @@ export function categorizeElementType(
 export const elementTypeToCategoryKey: Record<
   ElementType,
   keyof CategorizedElements
-> =
-  {
-    heading: "headings",
-    button: "buttons",
-    input: "inputs",
-    textarea: "textareas",
-    select: "selects",
-    image: "images",
-    link: "links",
-    paragraph: "paragraphs",
-    div: "divs",
-    other: "other",
-  };
+> = {
+  heading: "headings",
+  button: "buttons",
+  input: "inputs",
+  textarea: "textareas",
+  select: "selects",
+  image: "images",
+  link: "links",
+  paragraph: "paragraphs",
+  div: "divs",
+  other: "other",
+};
 
 /**
  * Categorizes a flat array of extracted elements into organized categories

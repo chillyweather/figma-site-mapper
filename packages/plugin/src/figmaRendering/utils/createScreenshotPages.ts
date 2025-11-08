@@ -764,10 +764,7 @@ export async function createScreenshotPages(
 
       newPage.setPluginData("SCREENSHOT_WIDTH", String(screenshotWidth));
       if (originalWidth && Number.isFinite(originalWidth)) {
-        newPage.setPluginData(
-          "ORIGINAL_VIEWPORT_WIDTH",
-          String(originalWidth)
-        );
+        newPage.setPluginData("ORIGINAL_VIEWPORT_WIDTH", String(originalWidth));
       }
 
       if (referenceShot) {
