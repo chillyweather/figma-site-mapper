@@ -6,6 +6,7 @@ import {
 import {
   categorizeElementType,
   elementTypeToCategoryKey,
+  LINK_LIKE_TYPES,
 } from "../../utils/elementCategorization";
 import { ELEMENT_HIGHLIGHT_COLORS } from "../../figmaRendering/utils/createScreenshotPages";
 import type { ElementFilters, ElementType } from "../../types";
@@ -251,6 +252,8 @@ export async function handleRenderMarkupRequest({
 
       highlightRect.setPluginData("MARKUP_ELEMENT", JSON.stringify(metadata));
       highlightRect.setPluginData("PAGE_ID", pageId ?? "");
+      highlightRect.setPluginData("dbId", record._id);
+      highlightRect.setPluginData("link", transformed.href || "");
 
       markupContainer.appendChild(highlightRect);
 
@@ -286,6 +289,50 @@ export async function handleRenderMarkupRequest({
         badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
         badgeText.x = badgeCircle.x + (badgeSize - badgeText.width) / 2;
         badgeText.y = badgeCircle.y + (badgeSize - badgeText.height) / 2;
+
+        if (LINK_LIKE_TYPES.has(elementType) && record.href) {
+          try {
+            let validUrl = record.href;
+
+            if (
+              !validUrl.startsWith("http://") &&
+              !validUrl.startsWith("https://") &&
+              !validUrl.startsWith("mailto:")
+            ) {
+              const baseMatch = (pageUrl || "").match(/^https?:\/\/[^\/]+/);
+              const baseUrl = baseMatch ? baseMatch[0] : null;
+              if (baseUrl) {
+                if (!validUrl.startsWith("/")) {
+                  validUrl = "/" + validUrl;
+                }
+                validUrl = baseUrl + validUrl;
+              } else {
+                validUrl = "https://" + validUrl;
+              }
+            }
+
+            const urlPattern = /^https?:\/\/[^\s]+$/;
+            if (urlPattern.test(validUrl)) {
+              const hyperlinkTarget: HyperlinkTarget = {
+                type: "URL",
+                value: validUrl,
+              };
+              badgeText.setRangeHyperlink(
+                0,
+                badgeText.characters.length,
+                hyperlinkTarget
+              );
+              badgeText.hyperlink = hyperlinkTarget;
+              badgeText.setPluginData("TARGET_URL", validUrl);
+              highlightRect.setPluginData("TARGET_URL", validUrl);
+            }
+          } catch (hyperlinkError) {
+            console.warn(
+              `Unable to assign hyperlink for markup badge: ${record.href}`,
+              hyperlinkError
+            );
+          }
+        }
       }
 
       const badgeNodes: SceneNode[] = badgeText

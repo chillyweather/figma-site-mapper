@@ -82,6 +82,8 @@ export const elementTypeToCategoryKey: Record<
   other: "other",
 };
 
+export const LINK_LIKE_TYPES = new Set<ElementType>(["button", "link"]);
+
 /**
  * Categorizes a flat array of extracted elements into organized categories
  */
