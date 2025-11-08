@@ -18,7 +18,10 @@ import {
   handleShowStylingElements,
   handleGetCurrentPageUrl,
 } from "./stylingHandlers";
-import { buildManifestFromProject } from "../utils/buildManifestFromProject";
+import {
+  buildManifestFromProject,
+  buildManifestFromPageIds,
+} from "../utils/buildManifestFromProject";
 import type { ManifestData } from "../types";
 
 /** Persist cookies for a domain */
@@ -104,6 +107,13 @@ export async function handleGetStatus(
       jobResult.detectInteractiveElements !== undefined
         ? !!jobResult.detectInteractiveElements
         : detectInteractiveElements;
+    const visitedPageIds = Array.isArray(jobResult.visitedPageIds)
+      ? jobResult.visitedPageIds.filter(
+          (value: unknown): value is string =>
+            typeof value === "string" && value.length > 0
+        )
+      : [];
+    const hasSubsetPages = visitedPageIds.length > 0;
 
     if (result.status === "completed" && projectId && startUrl) {
       if (hasRenderedSitemap) {
@@ -451,15 +461,58 @@ export async function handleGetStatus(msg: any): Promise<void> {
         jobId,
         status: "rendering",
         detailedProgress: {
-          stage: "Fetching crawl data...",
+          stage: hasSubsetPages
+            ? "Fetching job subset..."
+            : "Fetching crawl data...",
           progress: 5,
         },
       });
 
       try {
-        const manifestData = await buildManifestFromProject(projectId, startUrl, {
-          detectInteractiveElements,
-        });
+        let manifestData = null as null | ManifestData;
+        let subsetUsed = false;
+
+        if (hasSubsetPages) {
+          try {
+            manifestData = await buildManifestFromPageIds(
+              projectId,
+              startUrl,
+              visitedPageIds,
+              {
+                detectInteractiveElements: detectInteractiveFromJob,
+              }
+            );
+            subsetUsed = true;
+          } catch (subsetError) {
+            console.warn(
+              "Failed to build manifest from page ids, falling back to full project",
+              subsetError
+            );
+            subsetUsed = false;
+            manifestData = null;
+          }
+        }
+
+        if (!manifestData) {
+          manifestData = await buildManifestFromProject(
+            projectId,
+            startUrl,
+            {
+              detectInteractiveElements: detectInteractiveFromJob,
+            }
+          );
+          subsetUsed = false;
+        }
+
+        if (subsetUsed && !manifestData.tree) {
+          console.warn(
+            "Subset manifest contained no tree data, using full project manifest instead"
+          );
+          manifestData = await buildManifestFromProject(projectId, startUrl, {
+            detectInteractiveElements: detectInteractiveFromJob,
+          });
+          subsetUsed = false;
+        }
 
         if (!manifestData.tree) {
           figma.ui.postMessage({
@@ -483,8 +536,22 @@ export async function handleGetStatus(msg: any): Promise<void> {
         await figma.clientStorage.setAsync("lastJobId", jobId);
         await figma.clientStorage.setAsync(
           "lastDetectInteractiveElements",
-          detectInteractiveElements
+          detectInteractiveFromJob
         );
+
+        if (subsetUsed) {
+          await figma.clientStorage.setAsync("lastJobSubset", {
+            jobId,
+            projectId,
+            startUrl,
+            pageIds: visitedPageIds,
+            detectInteractiveElements: detectInteractiveFromJob,
+            storedAt: Date.now(),
+            manifestData,
+          });
+        } else {
+          await figma.clientStorage.setAsync("lastJobSubset", null);
+        }
 
         figma.ui.postMessage({
           type: "manifest-data",
@@ -507,7 +574,7 @@ export async function handleGetStatus(msg: any): Promise<void> {
         await renderSitemap(
           manifestData,
           screenshotWidth,
-          detectInteractiveElements,
+          detectInteractiveFromJob,
           highlightAllElements,
           (stage: string, progress: number) => {
             figma.ui.postMessage({

@@ -1,7 +1,11 @@
 import { TreeNode, InteractiveElement, ExtractedElement } from "../../types";
-import { fetchProjectPages, fetchProjectElements } from "../services/apiClient";
+import {
+  fetchProjectPages,
+  fetchProjectElements,
+  fetchPagesByIds,
+} from "../services/apiClient";
 
-interface PageRecord {
+export interface PageRecord {
   _id: string;
   url: string;
   title: string;
@@ -20,7 +24,7 @@ interface PageRecord {
   updatedAt?: string;
 }
 
-interface ElementRecord {
+export interface ElementRecord {
   _id: string;
   pageId: string;
   projectId: string;
@@ -222,14 +226,15 @@ function buildTreeFromPages(
   pages: PageRecord[],
   elementsByPageId: Map<string, ExtractedElement[]>,
   interactiveByPageId: Map<string, InteractiveElement[]>,
-  startUrl: string
+  startUrl: string,
+  preserveOrder: boolean
 ): TreeNode | null {
   if (pages.length === 0) {
     return null;
   }
 
   const canonicalStartUrl = canonicalizeUrl(startUrl);
-  const sortedPages = sortPages(pages);
+  const sortedPages = preserveOrder ? pages.slice() : sortPages(pages);
   const nodeMap = new Map<string, TreeNode & { children: TreeNode[] }>();
 
   for (const page of sortedPages) {
@@ -312,19 +317,23 @@ function buildTreeFromPages(
   return root;
 }
 
-export async function buildManifestFromProject(
+interface AssembleOptions {
+  detectInteractiveElements: boolean;
+  preservePageOrder?: boolean;
+}
+
+function assembleManifestData(
   projectId: string,
   startUrl: string,
-  options: { detectInteractiveElements: boolean }
-): Promise<{ tree: TreeNode | null; projectId: string; startUrl: string }> {
-  const pages = await fetchProjectPages(projectId);
-  const elements = await fetchProjectElements(projectId);
-
+  pages: PageRecord[],
+  elements: ElementRecord[],
+  options: AssembleOptions
+): { tree: TreeNode | null; projectId: string; startUrl: string } {
   const elementsByPageId = new Map<string, ExtractedElement[]>();
   const interactiveByPageId = new Map<string, InteractiveElement[]>();
 
-  for (const element of elements as ElementRecord[]) {
-    if (!element.pageId) {
+  for (const element of elements) {
+    if (!element || !element.pageId) {
       continue;
     }
 
@@ -349,10 +358,11 @@ export async function buildManifestFromProject(
   }
 
   const tree = buildTreeFromPages(
-    pages as PageRecord[],
+    pages,
     elementsByPageId,
     interactiveByPageId,
-    startUrl
+    startUrl,
+    options.preservePageOrder === true
   );
 
   return {
@@ -360,4 +370,54 @@ export async function buildManifestFromProject(
     projectId,
     startUrl,
   };
+}
+
+export async function buildManifestFromProject(
+  projectId: string,
+  startUrl: string,
+  options: { detectInteractiveElements: boolean }
+): Promise<{ tree: TreeNode | null; projectId: string; startUrl: string }> {
+  const pages = (await fetchProjectPages(projectId)) as PageRecord[];
+  const elements = (await fetchProjectElements(projectId)) as ElementRecord[];
+
+  return assembleManifestData(projectId, startUrl, pages, elements, {
+    detectInteractiveElements: options.detectInteractiveElements,
+  });
+}
+
+export async function buildManifestFromPageIds(
+  projectId: string,
+  startUrl: string,
+  pageIds: string[],
+  options: { detectInteractiveElements: boolean }
+): Promise<{ tree: TreeNode | null; projectId: string; startUrl: string }> {
+  const normalizedIds = (Array.isArray(pageIds) ? pageIds : [])
+    .map((id) => String(id).trim())
+    .filter((id) => id.length > 0);
+
+  if (normalizedIds.length === 0) {
+    return { tree: null, projectId, startUrl };
+  }
+
+  const response = await fetchPagesByIds(projectId, normalizedIds);
+
+  const pages = (response.pages || []) as PageRecord[];
+  const elements = (response.elements || []) as ElementRecord[];
+
+  return assembleManifestData(projectId, startUrl, pages, elements, {
+    detectInteractiveElements: options.detectInteractiveElements,
+    preservePageOrder: true,
+  });
+}
+
+export function buildManifestFromData(
+  projectId: string,
+  startUrl: string,
+  data: { pages: PageRecord[]; elements: ElementRecord[] },
+  options: { detectInteractiveElements: boolean; preservePageOrder?: boolean }
+): { tree: TreeNode | null; projectId: string; startUrl: string } {
+  const pages = Array.isArray(data.pages) ? data.pages : [];
+  const elements = Array.isArray(data.elements) ? data.elements : [];
+
+  return assembleManifestData(projectId, startUrl, pages, elements, options);
 }

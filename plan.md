@@ -100,8 +100,8 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Record visited URLs/IDs during each crawl job and include them in job status responses.
           [x] Provide lightweight endpoints to fetch page snapshots by job or by ID list.
 2.  **Plugin Rendering:**
-    - [ ] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
-    - [ ] Cache the last job subset locally for quick re-renders.
+    - [x] Build a `buildManifestFromPageIds` helper and update the status handler to render only the job’s pages.
+    - [x] Cache the last job subset locally for quick re-renders.
 3.  **Snapshot Control:**
     - [ ] Expose a "Render project snapshot" button that invokes the full-project manifest when needed.
 

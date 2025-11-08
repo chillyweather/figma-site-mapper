@@ -9,9 +9,9 @@
 
 ## Plugin Rendering
 
-- [ ] Add an API client helper to fetch pages by ID list.
-- [ ] Implement `buildManifestFromPageIds` and wire `handleGetStatus` to render job subsets.
-- [ ] Cache the latest job subset in `clientStorage` for quick re-renders.
+- [x] Add an API client helper to fetch pages by ID list.
+- [x] Implement `buildManifestFromPageIds` and wire `handleGetStatus` to render job subsets.
+- [x] Cache the latest job subset in `clientStorage` for quick re-renders.
 
 ## Snapshot Control
 

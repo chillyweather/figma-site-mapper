@@ -138,6 +138,83 @@ export async function fetchProjectElements(
   return Array.isArray(data.elements) ? data.elements : [];
 }
 
+interface PagesByIdsResponse {
+  pages: PageResponseItem[];
+  elements: ElementResponseItem[];
+}
+
+interface JobPagesResponse extends PagesByIdsResponse {
+  jobId: string;
+  projectId: string;
+}
+
+/**
+ * Fetch a subset of pages by their identifiers.
+ */
+export async function fetchPagesByIds(
+  projectId: string,
+  pageIds: string[]
+): Promise<PagesByIdsResponse> {
+  const normalizedIds = (Array.isArray(pageIds) ? pageIds : [])
+    .map((id) => String(id).trim())
+    .filter((id) => id.length > 0);
+
+  if (normalizedIds.length === 0) {
+    return { pages: [], elements: [] };
+  }
+
+  const params = new URLSearchParams({ projectId });
+  for (const id of normalizedIds) {
+    params.append("ids", id);
+  }
+
+  const response = await fetch(`${BACKEND_URL}/pages/by-ids?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch pages by ids: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const pages = Array.isArray((data as any).pages)
+    ? ((data as any).pages as PageResponseItem[])
+    : [];
+  const elements = Array.isArray((data as any).elements)
+    ? ((data as any).elements as ElementResponseItem[])
+    : [];
+
+  return { pages, elements };
+}
+
+/**
+ * Fetch the manifest subset for a completed job.
+ */
+export async function fetchJobPages(jobId: string): Promise<JobPagesResponse> {
+  const response = await fetch(`${BACKEND_URL}/jobs/${encodeURIComponent(jobId)}/pages`);
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch job pages: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const pages = Array.isArray((data as any).pages)
+    ? ((data as any).pages as PageResponseItem[])
+    : [];
+  const elements = Array.isArray((data as any).elements)
+    ? ((data as any).elements as ElementResponseItem[])
+    : [];
+
+  return {
+    jobId: (data as any).jobId ?? jobId,
+    projectId: (data as any).projectId ?? "",
+    pages,
+    elements,
+  };
+}
+
 /**
  * Open authentication session for manual login/CAPTCHA
  */
