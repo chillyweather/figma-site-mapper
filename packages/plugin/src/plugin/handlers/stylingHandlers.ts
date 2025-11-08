@@ -231,13 +231,9 @@ async function pollForStylingPageCompletion(
         figma.currentPage = stylingPage;
 
         // Render the page with ALL element types highlighted
-        await renderTargetPage(
-          stylingPage,
-          manifestForPage,
-          0, // x position
-          0, // y position
-          true, // highlightAllElements = true
-          {
+        await renderTargetPage(stylingPage, manifestForPage, 0, 0, {
+          highlightAllElements: true,
+          highlightElementFilters: {
             // Highlight ALL element types
             headings: true,
             buttons: true,
@@ -249,8 +245,8 @@ async function pollForStylingPageCompletion(
             paragraphs: true,
             divs: true,
             other: true,
-          }
-        );
+          },
+        });
 
         figma.notify("✨ Styling page created successfully!");
         return;

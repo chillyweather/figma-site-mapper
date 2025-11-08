@@ -1099,14 +1099,11 @@ async function finalizeFlowRendering(
 
   const highlightElementFilters = settings?.highlightElementFilters || null;
 
-  await renderTargetPage(
-    flowPage,
-    manifestData,
-    x,
-    y,
+  await renderTargetPage(flowPage, manifestData, x, y, {
     highlightAllElements,
-    highlightElementFilters
-  );
+    highlightElementFilters,
+    includeInteractiveOverlay: false,
+  });
 
   sendProgressUpdate({
     status: "building",

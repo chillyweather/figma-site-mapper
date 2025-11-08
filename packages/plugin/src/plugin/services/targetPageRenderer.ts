@@ -56,13 +56,18 @@ const DEFAULT_ELEMENT_FILTERS: ElementFilters = {
 /**
  * Render target page on flow page
  */
+type RenderTargetPageOptions = {
+  highlightAllElements?: boolean;
+  highlightElementFilters?: any;
+  includeInteractiveOverlay?: boolean;
+};
+
 export async function renderTargetPage(
   flowPage: PageNode,
   manifestData: ManifestData,
   x: number,
   y: number,
-  highlightAllElements: boolean = false,
-  highlightElementFilters?: any
+  options: RenderTargetPageOptions = {}
 ): Promise<void> {
   console.log("Rendering target page at", x, y);
 
@@ -91,13 +96,22 @@ export async function renderTargetPage(
 
   await loadScreenshotSlices(targetFrame, pageData.screenshot);
 
-  if (pageData.interactiveElements && pageData.interactiveElements.length > 0) {
+  const includeInteractiveOverlay =
+    options.includeInteractiveOverlay !== undefined
+      ? options.includeInteractiveOverlay
+      : true;
+
+  if (
+    includeInteractiveOverlay &&
+    pageData.interactiveElements &&
+    pageData.interactiveElements.length > 0
+  ) {
     await addInteractiveElementsOverlay(targetFrame, pageData);
   }
 
   // Add highlights for all detected elements if enabled and styleData is available
   if (
-    highlightAllElements &&
+    options.highlightAllElements &&
     pageData.styleData &&
     pageData.styleData.elements &&
     pageData.styleData.elements.length > 0
@@ -108,7 +122,7 @@ export async function renderTargetPage(
     await addElementHighlightsOverlay(
       targetFrame,
       pageData,
-      highlightElementFilters
+      options.highlightElementFilters
     );
   }
 
