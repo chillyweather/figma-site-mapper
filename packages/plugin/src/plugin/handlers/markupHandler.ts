@@ -215,6 +215,8 @@ export async function handleRenderMarkupRequest({
     markupContainer.name = MARKUP_CONTAINER_NAME;
 
     let created = 0;
+    let badgeFontLoaded = false;
+    const badgeFont: FontName = { family: "Inter", style: "Bold" };
 
     for (const item of includedElements) {
       const { transformed, elementType, record } = item;
@@ -223,9 +225,10 @@ export async function handleRenderMarkupRequest({
       const scaledY = boundingBox.y * scaleFactor;
       const scaledWidth = Math.max(1, boundingBox.width * scaleFactor);
       const scaledHeight = Math.max(1, boundingBox.height * scaleFactor);
+      const highlightNumber = created + 1;
 
       const highlightRect = figma.createRectangle();
-      highlightRect.name = `markup_${elementType}_${created + 1}`;
+      highlightRect.name = `markup_${elementType}_${highlightNumber}`;
       highlightRect.x = scaledX;
       highlightRect.y = scaledY;
       highlightRect.resize(scaledWidth, scaledHeight);
@@ -250,6 +253,55 @@ export async function handleRenderMarkupRequest({
       highlightRect.setPluginData("PAGE_ID", pageId ?? "");
 
       markupContainer.appendChild(highlightRect);
+
+      const badgeSize = 16;
+      const badgeColor = getElementColor(elementType);
+      const badgeCircle = figma.createEllipse();
+      badgeCircle.name = `markup_badge_${highlightNumber}_circle`;
+      badgeCircle.x = scaledX + scaledWidth - badgeSize - 2;
+      badgeCircle.y = scaledY - 2;
+      badgeCircle.resize(badgeSize, badgeSize);
+      badgeCircle.fills = [{ type: "SOLID", color: badgeColor }];
+      badgeCircle.strokes = [];
+
+      if (!badgeFontLoaded) {
+        try {
+          await figma.loadFontAsync(badgeFont);
+          badgeFontLoaded = true;
+        } catch (fontError) {
+          console.warn(
+            "Unable to load Inter Bold font for markup badges",
+            fontError
+          );
+        }
+      }
+
+      let badgeText: TextNode | null = null;
+      if (badgeFontLoaded) {
+        badgeText = figma.createText();
+        badgeText.fontName = badgeFont;
+        badgeText.fontSize = 9;
+        badgeText.characters = highlightNumber.toString();
+        badgeText.name = `markup_badge_${highlightNumber}_label`;
+        badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+        badgeText.x = badgeCircle.x + (badgeSize - badgeText.width) / 2;
+        badgeText.y = badgeCircle.y + (badgeSize - badgeText.height) / 2;
+      }
+
+      const badgeNodes: SceneNode[] = badgeText
+        ? [badgeCircle, badgeText]
+        : [badgeCircle];
+
+      const badgeGroup = figma.group(badgeNodes, figma.currentPage);
+      badgeGroup.name = `markup_badge_${highlightNumber}`;
+      badgeGroup.setPluginData(
+        "MARKUP_ELEMENT",
+        JSON.stringify(Object.assign({}, metadata, { kind: "badge" }))
+      );
+      badgeGroup.setPluginData("PAGE_ID", pageId ?? "");
+
+      markupContainer.appendChild(badgeGroup);
+
       created += 1;
     }
 
