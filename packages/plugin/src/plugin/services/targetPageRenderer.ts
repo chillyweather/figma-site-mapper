@@ -50,16 +50,11 @@ const DEFAULT_ELEMENT_FILTERS: ElementFilters = {
   other: false,
 };
 
-/**
- * Render target page on flow page
- */
-/**
- * Render target page on flow page
- */
 type RenderTargetPageOptions = {
   highlightAllElements?: boolean;
   highlightElementFilters?: any;
   includeInteractiveOverlay?: boolean;
+  originalViewportWidth?: number;
 };
 
 export async function renderTargetPage(
@@ -101,15 +96,81 @@ export async function renderTargetPage(
       ? options.includeInteractiveOverlay
       : true;
 
+  if (pageData.pageId) {
+    try {
+      flowPage.setPluginData("PAGE_ID", String(pageData.pageId));
+      console.log(
+        `🧭 Stored PAGE_ID=${pageData.pageId} on flow page ${flowPage.name}`
+      );
+    } catch (error) {
+      console.warn("Unable to persist PAGE_ID on flow page", error);
+    }
+  } else {
+    console.warn(
+      "Target manifest missing pageId; markup may stay disabled for this page"
+    );
+  }
+
+  if (pageData.url || manifestData.startUrl) {
+    try {
+      const urlToPersist = pageData.url || manifestData.startUrl;
+      flowPage.setPluginData("URL", urlToPersist);
+      console.log(`🧭 Stored URL=${urlToPersist} on flow page ${flowPage.name}`);
+    } catch (error) {
+      console.warn("Unable to persist URL on flow page", error);
+    }
+  }
+
+  const screenshotWidth = Number.isFinite(targetFrame.width)
+    ? targetFrame.width
+    : null;
+
+  if (screenshotWidth) {
+    try {
+      flowPage.setPluginData("SCREENSHOT_WIDTH", String(screenshotWidth));
+      console.log(
+        `🧭 Stored SCREENSHOT_WIDTH=${screenshotWidth} on flow page ${flowPage.name}`
+      );
+    } catch (error) {
+      console.warn("Unable to persist SCREENSHOT_WIDTH on flow page", error);
+    }
+
+    try {
+      const originalWidth =
+        options?.originalViewportWidth ?? screenshotWidth;
+      flowPage.setPluginData("ORIGINAL_VIEWPORT_WIDTH", String(originalWidth));
+      console.log(
+        `🧭 Stored ORIGINAL_VIEWPORT_WIDTH=${originalWidth} on flow page ${flowPage.name}`
+      );
+    } catch (error) {
+      console.warn(
+        "Unable to persist ORIGINAL_VIEWPORT_WIDTH on flow page",
+        error
+      );
+    }
+  }
+
+  const overlayContainer = ensurePageOverlay(targetFrame);
+
+  if (overlayContainer.children.length > 0) {
+    console.log(
+      `🧭 Clearing ${overlayContainer.children.length} existing overlay nodes before rendering`
+    );
+    while (overlayContainer.children.length > 0) {
+      overlayContainer.children[0].remove();
+    }
+  }
+
   if (
     includeInteractiveOverlay &&
     pageData.interactiveElements &&
     pageData.interactiveElements.length > 0
   ) {
-    await addInteractiveElementsOverlay(targetFrame, pageData);
+    await addInteractiveElementsOverlay(targetFrame, pageData, overlayContainer);
+  } else {
+    console.log("🧭 Skipping interactive overlay population for target page");
   }
 
-  // Add highlights for all detected elements if enabled and styleData is available
   if (
     options.highlightAllElements &&
     pageData.styleData &&
@@ -196,15 +257,10 @@ async function loadScreenshotSlices(
  */
 async function addInteractiveElementsOverlay(
   targetFrame: FrameNode,
-  pageData: any
+  pageData: any,
+  overlayContainer?: FrameNode
 ): Promise<void> {
-  const overlayContainer = figma.createFrame();
-  overlayContainer.name = "Page Overlay";
-  overlayContainer.resize(targetFrame.width, targetFrame.height);
-  overlayContainer.x = 0;
-  overlayContainer.y = 0;
-  overlayContainer.fills = [];
-  overlayContainer.clipsContent = false;
+  const container = overlayContainer ?? ensurePageOverlay(targetFrame);
 
   let linkCounter = 1;
 
@@ -218,16 +274,18 @@ async function addInteractiveElementsOverlay(
 
       const badge = await createBadge(element, pageData.url, linkCounter);
 
-      overlayContainer.appendChild(badge);
+      container.appendChild(badge);
       linkCounter++;
     } else {
       highlightRect.name = `${element.type}_highlight: ${elementLabel}`;
     }
 
-    overlayContainer.appendChild(highlightRect);
+    container.appendChild(highlightRect);
   }
 
-  targetFrame.appendChild(overlayContainer);
+  if (container.parent !== targetFrame) {
+    targetFrame.appendChild(container);
+  }
 }
 
 /**
@@ -469,6 +527,36 @@ async function addElementHighlightsOverlay(
     `🎨 Added ${elementCounter - 1} color-coded highlights (${filteredCount} filtered out)`
   );
   targetFrame.appendChild(overlayContainer);
+}
+
+function ensurePageOverlay(targetFrame: FrameNode): FrameNode {
+  const existing = targetFrame.findOne(
+    (node) => node.type === "FRAME" && node.name === "Page Overlay"
+  ) as FrameNode | null;
+
+  if (existing) {
+    existing.resize(targetFrame.width, targetFrame.height);
+    existing.x = 0;
+    existing.y = 0;
+    existing.fills = [];
+    existing.clipsContent = false;
+    return existing;
+  }
+
+  const overlayContainer = figma.createFrame();
+  overlayContainer.name = "Page Overlay";
+  overlayContainer.resize(targetFrame.width, targetFrame.height);
+  overlayContainer.x = 0;
+  overlayContainer.y = 0;
+  overlayContainer.fills = [];
+  overlayContainer.strokes = [];
+  overlayContainer.opacity = 1;
+  overlayContainer.layoutMode = "NONE";
+  overlayContainer.clipsContent = false;
+  overlayContainer.locked = false;
+  targetFrame.appendChild(overlayContainer);
+
+  return overlayContainer;
 }
 
 /**

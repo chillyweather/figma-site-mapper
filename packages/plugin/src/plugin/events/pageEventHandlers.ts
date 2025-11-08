@@ -20,6 +20,17 @@ function notifyActiveScreenshotPage(): void {
     "ORIGINAL_VIEWPORT_WIDTH"
   );
 
+  try {
+    const overlay = currentPage.findOne(
+      (node) => node.type === "FRAME" && node.name === "Page Overlay"
+    );
+    console.log(
+      `🧭 Markup Debug -> page:"${currentPage.name}" pageId:${pageId} url:${pageUrl} overlay:${overlay ? "yes" : "no"} screenshotWidth:${storedScreenshotWidth} originalWidth:${storedOriginalWidth}`
+    );
+  } catch (error) {
+    console.warn("🧭 Markup Debug -> failed to inspect overlay", error);
+  }
+
   if (storedScreenshotWidth) {
     const parsed = Number(storedScreenshotWidth);
     screenshotWidth = Number.isFinite(parsed) ? parsed : null;
