@@ -181,22 +181,24 @@ async function createFlowPage(selectedLink: FlowLink): Promise<void> {
  */
 function generateFlowPageName(
   currentPageName: string,
-  linkText: string
+  _linkText: string
 ): string {
-  const pageMatch = currentPageName.match(/^(\s*)([\d-]+)_(.*)/);
+  // New convention:
+  // Source page (any non-flow page) -> "    flow_1_Loading..." (4 spaces indent)
+  // Flow page "    flow_1_*" -> next becomes "        flow_2_Loading..." (8 spaces indent)
+  // Indent = flowLevel * 4 spaces.
 
-  if (!pageMatch) {
-    return `Flow_${linkText}`;
+  const flowMatch = currentPageName.match(/^\s*flow_(\d+)/i);
+
+  if (!flowMatch) {
+    const indent = " ".repeat(4); // level 1
+    return `${indent}flow_1_Loading...`;
   }
 
-  const currentIndent = pageMatch[1];
-  const currentHierarchy = pageMatch[2];
-  const newHierarchy = `${currentHierarchy}-${linkText}`;
-  const currentLevel = currentHierarchy.split("-").length;
-  const newLevel = currentLevel + 1;
-  const newIndent = "  ".repeat(Math.max(0, newLevel - 1));
-
-  return `${newIndent}${newHierarchy}_Loading...`;
+  const currentLevel = parseInt(flowMatch[1], 10);
+  const nextLevel = currentLevel + 1;
+  const indent = " ".repeat(nextLevel * 4);
+  return `${indent}flow_${nextLevel}_Loading...`;
 }
 
 /**
@@ -400,18 +402,13 @@ async function createFlowVisualization(
  * Check if page is a flow page (hierarchical naming pattern)
  */
 function isFlowPage(pageName: string): boolean {
-  // New pattern: names starting with "Flow_" (e.g. "Flow_4", "Flow_login")
-  if (/^\s*Flow_\S+/.test(pageName)) {
+  // Recognize new indentation-based flow naming: optional spaces then flow_<number>
+  if (/^\s*flow_\d+/i.test(pageName)) {
     return true;
   }
-
-  // Backward compatibility: hierarchical numeric naming with at least one dash (e.g. "1-2_Whatever")
+  // Backward compatibility: old hierarchical pattern
   const hierarchyMatch = pageName.match(/^\s*([\d-]+)_/);
-  if (hierarchyMatch && hierarchyMatch[1].includes("-")) {
-    return true;
-  }
-
-  return false;
+  return hierarchyMatch ? hierarchyMatch[1].includes("-") : false;
 }
 
 /**
