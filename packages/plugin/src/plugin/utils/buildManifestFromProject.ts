@@ -133,7 +133,8 @@ function canonicalizeUrl(url: string): string {
 
 function getParentUrl(url: string): string | null {
   try {
-    const parsed = typeof URL === "function" ? new URL(url) : manualParseUrl(url);
+    const parsed =
+      typeof URL === "function" ? new URL(url) : manualParseUrl(url);
     const segments = parsed.pathname.split("/").filter(Boolean);
     if (segments.length === 0) {
       return null;
@@ -294,8 +295,14 @@ function sortPages(pages: PageRecord[], startUrl?: string): PageRecord[] {
       }
     }
 
-    const aPath = typeof URL === "function" ? new URL(aUrl).pathname : manualParseUrl(aUrl).pathname;
-    const bPath = typeof URL === "function" ? new URL(bUrl).pathname : manualParseUrl(bUrl).pathname;
+    const aPath =
+      typeof URL === "function"
+        ? new URL(aUrl).pathname
+        : manualParseUrl(aUrl).pathname;
+    const bPath =
+      typeof URL === "function"
+        ? new URL(bUrl).pathname
+        : manualParseUrl(bUrl).pathname;
     const aDepth = aPath.split("/").filter(Boolean).length;
     const bDepth = bPath.split("/").filter(Boolean).length;
 
