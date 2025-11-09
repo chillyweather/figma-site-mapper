@@ -52,36 +52,99 @@ export interface ElementRecord {
   alt?: string;
 }
 
+// Figma plugin sandbox sometimes lacks the global URL constructor. Provide a resilient parser.
+interface ParsedUrl {
+  raw: string;
+  protocol: string;
+  host: string;
+  pathname: string;
+  search: string;
+  hash: string;
+  toString(): string;
+}
+
+function manualParseUrl(input: string): ParsedUrl {
+  let url = input.trim();
+  const protocolMatch = url.match(/^(https?:)\/\//i);
+  let protocol = protocolMatch ? protocolMatch[1].toLowerCase() : "http:";
+  if (!protocolMatch) {
+    // Prepend protocol if missing for consistency
+    url = protocol + "//" + url.replace(/^[\/]+/, "");
+  }
+
+  // Split off hash and search
+  let hash = "";
+  let search = "";
+  const hashIndex = url.indexOf("#");
+  if (hashIndex !== -1) {
+    hash = url.substring(hashIndex);
+    url = url.substring(0, hashIndex);
+  }
+  const searchIndex = url.indexOf("?");
+  if (searchIndex !== -1) {
+    search = url.substring(searchIndex);
+    url = url.substring(0, searchIndex);
+  }
+
+  // Remove protocol now for host/path extraction
+  let remainder = url.replace(/^(https?:)\/\//i, "");
+  // Host ends at first slash
+  const firstSlash = remainder.indexOf("/");
+  let host: string;
+  let pathname: string;
+  if (firstSlash === -1) {
+    host = remainder.toLowerCase();
+    pathname = "/";
+  } else {
+    host = remainder.substring(0, firstSlash).toLowerCase();
+    pathname = remainder.substring(firstSlash) || "/";
+  }
+  // Normalize pathname: collapse multiple slashes
+  pathname = pathname.replace(/\/+/, "/");
+  // Remove trailing slash except root
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    pathname = pathname.slice(0, -1);
+  }
+
+  return {
+    raw: input,
+    protocol,
+    host,
+    pathname,
+    search,
+    hash,
+    toString() {
+      return `${protocol}//${host}${pathname}`;
+    },
+  };
+}
+
 function canonicalizeUrl(url: string): string {
   try {
-    const normalized = new URL(url);
-    return normalized.toString();
+    if (typeof URL === "function") {
+      return new URL(url).toString();
+    }
+    return manualParseUrl(url).toString();
   } catch (error) {
     console.warn("Failed to canonicalize URL", url, error);
-    return url;
+    return manualParseUrl(url).toString();
   }
 }
 
 function getParentUrl(url: string): string | null {
   try {
-    const urlObj = new URL(url);
-    const segments = urlObj.pathname.split("/").filter(Boolean);
-
+    const parsed = typeof URL === "function" ? new URL(url) : manualParseUrl(url);
+    const segments = parsed.pathname.split("/").filter(Boolean);
     if (segments.length === 0) {
       return null;
     }
-
     segments.pop();
-    urlObj.pathname = `/${segments.join("/")}`;
-
-    if (urlObj.pathname === "") {
-      urlObj.pathname = "/";
+    const newPath = segments.length === 0 ? "/" : `/${segments.join("/")}`;
+    if (typeof URL === "function") {
+      parsed.pathname = newPath; // TS might complain; in manual parser we rebuild string
+      return new URL(`${parsed.protocol}//${parsed.host}${newPath}`).toString();
     }
-
-    urlObj.hash = "";
-    urlObj.search = "";
-
-    return urlObj.toString();
+    return `${parsed.protocol}//${parsed.host}${newPath}`;
   } catch (error) {
     console.warn("Failed to derive parent URL", url, error);
     return null;
@@ -231,8 +294,10 @@ function sortPages(pages: PageRecord[], startUrl?: string): PageRecord[] {
       }
     }
 
-    const aDepth = new URL(aUrl).pathname.split("/").filter(Boolean).length;
-    const bDepth = new URL(bUrl).pathname.split("/").filter(Boolean).length;
+    const aPath = typeof URL === "function" ? new URL(aUrl).pathname : manualParseUrl(aUrl).pathname;
+    const bPath = typeof URL === "function" ? new URL(bUrl).pathname : manualParseUrl(bUrl).pathname;
+    const aDepth = aPath.split("/").filter(Boolean).length;
+    const bDepth = bPath.split("/").filter(Boolean).length;
 
     if (aDepth !== bDepth) {
       return aDepth - bDepth;

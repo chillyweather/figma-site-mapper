@@ -123,7 +123,7 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Created empty `Page Overlay` frame on flow target pages so Markup tab recognizes them.
     - [x] Added console debug logging for markup activation to trace page metadata and overlay presence.
     - [x] Fixed flow arrow positioning to start from highlight rectangle edge instead of frame edge.
-    - [ ] **Fix flow chaining: When creating a flow from a flow page, copy ALL previous Source frames + their clicked_links + arrows, then add the new Target frame (not duplicating frames).**
+    - [x] **Fix flow chaining: When creating a flow from a flow page, copy ALL previous Source frames + their clicked_links + arrows, then add the new Target frame (not duplicating frames).**
 3.  **"Styling" Tab:**
     - [ ] Create `StylingTab.tsx` and add it to `MainView.tsx`.
     - [ ] Implement the "Global Styles" button and its handler to fetch from `GET /styles/global` and render a new Figma frame with text nodes.
