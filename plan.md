@@ -116,9 +116,14 @@ This plan outlines the step-by-step process to refactor the Figma Site Mapper fr
     - [x] Implement `src/plugin/handlers/markupHandler.ts` that reads the active page + requested element categories, fetches highlight data from `GET /elements`, and draws the overlay rectangles/badges in place (re-using the previous highlight logic).
     - [x] Ensure rendered link highlights retain destination metadata for downstream flow-building.
 2.  **"Flows" Tab Update:**
-    - [ ] Refactor `flowHandlers.ts` to use the "Check DB first" logic.
-    - [ ] `const page = await apiClient.getPage(url, activeProjectId);`
-    - [ ] `if (page) { cloneFigmaFrame(page._id); } else { apiClient.recrawlPage(url, activeProjectId); ...poll for completion... }`
+    - [x] Refactored `flowHandlers.ts` to use "Check DB first" logic: tries `getPage()` before falling back to `recrawlPage()`.
+    - [x] Implemented DB-first flow rendering with `buildManifestFromPageIds` for cached pages.
+    - [x] Added fallback to recrawl if page not in DB, with polling for completion.
+    - [x] Ensured flow pages store `PAGE_ID`, `URL`, and screenshot width metadata for markup integration.
+    - [x] Created empty `Page Overlay` frame on flow target pages so Markup tab recognizes them.
+    - [x] Added console debug logging for markup activation to trace page metadata and overlay presence.
+    - [x] Fixed flow arrow positioning to start from highlight rectangle edge instead of frame edge.
+    - [ ] **Fix flow chaining: When creating a flow from a flow page, copy ALL previous Source frames + their clicked_links + arrows, then add the new Target frame (not duplicating frames).**
 3.  **"Styling" Tab:**
     - [ ] Create `StylingTab.tsx` and add it to `MainView.tsx`.
     - [ ] Implement the "Global Styles" button and its handler to fetch from `GET /styles/global` and render a new Figma frame with text nodes.
