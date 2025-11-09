@@ -400,8 +400,18 @@ async function createFlowVisualization(
  * Check if page is a flow page (hierarchical naming pattern)
  */
 function isFlowPage(pageName: string): boolean {
+  // New pattern: names starting with "Flow_" (e.g. "Flow_4", "Flow_login")
+  if (/^\s*Flow_\S+/.test(pageName)) {
+    return true;
+  }
+
+  // Backward compatibility: hierarchical numeric naming with at least one dash (e.g. "1-2_Whatever")
   const hierarchyMatch = pageName.match(/^\s*([\d-]+)_/);
-  return hierarchyMatch ? hierarchyMatch[1].includes("-") : false;
+  if (hierarchyMatch && hierarchyMatch[1].includes("-")) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
