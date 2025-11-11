@@ -1,15 +1,16 @@
 /**
  * STYLING ELEMENT HANDLERS
  *
- * Handles creating a styling page for the current page:
+ * Handles creating styling pages and rendering CSS variables:
  * 1. Gets URL from current page plugin data
  * 2. Creates new page with 🎨 prefix
  * 3. Crawls single page with element highlighting
- * 4. Renders below current page
+ * 4. Renders global styles and element styles
  */
 
 import { startCrawl, getJobStatus } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
+import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 import { buildManifestFromProject } from "../utils/buildManifestFromProject";
@@ -308,8 +309,8 @@ export async function handleRenderGlobalStylesRequest(): Promise<void> {
       return;
     }
 
-    // Load required fonts before creating text nodes
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    // Load all required fonts before creating text nodes
+    await loadStylingFonts();
 
     // Create new page for global styles
     const globalStylesPage = figma.createPage();
@@ -319,25 +320,17 @@ export async function handleRenderGlobalStylesRequest(): Promise<void> {
     figma.root.appendChild(globalStylesPage);
     figma.currentPage = globalStylesPage;
 
-    // TODO: Implement actual global styles rendering
-    // For now, just create a placeholder frame
-    const frame = figma.createFrame();
-    frame.name = "Global Styles";
-    frame.x = 100;
-    frame.y = 100;
-    frame.resize(400, 300);
-    frame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+    // Fetch global styles data from backend
+    const backendUrl = "http://localhost:3006";
+    const stylesResponse = await fetch(`${backendUrl}/styles/global?projectId=${activeProjectId}`);
+    const stylesData = await stylesResponse.json();
 
-    const text = figma.createText();
-    text.characters = "Global Styles - Coming Soon";
-    text.fontSize = 20;
-    text.x = 120;
-    text.y = 200;
+    console.log("Fetched global styles:", stylesData);
 
-    globalStylesPage.appendChild(frame);
-    globalStylesPage.appendChild(text);
+    // Create table with CSS variables
+    await createGlobalStylesTable(globalStylesPage, stylesData);
 
-    figma.notify("✨ Global styles page created!");
+    figma.notify("✨ Global styles table created!");
   } catch (error) {
     console.error("Failed to render global styles:", error);
     figma.notify("Error creating global styles page", { error: true });
@@ -362,8 +355,8 @@ export async function handleRenderElementStylesRequest(elementId: string): Promi
       return;
     }
 
-    // Load required fonts before creating text nodes
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    // Load all required fonts before creating text nodes
+    await loadStylingFonts();
 
     // Create new page for element styles
     const elementStylesPage = figma.createPage();
@@ -416,4 +409,208 @@ export async function handleSelectElementStyle(elementId: string | null): Promis
   } catch (error) {
     console.error("Failed to handle element selection:", error);
   }
+}
+
+/**
+ * Helper function to create a global styles table
+ */
+async function createGlobalStylesTable(page: PageNode, stylesData: any): Promise<void> {
+  const cssVariables = stylesData.cssVariables || {};
+  const variables = Object.entries(cssVariables);
+  
+  if (variables.length === 0) {
+    // Create "No styles" message
+    const text = figma.createText();
+    text.characters = "No CSS variables found in this project";
+    text.fontSize = 16;
+    text.x = 100;
+    text.y = 100;
+    page.appendChild(text);
+    return;
+  }
+
+  // Table layout settings
+  const startX = 100;
+  const startY = 100;
+  const rowHeight = 40;
+  const colWidths = [50, 200, 150, 100]; // #, Variable, Value, Sample
+
+  // Table header
+  const headers = ["#", "Variable Name", "Variable Value", "Sample"];
+  let currentY = startY;
+
+  // Create header row background
+  const headerFrame = figma.createFrame();
+  headerFrame.name = "Table Header";
+  headerFrame.x = startX;
+  headerFrame.y = currentY;
+  headerFrame.resize(colWidths.reduce((a, b) => a + b, 0), rowHeight);
+  headerFrame.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+  headerFrame.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
+  headerFrame.strokeWeight = 1;
+  page.appendChild(headerFrame);
+
+    // Create header text
+    let currentX = startX + 10;
+    for (let i = 0; i < headers.length; i++) {
+      const headerText = figma.createText();
+      headerText.characters = headers[i];
+      headerText.fontSize = 12;
+      headerText.fontName = { family: "Inter", style: "Bold" };
+      headerText.x = currentX;
+      headerText.y = currentY + 12;
+      page.appendChild(headerText);
+      currentX += colWidths[i];
+    }
+
+  currentY += rowHeight;
+
+  // Create rows for each CSS variable
+  variables.forEach(([variableName, variableValue], index) => {
+    const rowNumber = index + 1;
+
+    // Create row background
+    const rowFrame = figma.createFrame();
+    rowFrame.name = `Row ${rowNumber}`;
+    rowFrame.x = startX;
+    rowFrame.y = currentY;
+    rowFrame.resize(colWidths.reduce((a, b) => a + b, 0), rowHeight);
+    rowFrame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+    rowFrame.strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+    rowFrame.strokeWeight = 1;
+    page.appendChild(rowFrame);
+
+    // Create row text elements
+    let textX = startX + 10;
+    
+    // Row number
+    const numberText = figma.createText();
+    numberText.characters = rowNumber.toString();
+    numberText.fontSize = 11;
+    numberText.x = textX;
+    numberText.y = currentY + 12;
+    page.appendChild(numberText);
+    textX += colWidths[0];
+
+    // Variable name
+    const nameText = figma.createText();
+    nameText.characters = variableName;
+    nameText.fontSize = 11;
+    nameText.x = textX;
+    nameText.y = currentY + 12;
+    page.appendChild(nameText);
+    textX += colWidths[1];
+
+    // Variable value
+    const valueText = figma.createText();
+    valueText.characters = String(variableValue);
+    valueText.fontSize = 11;
+    valueText.x = textX;
+    valueText.y = currentY + 12;
+    page.appendChild(valueText);
+    textX += colWidths[2];
+
+    // Sample (only for colors)
+    if (isColorValue(String(variableValue))) {
+      // Create rectangle color sample (24x60px with 2px border radius)
+      const colorSample = figma.createRectangle();
+      colorSample.name = `Color Sample - ${variableName}`;
+      colorSample.resize(24, 60);
+      colorSample.x = textX + 8; // Center in column
+      colorSample.y = currentY + 10; // Center vertically in row
+      colorSample.rectangleCornerRadii = [2, 2, 2, 2]; // Set corner radius for all corners
+      
+      // Safer color creation with validation
+      try {
+        const paint = colorToPaint(String(variableValue));
+        console.log(`Color paint for ${variableName}:`, paint);
+        
+        // Validate the color values before assignment
+        if (paint && paint.color && 
+            !isNaN(paint.color.r) && !isNaN(paint.color.g) && !isNaN(paint.color.b) &&
+            paint.color.r >= 0 && paint.color.r <= 1 &&
+            paint.color.g >= 0 && paint.color.g <= 1 &&
+            paint.color.b >= 0 && paint.color.b <= 1) {
+          colorSample.fills = [paint];
+        } else {
+          console.warn(`Invalid color values for ${variableName}: ${variableValue}`);
+          colorSample.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
+        }
+      } catch (error) {
+        console.error(`Failed to create color paint for ${variableName}: ${variableValue}`, error);
+        colorSample.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
+      }
+      
+      page.appendChild(colorSample);
+    }
+    // No element created for non-color values (empty sample column)
+
+    currentY += rowHeight;
+  });
+
+  // Add table title
+  const titleText = figma.createText();
+  titleText.characters = `CSS Variables (${variables.length} variables)`;
+  titleText.fontSize = 18;
+  titleText.fontName = { family: "Inter", style: "Bold" };
+  titleText.x = startX;
+  titleText.y = startY - 40;
+  page.appendChild(titleText);
+}
+
+/**
+ * Helper function to check if a value is a color
+ */
+function isColorValue(value: string): boolean {
+  const colorPatterns = [
+    /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, // Hex
+    /^rgb\(/, // RGB
+    /^rgba\(/, // RGBA
+    /^hsl\(/, // HSL
+    /^hsla\(/, // HSLA
+  ];
+  
+  return colorPatterns.some(pattern => pattern.test(value));
+}
+
+/**
+ * Helper function to load all required fonts for styling pages
+ */
+async function loadStylingFonts(): Promise<void> {
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+}
+
+/**
+ * Helper function to convert color string to Figma paint
+ */
+function colorToPaint(colorString: string): SolidPaint {
+  // Simple hex color converter
+  if (colorString.startsWith('#')) {
+    let hex = colorString.substring(1);
+    
+    // Handle 3-character hex colors (e.g., #fff)
+    if (hex.length === 3) {
+      hex = hex.split('').map(char => char + char).join('');
+    }
+    
+    // Ensure we have 6 characters
+    if (hex.length !== 6) {
+      return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
+    }
+    
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    // Check if parsing failed (NaN)
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
+    }
+    
+    return { type: 'SOLID', color: { r: r / 255, g: g / 255, b: b / 255 } };
+  }
+  
+  // Default to gray if can't parse
+  return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
 }
