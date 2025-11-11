@@ -518,7 +518,7 @@ async function createGlobalStylesTable(page: PageNode, stylesData: any): Promise
       colorSample.resize(24, 60);
       colorSample.x = textX + 8; // Center in column
       colorSample.y = currentY + 10; // Center vertically in row
-      colorSample.rectangleCornerRadii = [2, 2, 2, 2]; // Set corner radius for all corners
+      colorSample.cornerRadius = 2; // Set corner radius for all corners
       
       // Safer color creation with validation
       try {
