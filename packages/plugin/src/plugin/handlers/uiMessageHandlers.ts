@@ -94,6 +94,37 @@ export async function loadDomainCookies(
   }
 }
 
+type LastJobSubsetMetadata = {
+  jobId: string;
+  projectId: string;
+  startUrl: string;
+  pageIds: string[];
+  detectInteractiveElements: boolean;
+  storedAt: number;
+};
+
+async function persistLastJobSubset(
+  payload: LastJobSubsetMetadata | null
+): Promise<boolean> {
+  try {
+    await figma.clientStorage.setAsync("lastJobSubset", payload);
+    return true;
+  } catch (error) {
+    console.warn("Unable to persist last job subset metadata", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (payload && message.includes("quota")) {
+      try {
+        await figma.clientStorage.setAsync("lastJobSubset", null);
+        await figma.clientStorage.setAsync("lastJobSubset", payload);
+        return true;
+      } catch (retryError) {
+        console.warn("Retry to persist subset metadata failed", retryError);
+      }
+    }
+    return false;
+  }
+}
+
 export async function handleGetStatus(
   jobId: string,
   screenshotWidth: number,
@@ -232,20 +263,25 @@ export async function handleGetStatus(
           "lastDetectInteractiveElements",
           detectInteractiveFromJob
         );
-        if (subsetUsed) {
-          await figma.clientStorage.setAsync("lastJobSubset", {
-            jobId,
-            projectId,
-            startUrl,
-            pageIds: visitedPageIds,
-            detectInteractiveElements: detectInteractiveFromJob,
-            storedAt: Date.now(),
-            manifestData,
-          });
-        } else {
-          await figma.clientStorage.setAsync("lastJobSubset", null);
+        const subsetMetadataStored = await persistLastJobSubset(
+          subsetUsed
+            ? {
+                jobId,
+                projectId,
+                startUrl,
+                pageIds: visitedPageIds,
+                detectInteractiveElements: detectInteractiveFromJob,
+                storedAt: Date.now(),
+              }
+            : null
+        );
+        if (subsetMetadataStored) {
+          console.log(
+            subsetUsed
+              ? "💾 Stored job subset metadata in clientStorage"
+              : "💾 Cleared job subset metadata in clientStorage"
+          );
         }
-        console.log("💾 Stored crawl metadata in clientStorage");
 
         figma.ui.postMessage({
           type: "manifest-data",
@@ -601,7 +637,7 @@ async function handleRenderProjectSnapshot(msg: {
       "lastDetectInteractiveElements",
       detectInteractiveElements
     );
-    await figma.clientStorage.setAsync("lastJobSubset", null);
+    await persistLastJobSubset(null);
 
     figma.ui.postMessage({
       type: "manifest-data",
@@ -772,18 +808,24 @@ export async function handleGetStatus(msg: any): Promise<void> {
           detectInteractiveFromJob
         );
 
-        if (subsetUsed) {
-          await figma.clientStorage.setAsync("lastJobSubset", {
-            jobId,
-            projectId,
-            startUrl,
-            pageIds: visitedPageIds,
-            detectInteractiveElements: detectInteractiveFromJob,
-            storedAt: Date.now(),
-            manifestData,
-          });
-        } else {
-          await figma.clientStorage.setAsync("lastJobSubset", null);
+        const subsetMetadataStored = await persistLastJobSubset(
+          subsetUsed
+            ? {
+                jobId,
+                projectId,
+                startUrl,
+                pageIds: visitedPageIds,
+                detectInteractiveElements: detectInteractiveFromJob,
+                storedAt: Date.now(),
+              }
+            : null
+        );
+        if (subsetMetadataStored) {
+          console.log(
+            subsetUsed
+              ? "💾 Stored job subset metadata in clientStorage"
+              : "💾 Cleared job subset metadata in clientStorage"
+          );
         }
 
         figma.ui.postMessage({
