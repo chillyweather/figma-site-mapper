@@ -308,6 +308,9 @@ export async function handleRenderGlobalStylesRequest(): Promise<void> {
       return;
     }
 
+    // Load required fonts before creating text nodes
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+
     // Create new page for global styles
     const globalStylesPage = figma.createPage();
     globalStylesPage.name = "🎨 Global Styles";
@@ -358,6 +361,9 @@ export async function handleRenderElementStylesRequest(elementId: string): Promi
       figma.notify("No active project selected", { error: true });
       return;
     }
+
+    // Load required fonts before creating text nodes
+    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
 
     // Create new page for element styles
     const elementStylesPage = figma.createPage();
