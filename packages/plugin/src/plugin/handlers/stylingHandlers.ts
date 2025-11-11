@@ -322,7 +322,9 @@ export async function handleRenderGlobalStylesRequest(): Promise<void> {
 
     // Fetch global styles data from backend
     const backendUrl = "http://localhost:3006";
-    const stylesResponse = await fetch(`${backendUrl}/styles/global?projectId=${activeProjectId}`);
+    const stylesResponse = await fetch(
+      `${backendUrl}/styles/global?projectId=${activeProjectId}`
+    );
     const stylesData = await stylesResponse.json();
 
     console.log("Fetched global styles:", stylesData);
@@ -340,7 +342,9 @@ export async function handleRenderGlobalStylesRequest(): Promise<void> {
 /**
  * Handle render-element-styles request from UI
  */
-export async function handleRenderElementStylesRequest(elementId: string): Promise<void> {
+export async function handleRenderElementStylesRequest(
+  elementId: string
+): Promise<void> {
   console.log(`🎨 Starting element styles rendering for element: ${elementId}`);
 
   try {
@@ -373,7 +377,7 @@ export async function handleRenderElementStylesRequest(elementId: string): Promi
     frame.x = 100;
     frame.y = 100;
     frame.resize(400, 300);
-    frame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.7, b: 0.7 } }];
+    frame.fills = [{ type: "SOLID", color: { r: 0.9, g: 0.7, b: 0.7 } }];
 
     const text = figma.createText();
     text.characters = `Element ${elementId}\nStyles - Coming Soon`;
@@ -394,13 +398,15 @@ export async function handleRenderElementStylesRequest(elementId: string): Promi
 /**
  * Handle select-element-style request from UI
  */
-export async function handleSelectElementStyle(elementId: string | null): Promise<void> {
+export async function handleSelectElementStyle(
+  elementId: string | null
+): Promise<void> {
   console.log(`Selecting element style: ${elementId}`);
 
   try {
     // Store selection in plugin data for future use
     await figma.clientStorage.setAsync("selectedElementId", elementId);
-    
+
     if (elementId) {
       figma.notify(`Selected element: ${elementId.substring(0, 8)}...`);
     } else {
@@ -412,14 +418,153 @@ export async function handleSelectElementStyle(elementId: string | null): Promis
 }
 
 /**
+ * Helper function to create a text node with auto-layout support
+ * Note: Fonts must be loaded before calling this function
+ */
+function createStyledText(
+  text: string,
+  fontSize: number,
+  fontWeight: "Regular" | "Medium" | "Bold"
+): TextNode {
+  const textNode = figma.createText();
+  textNode.characters = text;
+  textNode.fontSize = fontSize;
+  textNode.textAutoResize = "WIDTH_AND_HEIGHT";
+  textNode.layoutGrow = 0;
+  textNode.layoutAlign = "MIN";
+  // Font must already be loaded via loadStylingFonts()
+  try {
+    textNode.fontName = { family: "Inter", style: fontWeight };
+  } catch (error) {
+    console.error(`Failed to set font ${fontWeight}:`, error);
+    // Fallback to Regular if the specific weight fails
+    textNode.fontName = { family: "Inter", style: "Regular" };
+  }
+  return textNode;
+}
+
+/**
+ * Helper function to create a table row with auto-layout
+ */
+function createVariableRow(
+  variableName: string,
+  variableValue: string,
+  width: number
+): FrameNode {
+  const rowFrame = figma.createFrame();
+  rowFrame.name = "variable-row";
+  rowFrame.layoutMode = "HORIZONTAL";
+  rowFrame.primaryAxisSizingMode = "FIXED";
+  rowFrame.counterAxisSizingMode = "AUTO";
+  rowFrame.resize(width, rowFrame.height);
+  rowFrame.paddingLeft = 12;
+  rowFrame.paddingRight = 12;
+  rowFrame.paddingTop = 12;
+  rowFrame.paddingBottom = 12;
+  rowFrame.itemSpacing = 16;
+  rowFrame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+  rowFrame.strokes = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
+  rowFrame.strokeWeight = 1;
+  rowFrame.cornerRadius = 4;
+
+  // Name container (fixed width)
+  const nameContainer = figma.createFrame();
+  nameContainer.name = "name";
+  nameContainer.layoutMode = "HORIZONTAL";
+  nameContainer.primaryAxisSizingMode = "FIXED";
+  nameContainer.counterAxisSizingMode = "AUTO";
+  nameContainer.resize(300, nameContainer.height);
+  nameContainer.fills = [];
+
+  const nameText = createStyledText(variableName, 12, "Medium");
+  nameContainer.appendChild(nameText);
+
+  // Value container (grows to fill space)
+  const valueContainer = figma.createFrame();
+  valueContainer.name = "value";
+  valueContainer.layoutMode = "HORIZONTAL";
+  valueContainer.primaryAxisSizingMode = "FIXED";
+  valueContainer.counterAxisSizingMode = "AUTO";
+  valueContainer.resize(250, valueContainer.height);
+  valueContainer.fills = [];
+
+  const valueText = createStyledText(String(variableValue), 12, "Regular");
+  valueText.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4 } }];
+  valueContainer.appendChild(valueText);
+
+  // Sample container (color preview if applicable)
+  const sampleContainer = figma.createFrame();
+  sampleContainer.name = "sample";
+  sampleContainer.layoutMode = "HORIZONTAL";
+  sampleContainer.primaryAxisSizingMode = "FIXED";
+  sampleContainer.counterAxisSizingMode = "AUTO";
+  sampleContainer.resize(80, sampleContainer.height);
+  sampleContainer.fills = [];
+  sampleContainer.primaryAxisAlignItems = "CENTER";
+  sampleContainer.counterAxisAlignItems = "CENTER";
+
+  if (isColorValue(String(variableValue))) {
+    const colorSample = figma.createRectangle();
+    colorSample.name = "color-preview";
+    colorSample.resize(48, 24);
+    colorSample.cornerRadius = 4;
+
+    try {
+      const paint = colorToPaint(String(variableValue));
+      if (
+        paint &&
+        paint.color &&
+        !isNaN(paint.color.r) &&
+        !isNaN(paint.color.g) &&
+        !isNaN(paint.color.b) &&
+        paint.color.r >= 0 &&
+        paint.color.r <= 1 &&
+        paint.color.g >= 0 &&
+        paint.color.g <= 1 &&
+        paint.color.b >= 0 &&
+        paint.color.b <= 1
+      ) {
+        colorSample.fills = [paint];
+        colorSample.strokes = [
+          { type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8 } },
+        ];
+        colorSample.strokeWeight = 1;
+      } else {
+        colorSample.fills = [
+          { type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } },
+        ];
+      }
+    } catch (error) {
+      console.error(
+        `Failed to create color for ${variableName}: ${variableValue}`,
+        error
+      );
+      colorSample.fills = [
+        { type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } },
+      ];
+    }
+
+    sampleContainer.appendChild(colorSample);
+  }
+
+  rowFrame.appendChild(nameContainer);
+  rowFrame.appendChild(valueContainer);
+  rowFrame.appendChild(sampleContainer);
+
+  return rowFrame;
+}
+
+/**
  * Helper function to create a global styles table
  */
-async function createGlobalStylesTable(page: PageNode, stylesData: any): Promise<void> {
+async function createGlobalStylesTable(
+  page: PageNode,
+  stylesData: any
+): Promise<void> {
   const cssVariables = stylesData.cssVariables || {};
   const variables = Object.entries(cssVariables);
-  
+
   if (variables.length === 0) {
-    // Create "No styles" message
     const text = figma.createText();
     text.characters = "No CSS variables found in this project";
     text.fontSize = 16;
@@ -429,133 +574,104 @@ async function createGlobalStylesTable(page: PageNode, stylesData: any): Promise
     return;
   }
 
-  // Table layout settings
-  const startX = 100;
-  const startY = 100;
-  const rowHeight = 40;
-  const colWidths = [50, 200, 150, 100]; // #, Variable, Value, Sample
+  // Create main container with auto-layout
+  const mainFrame = figma.createFrame();
+  mainFrame.name = "Global Styles Table";
+  mainFrame.layoutMode = "VERTICAL";
+  mainFrame.primaryAxisSizingMode = "AUTO";
+  mainFrame.counterAxisSizingMode = "FIXED";
+  mainFrame.resize(740, mainFrame.height);
+  mainFrame.paddingLeft = 20;
+  mainFrame.paddingRight = 20;
+  mainFrame.paddingTop = 20;
+  mainFrame.paddingBottom = 20;
+  mainFrame.itemSpacing = 16;
+  mainFrame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
+  mainFrame.cornerRadius = 8;
 
-  // Table header
-  const headers = ["#", "Variable Name", "Variable Value", "Sample"];
-  let currentY = startY;
+  // Add title
+  const titleText = createStyledText(
+    `CSS Variables (${variables.length} total)`,
+    18,
+    "Bold"
+  );
+  titleText.fills = [{ type: "SOLID", color: { r: 0.1, g: 0.1, b: 0.1 } }];
+  mainFrame.appendChild(titleText);
 
-  // Create header row background
+  // Add header row
   const headerFrame = figma.createFrame();
-  headerFrame.name = "Table Header";
-  headerFrame.x = startX;
-  headerFrame.y = currentY;
-  headerFrame.resize(colWidths.reduce((a, b) => a + b, 0), rowHeight);
-  headerFrame.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
-  headerFrame.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
-  headerFrame.strokeWeight = 1;
-  page.appendChild(headerFrame);
+  headerFrame.name = "header";
+  headerFrame.layoutMode = "HORIZONTAL";
+  headerFrame.primaryAxisSizingMode = "FIXED";
+  headerFrame.counterAxisSizingMode = "AUTO";
+  headerFrame.resize(700, headerFrame.height);
+  headerFrame.paddingLeft = 12;
+  headerFrame.paddingRight = 12;
+  headerFrame.paddingTop = 8;
+  headerFrame.paddingBottom = 8;
+  headerFrame.itemSpacing = 16;
+  headerFrame.fills = [{ type: "SOLID", color: { r: 0.92, g: 0.92, b: 0.92 } }];
+  headerFrame.cornerRadius = 4;
 
-    // Create header text
-    let currentX = startX + 10;
-    for (let i = 0; i < headers.length; i++) {
-      const headerText = figma.createText();
-      headerText.characters = headers[i];
-      headerText.fontSize = 12;
-      headerText.fontName = { family: "Inter", style: "Bold" };
-      headerText.x = currentX;
-      headerText.y = currentY + 12;
-      page.appendChild(headerText);
-      currentX += colWidths[i];
-    }
+  // Header columns
+  const headers = [
+    { text: "Variable Name", width: 300 },
+    { text: "Value", width: 250 },
+    { text: "Preview", width: 80 },
+  ];
 
-  currentY += rowHeight;
+  headers.forEach(({ text: headerText, width }) => {
+    const headerCol = figma.createFrame();
+    headerCol.name = "header-col";
+    headerCol.layoutMode = "HORIZONTAL";
+    headerCol.primaryAxisSizingMode = "FIXED";
+    headerCol.counterAxisSizingMode = "AUTO";
+    headerCol.resize(width, headerCol.height);
+    headerCol.fills = [];
 
-  // Create rows for each CSS variable
-  variables.forEach(([variableName, variableValue], index) => {
-    const rowNumber = index + 1;
+    const text = createStyledText(headerText, 11, "Bold");
+    text.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
+    headerCol.appendChild(text);
 
-    // Create row background
-    const rowFrame = figma.createFrame();
-    rowFrame.name = `Row ${rowNumber}`;
-    rowFrame.x = startX;
-    rowFrame.y = currentY;
-    rowFrame.resize(colWidths.reduce((a, b) => a + b, 0), rowHeight);
-    rowFrame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-    rowFrame.strokes = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
-    rowFrame.strokeWeight = 1;
-    page.appendChild(rowFrame);
-
-    // Create row text elements
-    let textX = startX + 10;
-    
-    // Row number
-    const numberText = figma.createText();
-    numberText.characters = rowNumber.toString();
-    numberText.fontSize = 11;
-    numberText.x = textX;
-    numberText.y = currentY + 12;
-    page.appendChild(numberText);
-    textX += colWidths[0];
-
-    // Variable name
-    const nameText = figma.createText();
-    nameText.characters = variableName;
-    nameText.fontSize = 11;
-    nameText.x = textX;
-    nameText.y = currentY + 12;
-    page.appendChild(nameText);
-    textX += colWidths[1];
-
-    // Variable value
-    const valueText = figma.createText();
-    valueText.characters = String(variableValue);
-    valueText.fontSize = 11;
-    valueText.x = textX;
-    valueText.y = currentY + 12;
-    page.appendChild(valueText);
-    textX += colWidths[2];
-
-    // Sample (only for colors)
-    if (isColorValue(String(variableValue))) {
-      // Create rectangle color sample (24x60px with 2px border radius)
-      const colorSample = figma.createRectangle();
-      colorSample.name = `Color Sample - ${variableName}`;
-      colorSample.resize(24, 60);
-      colorSample.x = textX + 8; // Center in column
-      colorSample.y = currentY + 10; // Center vertically in row
-      colorSample.cornerRadius = 2; // Set corner radius for all corners
-      
-      // Safer color creation with validation
-      try {
-        const paint = colorToPaint(String(variableValue));
-        console.log(`Color paint for ${variableName}:`, paint);
-        
-        // Validate the color values before assignment
-        if (paint && paint.color && 
-            !isNaN(paint.color.r) && !isNaN(paint.color.g) && !isNaN(paint.color.b) &&
-            paint.color.r >= 0 && paint.color.r <= 1 &&
-            paint.color.g >= 0 && paint.color.g <= 1 &&
-            paint.color.b >= 0 && paint.color.b <= 1) {
-          colorSample.fills = [paint];
-        } else {
-          console.warn(`Invalid color values for ${variableName}: ${variableValue}`);
-          colorSample.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
-        }
-      } catch (error) {
-        console.error(`Failed to create color paint for ${variableName}: ${variableValue}`, error);
-        colorSample.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
-      }
-      
-      page.appendChild(colorSample);
-    }
-    // No element created for non-color values (empty sample column)
-
-    currentY += rowHeight;
+    headerFrame.appendChild(headerCol);
   });
 
-  // Add table title
-  const titleText = figma.createText();
-  titleText.characters = `CSS Variables (${variables.length} variables)`;
-  titleText.fontSize = 18;
-  titleText.fontName = { family: "Inter", style: "Bold" };
-  titleText.x = startX;
-  titleText.y = startY - 40;
-  page.appendChild(titleText);
+  mainFrame.appendChild(headerFrame);
+
+  // Add variable rows
+  variables.forEach(([variableName, variableValue]) => {
+    const row = createVariableRow(variableName, String(variableValue), 700);
+    mainFrame.appendChild(row);
+  });
+
+  // Position in viewport
+  page.appendChild(mainFrame);
+
+  // Position to the right of existing content
+  const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
+  let rightmostX = 0;
+  let topmostY = 0;
+
+  if (allNodes.length > 0) {
+    allNodes.forEach((node) => {
+      const nodeRight = node.x + node.width;
+      if (nodeRight > rightmostX) {
+        rightmostX = nodeRight;
+      }
+      if (node.y < topmostY || topmostY === 0) {
+        topmostY = node.y;
+      }
+    });
+    mainFrame.x = rightmostX + 200;
+    mainFrame.y = topmostY;
+  } else {
+    mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
+    mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+  }
+
+  // Select and zoom to the frame
+  page.selection = [mainFrame];
+  figma.viewport.scrollAndZoomIntoView([mainFrame]);
 }
 
 /**
@@ -569,8 +685,8 @@ function isColorValue(value: string): boolean {
     /^hsl\(/, // HSL
     /^hsla\(/, // HSLA
   ];
-  
-  return colorPatterns.some(pattern => pattern.test(value));
+
+  return colorPatterns.some((pattern) => pattern.test(value));
 }
 
 /**
@@ -578,6 +694,7 @@ function isColorValue(value: string): boolean {
  */
 async function loadStylingFonts(): Promise<void> {
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+  await figma.loadFontAsync({ family: "Inter", style: "Medium" });
   await figma.loadFontAsync({ family: "Inter", style: "Bold" });
 }
 
@@ -586,31 +703,34 @@ async function loadStylingFonts(): Promise<void> {
  */
 function colorToPaint(colorString: string): SolidPaint {
   // Simple hex color converter
-  if (colorString.startsWith('#')) {
+  if (colorString.startsWith("#")) {
     let hex = colorString.substring(1);
-    
+
     // Handle 3-character hex colors (e.g., #fff)
     if (hex.length === 3) {
-      hex = hex.split('').map(char => char + char).join('');
+      hex = hex
+        .split("")
+        .map((char) => char + char)
+        .join("");
     }
-    
+
     // Ensure we have 6 characters
     if (hex.length !== 6) {
-      return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
+      return { type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5 } };
     }
-    
+
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
-    
+
     // Check if parsing failed (NaN)
     if (isNaN(r) || isNaN(g) || isNaN(b)) {
-      return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
+      return { type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5 } };
     }
-    
-    return { type: 'SOLID', color: { r: r / 255, g: g / 255, b: b / 255 } };
+
+    return { type: "SOLID", color: { r: r / 255, g: g / 255, b: b / 255 } };
   }
-  
+
   // Default to gray if can't parse
-  return { type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } };
+  return { type: "SOLID", color: { r: 0.5, g: 0.5, b: 0.5 } };
 }
