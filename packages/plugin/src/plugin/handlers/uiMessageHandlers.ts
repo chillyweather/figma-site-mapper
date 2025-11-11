@@ -17,6 +17,9 @@ import { handleShowFlow } from "./flowHandlers";
 import {
   handleShowStylingElements,
   handleGetCurrentPageUrl,
+  handleRenderGlobalStylesRequest,
+  handleRenderElementStylesRequest,
+  handleSelectElementStyle,
 } from "./stylingHandlers";
 import {
   buildManifestFromProject,
@@ -1076,15 +1079,12 @@ export async function handleUIMessage(msg: any): Promise<void> {
     case "start-crawl":
       await handleStartCrawl(msg);
       break;
-
     case "save-settings":
       await handleSaveSettings(msg);
       break;
-
     case "load-settings":
       await handleLoadSettings();
       break;
-
     case "get-status":
       await handleGetStatus(
         msg.jobId,
@@ -1092,41 +1092,29 @@ export async function handleUIMessage(msg: any): Promise<void> {
         msg.detectInteractiveElements !== false
       );
       break;
-
     case "show-flow":
       await handleShowFlow(msg.selectedLinks);
       break;
-
-    case "get-current-page-url":
-      await handleGetCurrentPageUrl();
-      break;
-
     case "show-styling-elements":
       await handleShowStylingElements();
       break;
-
+    case "get-current-page-url":
+      await handleGetCurrentPageUrl();
+      break;
+    case "render-global-styles":
+      await handleRenderGlobalStylesRequest();
+      break;
+    case "render-element-styles":
+      await handleRenderElementStylesRequest((msg as any).elementId);
+      break;
+    case "select-element-style":
+      await handleSelectElementStyle((msg as any).elementId);
+      break;
     case "open-auth-session":
       await handleOpenAuthSession(msg);
       break;
-
-    case "get-last-manifest":
-      await handleGetLastManifest();
-      break;
-
-    case "build-tokens-table":
-      await handleBuildTokensTable(msg);
-      break;
-
-    case "build-all-tokens-tables":
-      await handleBuildAllTokensTables(msg);
-      break;
-
     case "set-active-project":
       await handleSetActiveProject(msg.projectId || null);
-      break;
-
-    case "render-project-snapshot":
-      await handleRenderProjectSnapshot(msg);
       break;
 
     case "render-markup": {

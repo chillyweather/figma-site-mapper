@@ -330,6 +330,9 @@ export interface MainViewProps {
     pageName?: string;
   } | null;
   selectedMarkupFilterCount: number;
+  // Styling snapshot props
+  handleRenderSnapshot: () => void;
+  isRenderingSnapshot: boolean;
 }
 
 export interface CrawlingTabProps {

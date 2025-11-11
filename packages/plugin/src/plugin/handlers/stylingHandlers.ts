@@ -294,3 +294,120 @@ function findPageByUrl(
 
   return null;
 }
+
+/**
+ * Handle render-global-styles request from UI
+ */
+export async function handleRenderGlobalStylesRequest(): Promise<void> {
+  console.log("🎨 Starting global styles rendering");
+
+  try {
+    const activeProjectId = await getActiveProjectId();
+    if (!activeProjectId) {
+      figma.notify("No active project selected", { error: true });
+      return;
+    }
+
+    // Create new page for global styles
+    const globalStylesPage = figma.createPage();
+    globalStylesPage.name = "🎨 Global Styles";
+
+    // Insert page at the end
+    figma.root.appendChild(globalStylesPage);
+    figma.currentPage = globalStylesPage;
+
+    // TODO: Implement actual global styles rendering
+    // For now, just create a placeholder frame
+    const frame = figma.createFrame();
+    frame.name = "Global Styles";
+    frame.x = 100;
+    frame.y = 100;
+    frame.resize(400, 300);
+    frame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+
+    const text = figma.createText();
+    text.characters = "Global Styles - Coming Soon";
+    text.fontSize = 20;
+    text.x = 120;
+    text.y = 200;
+
+    globalStylesPage.appendChild(frame);
+    globalStylesPage.appendChild(text);
+
+    figma.notify("✨ Global styles page created!");
+  } catch (error) {
+    console.error("Failed to render global styles:", error);
+    figma.notify("Error creating global styles page", { error: true });
+  }
+}
+
+/**
+ * Handle render-element-styles request from UI
+ */
+export async function handleRenderElementStylesRequest(elementId: string): Promise<void> {
+  console.log(`🎨 Starting element styles rendering for element: ${elementId}`);
+
+  try {
+    if (!elementId) {
+      figma.notify("No element selected", { error: true });
+      return;
+    }
+
+    const activeProjectId = await getActiveProjectId();
+    if (!activeProjectId) {
+      figma.notify("No active project selected", { error: true });
+      return;
+    }
+
+    // Create new page for element styles
+    const elementStylesPage = figma.createPage();
+    elementStylesPage.name = `🎨 Element ${elementId.substring(0, 8)}`;
+
+    // Insert page at the end
+    figma.root.appendChild(elementStylesPage);
+    figma.currentPage = elementStylesPage;
+
+    // TODO: Implement actual element styles rendering
+    // For now, just create a placeholder frame
+    const frame = figma.createFrame();
+    frame.name = `Element ${elementId}`;
+    frame.x = 100;
+    frame.y = 100;
+    frame.resize(400, 300);
+    frame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.7, b: 0.7 } }];
+
+    const text = figma.createText();
+    text.characters = `Element ${elementId}\nStyles - Coming Soon`;
+    text.fontSize = 16;
+    text.x = 120;
+    text.y = 200;
+
+    elementStylesPage.appendChild(frame);
+    elementStylesPage.appendChild(text);
+
+    figma.notify("✨ Element styles page created!");
+  } catch (error) {
+    console.error("Failed to render element styles:", error);
+    figma.notify("Error creating element styles page", { error: true });
+  }
+}
+
+/**
+ * Handle select-element-style request from UI
+ */
+export async function handleSelectElementStyle(elementId: string | null): Promise<void> {
+  console.log(`Selecting element style: ${elementId}`);
+
+  try {
+    // Store selection in plugin data for future use
+    await figma.clientStorage.setAsync("selectedElementId", elementId);
+    
+    if (elementId) {
+      figma.notify(`Selected element: ${elementId.substring(0, 8)}...`);
+    } else {
+      figma.notify("Element selection cleared");
+    }
+  } catch (error) {
+    console.error("Failed to handle element selection:", error);
+  }
+}

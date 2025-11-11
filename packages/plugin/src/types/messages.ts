@@ -13,7 +13,10 @@ export type PluginMessageType =
   | "badge-links-update"
   | "open-auth-session"
   | "current-page-url"
-  | "set-active-project";
+  | "set-active-project"
+  | "render-global-styles"
+  | "render-element-styles"
+  | "select-element-style";
 
 export interface StyleExtractionSettings {
   enabled: boolean;
@@ -71,4 +74,18 @@ export interface DetailedProgress {
   totalPages?: number;
   currentUrl?: string;
   progress?: number;
+}
+
+export interface RenderGlobalStylesMessage {
+  type: "render-global-styles";
+}
+
+export interface RenderElementStylesMessage {
+  type: "render-element-styles";
+  elementId: string;
+}
+
+export interface SelectElementStyleMessage {
+  type: "select-element-style";
+  elementId: string | null;
 }

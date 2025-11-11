@@ -4,7 +4,7 @@ import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
 import { MarkupTab } from "./MarkupTab";
-import { ElementStylingTab } from "./ElementStylingTab";
+import { StylingTab } from "./StylingTab";
 import { TokensTab } from "./TokensTab";
 
 export const MainView: React.FC<MainViewProps> = ({
@@ -37,8 +37,6 @@ export const MainView: React.FC<MainViewProps> = ({
   manifestData: _manifestData,
   selectedPageUrl: _selectedPageUrl,
   onPageSelection: _onPageSelection,
-  handleRenderSnapshot,
-  isRenderingSnapshot,
   markupFilters,
   supportedMarkupFilters,
   onMarkupFilterChange,
@@ -48,7 +46,16 @@ export const MainView: React.FC<MainViewProps> = ({
   markupStatus,
   activeMarkupPage,
   selectedMarkupFilterCount,
+  handleRenderSnapshot,
+  isRenderingSnapshot,
 }) => {
+  // Styling state
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [isRenderingGlobalStyles, setIsRenderingGlobalStyles] = useState(false);
+  const [isRenderingElementStyles, setIsRenderingElementStyles] = useState(false);
+  const [globalStylesStatus, setGlobalStylesStatus] = useState("");
+  const [elementStylesStatus, setElementStylesStatus] = useState("");
+
   const [activeTab, setActiveTab] = useState<
     "crawling" | "flows" | "styling" | "markup" | "tokens"
   >("crawling");
@@ -56,6 +63,41 @@ export const MainView: React.FC<MainViewProps> = ({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const projectSelected = Boolean(activeProjectId);
+
+  // Styling handlers
+  const handleRenderGlobalStyles = () => {
+    setIsRenderingGlobalStyles(true);
+    setGlobalStylesStatus("Rendering global styles...");
+    
+    parent.postMessage(
+      { pluginMessage: { type: "render-global-styles" } },
+      "*"
+    );
+    
+    // Reset after a delay (actual completion handled by plugin message)
+    setTimeout(() => {
+      setIsRenderingGlobalStyles(false);
+      setGlobalStylesStatus("");
+    }, 3000);
+  };
+
+  const handleRenderElementStyles = (elementId: string) => {
+    if (!elementId) return;
+    
+    setIsRenderingElementStyles(true);
+    setElementStylesStatus("Rendering element styles...");
+    
+    parent.postMessage(
+      { pluginMessage: { type: "render-element-styles", elementId } },
+      "*"
+    );
+    
+    // Reset after a delay (actual completion handled by plugin message)
+    setTimeout(() => {
+      setIsRenderingElementStyles(false);
+      setElementStylesStatus("");
+    }, 3000);
+  };
 
   const handleProjectSelect = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -407,7 +449,15 @@ export const MainView: React.FC<MainViewProps> = ({
           )}
 
           {activeTab === "styling" && (
-            <ElementStylingTab handleShowStyling={handleShowStyling} />
+            <StylingTab
+              onRenderGlobalStyles={handleRenderGlobalStyles}
+              onRenderElementStyles={handleRenderElementStyles}
+              isRenderingGlobalStyles={isRenderingGlobalStyles}
+              isRenderingElementStyles={isRenderingElementStyles}
+              globalStylesStatus={globalStylesStatus}
+              elementStylesStatus={elementStylesStatus}
+              selectedElementId={selectedElementId}
+            />
           )}
 
           {activeTab === "tokens" && <TokensTab />}
