@@ -420,10 +420,11 @@ async function extractStyleData(
       const elements: ExtractedElementInner[] = [];
       const allTokens = new Set<string>();
 
+      const MAX_STYLE_ELEMENTS = 5000;
       const allElements = Array.from(
         document.querySelectorAll<HTMLElement>("*")
       );
-      const maxElements = Math.min(allElements.length, 1000);
+      const maxElements = Math.min(allElements.length, MAX_STYLE_ELEMENTS);
 
       for (let i = 0; i < maxElements; i++) {
         const el = allElements[i];
