@@ -1,12 +1,21 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
+import { MarkupTab } from "./MarkupTab";
 import { ElementStylingTab } from "./ElementStylingTab";
 import { TokensTab } from "./TokensTab";
 
 export const MainView: React.FC<MainViewProps> = ({
+  projects,
+  activeProjectId,
+  onProjectChange,
+  onCreateProject,
+  onRefreshProjects,
+  isProjectLoading,
+  isCreatingProject,
+  projectError,
   url,
   handleUrlChange,
   isLoading,
@@ -21,18 +30,67 @@ export const MainView: React.FC<MainViewProps> = ({
   handleShowFlow,
   flowProgress,
   crawlProgress,
-  // Element styling props
-  categorizedElements,
-  elementFilters,
-  onElementFilterChange,
+  categorizedElements: _categorizedElements,
+  elementFilters: _elementFilters,
+  onElementFilterChange: _onElementFilterChange,
   handleShowStyling,
-  manifestData,
-  selectedPageUrl,
-  onPageSelection,
+  manifestData: _manifestData,
+  selectedPageUrl: _selectedPageUrl,
+  onPageSelection: _onPageSelection,
+  handleRenderSnapshot,
+  isRenderingSnapshot,
+  markupFilters,
+  supportedMarkupFilters,
+  onMarkupFilterChange,
+  onRenderMarkup,
+  onClearMarkup,
+  isMarkupRendering,
+  markupStatus,
+  activeMarkupPage,
+  selectedMarkupFilterCount,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "flows" | "styling" | "tokens"
+    "crawling" | "flows" | "styling" | "markup" | "tokens"
   >("crawling");
+  const [newProjectName, setNewProjectName] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const projectSelected = Boolean(activeProjectId);
+
+  const handleProjectSelect = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value;
+      onProjectChange(value ? value : null);
+      setLocalError(null);
+    },
+    [onProjectChange]
+  );
+
+  const handleCreateProject = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const trimmed = newProjectName.trim();
+      if (!trimmed) {
+        setLocalError("Project name is required.");
+        return;
+      }
+
+      try {
+        setLocalError(null);
+        await onCreateProject(trimmed);
+        setNewProjectName("");
+      } catch (error) {
+        setLocalError(
+          error instanceof Error
+            ? error.message
+            : "Unable to create project right now."
+        );
+      }
+    },
+    [newProjectName, onCreateProject]
+  );
 
   return (
     <div id="main-view" style={{ fontFamily: "Inter, sans-serif" }}>
@@ -68,123 +126,293 @@ export const MainView: React.FC<MainViewProps> = ({
         </button>
       </div>
 
-      {/* Tab Navigation */}
       <div
-        id="tab-navigation"
         style={{
+          padding: "0 16px 16px 16px",
           display: "flex",
-          marginBottom: "16px",
-          borderBottom: "1px solid #e0e0e0",
-          padding: "0 16px",
+          flexDirection: "column",
+          gap: "8px",
         }}
       >
-        <button
-          id="crawling-tab-button"
-          onClick={() => setActiveTab("crawling")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: activeTab === "crawling" ? "600" : "400",
-            color: activeTab === "crawling" ? "#000" : "#666",
-            borderBottom:
-              activeTab === "crawling"
-                ? "2px solid #0066cc"
-                : "2px solid transparent",
-          }}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <label
+            htmlFor="project-select"
+            style={{ fontSize: "12px", fontWeight: 600, minWidth: "60px" }}
+          >
+            Project
+          </label>
+          <select
+            id="project-select"
+            value={activeProjectId ? activeProjectId : ""}
+            onChange={handleProjectSelect}
+            disabled={isProjectLoading}
+            style={{
+              flex: 1,
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              fontSize: "12px",
+            }}
+          >
+            <option value="">Select a project…</option>
+            {projects.map((project) => (
+              <option key={project._id} value={project._id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setLocalError(null);
+              void onRefreshProjects();
+            }}
+            disabled={isProjectLoading}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              backgroundColor: isProjectLoading ? "#f1f3f5" : "white",
+              fontSize: "11px",
+              cursor: isProjectLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {isProjectLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleCreateProject}
+          style={{ display: "flex", gap: "8px" }}
         >
-          Crawling
-        </button>
-        <button
-          id="flows-tab-button"
-          onClick={() => setActiveTab("flows")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: activeTab === "flows" ? "600" : "400",
-            color: activeTab === "flows" ? "#000" : "#666",
-            borderBottom:
-              activeTab === "flows"
-                ? "2px solid #0066cc"
-                : "2px solid transparent",
-          }}
-        >
-          Flows
-        </button>
-        <button
-          id="styling-tab-button"
-          onClick={() => setActiveTab("styling")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: activeTab === "styling" ? "600" : "400",
-            color: activeTab === "styling" ? "#000" : "#666",
-            borderBottom:
-              activeTab === "styling"
-                ? "2px solid #0066cc"
-                : "2px solid transparent",
-          }}
-        >
-          Styling
-        </button>
-        <button
-          id="tokens-tab-button"
-          onClick={() => setActiveTab("tokens")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: activeTab === "tokens" ? "600" : "400",
-            color: activeTab === "tokens" ? "#000" : "#666",
-            borderBottom:
-              activeTab === "tokens"
-                ? "2px solid #0066cc"
-                : "2px solid transparent",
-          }}
-        >
-          Tokens
-        </button>
+          <input
+            type="text"
+            value={newProjectName}
+            onChange={(event) => setNewProjectName(event.target.value)}
+            placeholder="New project name"
+            disabled={isCreatingProject}
+            style={{
+              flex: 1,
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              fontSize: "12px",
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isCreatingProject}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "4px",
+              border: "none",
+              backgroundColor: isCreatingProject ? "#adb5bd" : "#0066cc",
+              color: "white",
+              fontSize: "12px",
+              cursor: isCreatingProject ? "not-allowed" : "pointer",
+              fontWeight: 500,
+            }}
+          >
+            {isCreatingProject ? "Creating…" : "Create Project"}
+          </button>
+        </form>
+
+        {(projectError || localError) && (
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#721c24",
+              backgroundColor: "#f8d7da",
+              border: "1px solid #f5c6cb",
+              borderRadius: "4px",
+              padding: "8px",
+            }}
+          >
+            {projectError || localError}
+          </div>
+        )}
+
+        {!projects.length && !isProjectLoading && !projectSelected && (
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#495057",
+              backgroundColor: "#e9ecef",
+              borderRadius: "4px",
+              padding: "8px",
+            }}
+          >
+            Create your first project to start crawling.
+          </div>
+        )}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === "crawling" && (
-        <CrawlingTab
-          url={url}
-          handleUrlChange={handleUrlChange}
-          isLoading={isLoading}
-          jobId={jobId}
-          handleSubmit={handleSubmit}
-          status={status}
-          handleClose={handleClose}
-          crawlProgress={crawlProgress}
-        />
-      )}
+      {!projectSelected ? (
+        <div
+          style={{
+            padding: "0 16px 16px 16px",
+            color: "#495057",
+            fontSize: "13px",
+          }}
+        >
+          Select or create a project to enable crawling, flows, styling, and
+          tokens.
+        </div>
+      ) : (
+        <>
+          <div
+            id="tab-navigation"
+            style={{
+              display: "flex",
+              marginBottom: "16px",
+              borderBottom: "1px solid #e0e0e0",
+              padding: "0 16px",
+            }}
+          >
+            <button
+              id="crawling-tab-button"
+              onClick={() => setActiveTab("crawling")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "crawling" ? "600" : "400",
+                color: activeTab === "crawling" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "crawling"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Crawling
+            </button>
+            <button
+              id="markup-tab-button"
+              onClick={() => setActiveTab("markup")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "markup" ? "600" : "400",
+                color: activeTab === "markup" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "markup"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Markup
+            </button>
+            <button
+              id="flows-tab-button"
+              onClick={() => setActiveTab("flows")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "flows" ? "600" : "400",
+                color: activeTab === "flows" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "flows"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Flows
+            </button>
+            <button
+              id="styling-tab-button"
+              onClick={() => setActiveTab("styling")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "styling" ? "600" : "400",
+                color: activeTab === "styling" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "styling"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Styling
+            </button>
+            <button
+              id="tokens-tab-button"
+              onClick={() => setActiveTab("tokens")}
+              style={{
+                background: "none",
+                border: "none",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: activeTab === "tokens" ? "600" : "400",
+                color: activeTab === "tokens" ? "#000" : "#666",
+                borderBottom:
+                  activeTab === "tokens"
+                    ? "2px solid #0066cc"
+                    : "2px solid transparent",
+              }}
+            >
+              Tokens
+            </button>
+          </div>
 
-      {activeTab === "flows" && (
-        <FlowsTab
-          badgeLinks={badgeLinks}
-          checkedLinks={checkedLinks}
-          handleLinkCheck={handleLinkCheck}
-          handleShowFlow={handleShowFlow}
-          flowProgress={flowProgress}
-        />
-      )}
+          {activeTab === "crawling" && (
+            <CrawlingTab
+              url={url}
+              handleUrlChange={handleUrlChange}
+              isLoading={isLoading}
+              jobId={jobId}
+              handleSubmit={handleSubmit}
+              handleRenderSnapshot={handleRenderSnapshot}
+              status={status}
+              handleClose={handleClose}
+              crawlProgress={crawlProgress}
+              projectSelected={projectSelected}
+              isRenderingSnapshot={isRenderingSnapshot}
+            />
+          )}
 
-      {activeTab === "styling" && (
-        <ElementStylingTab handleShowStyling={handleShowStyling} />
-      )}
+          {activeTab === "markup" && (
+            <MarkupTab
+              filters={markupFilters}
+              supportedFilters={supportedMarkupFilters}
+              onFilterChange={onMarkupFilterChange}
+              onRender={onRenderMarkup}
+              onClear={onClearMarkup}
+              isRendering={isMarkupRendering}
+              status={markupStatus}
+              activePage={activeMarkupPage}
+              selectedFilterCount={selectedMarkupFilterCount}
+            />
+          )}
 
-      {activeTab === "tokens" && <TokensTab />}
+          {activeTab === "flows" && (
+            <FlowsTab
+              badgeLinks={badgeLinks}
+              checkedLinks={checkedLinks}
+              handleLinkCheck={handleLinkCheck}
+              handleShowFlow={handleShowFlow}
+              flowProgress={flowProgress}
+            />
+          )}
+
+          {activeTab === "styling" && (
+            <ElementStylingTab handleShowStyling={handleShowStyling} />
+          )}
+
+          {activeTab === "tokens" && <TokensTab />}
+        </>
+      )}
     </div>
   );
 };

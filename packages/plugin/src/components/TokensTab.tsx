@@ -51,57 +51,55 @@ export const TokensTab: React.FC = () => {
     setIsLoading(true);
     setLoadError(null);
 
-    try {
-      // Request last manifest URL from plugin code
-      parent.postMessage({ pluginMessage: { type: "get-last-manifest" } }, "*");
+    let timeoutId: number | null = null;
 
-      // Set up listener for response
-      const handleMessage = async (event: MessageEvent) => {
-        const msg = event.data.pluginMessage;
-        if (msg?.type === "last-manifest-url") {
-          window.removeEventListener("message", handleMessage);
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) {
+        return;
+      }
 
-          if (msg.manifestUrl) {
-            try {
-              // Fetch manifest from server
-              const response = await fetch(msg.manifestUrl);
-              if (!response.ok) {
-                throw new Error(`Failed to fetch manifest: ${response.status}`);
-              }
-              const data = await response.json();
-              setManifestData(data);
-              setIsLoading(false);
-            } catch (error) {
-              console.error("Failed to fetch manifest:", error);
-              setLoadError(
-                error instanceof Error
-                  ? error.message
-                  : "Failed to load manifest data"
-              );
-              setIsLoading(false);
-            }
-          } else {
-            setLoadError("No previous crawl found");
-            setIsLoading(false);
-          }
-        }
-      };
-
-      window.addEventListener("message", handleMessage);
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
+      if (msg.type === "manifest-data") {
         window.removeEventListener("message", handleMessage);
-        if (isLoading) {
-          setLoadError("Timeout loading manifest data");
-          setIsLoading(false);
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
         }
-      }, 10000);
+        setManifestData(msg.manifestData);
+        setIsLoading(false);
+        setLoadError(null);
+      }
+
+      if (msg.type === "manifest-error") {
+        window.removeEventListener("message", handleMessage);
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+        setLoadError(
+          typeof msg.message === "string"
+            ? msg.message
+            : "Failed to load crawl data"
+        );
+        setIsLoading(false);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    try {
+      parent.postMessage({ pluginMessage: { type: "get-last-manifest" } }, "*");
     } catch (error) {
-      console.error("Error loading manifest:", error);
+      console.error("Error requesting manifest:", error);
+      window.removeEventListener("message", handleMessage);
       setLoadError("Error loading manifest data");
       setIsLoading(false);
+      return;
     }
+
+    timeoutId = window.setTimeout(() => {
+      window.removeEventListener("message", handleMessage);
+      setLoadError("Timeout loading manifest data");
+      setIsLoading(false);
+    }, 10000);
   };
 
   const handleBuildTokensTable = () => {

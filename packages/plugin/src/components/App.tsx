@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useAtom } from "jotai";
 import {
   currentViewAtom,
@@ -11,6 +11,8 @@ import { useSettings } from "../hooks/useSettings";
 import { useCrawl } from "../hooks/useCrawl";
 import { useFlowMapping } from "../hooks/useFlowMapping";
 import { useElementData } from "../hooks/useElementData";
+import { useProjects } from "../hooks/useProjects";
+import { useMarkup } from "../hooks/useMarkup";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
 import { StylingView } from "./StylingView";
@@ -20,8 +22,26 @@ import { ElementFilters } from "../types";
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
   const { settings, updateSetting } = useSettings();
-  const { isLoading, status, jobId, authStatus, handleSubmit, crawlProgress } =
-    useCrawl();
+  const {
+    isLoading,
+    isRenderingSnapshot,
+    status,
+    jobId,
+    authStatus,
+    handleSubmit,
+    handleRenderSnapshot,
+    crawlProgress,
+  } = useCrawl();
+  const {
+    projects,
+    activeProjectId,
+    setActiveProjectId,
+    isLoading: isProjectLoading,
+    isCreating: isCreatingProject,
+    error: projectError,
+    refresh,
+    createProject,
+  } = useProjects();
   const {
     badgeLinks,
     checkedLinks,
@@ -40,6 +60,18 @@ export const App: React.FC = () => {
   const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
   const [categorizedElements] = useAtom(categorizedElementsAtom);
 
+  const {
+    filters: markupFilters,
+    activePage: activeMarkupPage,
+    isRendering: isMarkupRendering,
+    status: markupStatus,
+    handleFilterChange: handleMarkupFilterChange,
+    handleRenderMarkup,
+    handleClearMarkup,
+    supportedFilters: supportedMarkupFilters,
+    selectedFilterCount: selectedMarkupFilterCount,
+  } = useMarkup();
+
   // Element filter handler
   const handleElementFilterChange = useCallback(
     (elementType: keyof ElementFilters, checked: boolean) => {
@@ -57,6 +89,20 @@ export const App: React.FC = () => {
       setSelectedPageUrl(pageUrl);
     },
     [setSelectedPageUrl]
+  );
+
+  const handleProjectChange = useCallback(
+    (projectId: string | null) => {
+      setActiveProjectId(projectId);
+    },
+    [setActiveProjectId]
+  );
+
+  const handleCreateProject = useCallback(
+    async (name: string) => {
+      await createProject(name);
+    },
+    [createProject]
   );
 
   // Styling mode handler
@@ -147,6 +193,13 @@ export const App: React.FC = () => {
   const handleDefaultLanguageOnlyChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       updateSetting("defaultLanguageOnly", e.target.checked);
+    },
+    [updateSetting]
+  );
+
+  const handleFullRefreshChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      updateSetting("fullRefresh", e.target.checked);
     },
     [updateSetting]
   );
@@ -339,6 +392,18 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  useEffect(() => {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "set-active-project",
+          projectId: activeProjectId != null ? activeProjectId : null,
+        },
+      },
+      "*"
+    );
+  }, [activeProjectId]);
+
   return currentView === "styling" ? (
     <StylingView onBack={switchToMain} />
   ) : currentView === "settings" ? (
@@ -360,6 +425,8 @@ export const App: React.FC = () => {
       handleSampleSizeChange={handleSampleSizeChange}
       defaultLanguageOnly={settings.defaultLanguageOnly}
       handleDefaultLanguageOnlyChange={handleDefaultLanguageOnlyChange}
+      fullRefresh={settings.fullRefresh}
+      handleFullRefreshChange={handleFullRefreshChange}
       showBrowser={settings.showBrowser}
       handleShowBrowserChange={handleShowBrowserChange}
       detectInteractiveElements={settings.detectInteractiveElements}
@@ -376,14 +443,6 @@ export const App: React.FC = () => {
       }
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
-      loginUrl={settings.loginUrl}
-      handleLoginUrlChange={handleLoginUrlChange}
-      username={settings.username}
-      handleUsernameChange={handleUsernameChange}
-      password={settings.password}
-      handlePasswordChange={handlePasswordChange}
-      cookies={settings.cookies}
-      handleCookiesChange={handleCookiesChange}
       authStatus={authStatus}
       isLoading={isLoading}
       jobId={jobId}
@@ -419,6 +478,14 @@ export const App: React.FC = () => {
     />
   ) : (
     <MainView
+      projects={projects}
+      activeProjectId={activeProjectId}
+      onProjectChange={handleProjectChange}
+      onCreateProject={handleCreateProject}
+      onRefreshProjects={refresh}
+      isProjectLoading={isProjectLoading}
+      isCreatingProject={isCreatingProject}
+      projectError={projectError}
       url={settings.url}
       handleUrlChange={handleUrlChange}
       isLoading={isLoading}
@@ -441,6 +508,17 @@ export const App: React.FC = () => {
       manifestData={manifestData}
       selectedPageUrl={selectedPageUrl}
       onPageSelection={handlePageSelection}
+      handleRenderSnapshot={handleRenderSnapshot}
+      isRenderingSnapshot={isRenderingSnapshot}
+      markupFilters={markupFilters}
+      supportedMarkupFilters={supportedMarkupFilters}
+      onMarkupFilterChange={handleMarkupFilterChange}
+      onRenderMarkup={handleRenderMarkup}
+      onClearMarkup={handleClearMarkup}
+      isMarkupRendering={isMarkupRendering}
+      markupStatus={markupStatus}
+      activeMarkupPage={activeMarkupPage}
+      selectedMarkupFilterCount={selectedMarkupFilterCount}
     />
   );
 };

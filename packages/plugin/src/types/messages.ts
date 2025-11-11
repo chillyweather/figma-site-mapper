@@ -12,7 +12,8 @@ export type PluginMessageType =
   | "status-update"
   | "badge-links-update"
   | "open-auth-session"
-  | "current-page-url";
+  | "current-page-url"
+  | "set-active-project";
 
 export interface StyleExtractionSettings {
   enabled: boolean;
@@ -41,12 +42,14 @@ export interface CrawlStartMessage {
   requestDelay: number;
   maxDepth: number;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
   captureOnlyVisibleElements: boolean;
   auth: AuthData | null;
   styleExtraction?: StyleExtractionSettings;
+  projectId: string;
 }
 
 export interface AuthData {

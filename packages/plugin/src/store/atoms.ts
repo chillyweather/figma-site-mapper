@@ -1,13 +1,15 @@
 import { atom } from "jotai";
 import {
   PluginSettings,
-  BadgeLink,
+  FlowLink,
   FlowProgress,
   CrawlProgress,
   ElementFilters,
   CategorizedElements,
+  Project,
 } from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
+import type { ManifestData } from "../plugin/types";
 
 // Settings atoms
 export const settingsAtom = atom<PluginSettings>(DEFAULT_SETTINGS);
@@ -15,10 +17,11 @@ export const currentViewAtom = atom<"main" | "settings" | "styling">("main");
 
 // Crawl state atoms
 export const isLoadingAtom = atom(false);
+export const isRenderingSnapshotAtom = atom(false);
 export const statusAtom = atom("");
 export const jobIdAtom = atom<string | null>(null);
 export const authStatusAtom = atom<
-  "idle" | "authenticating" | "success" | "failed"
+  "idle" | "authenticating" | "success" | "failed" | null
 >("idle");
 export const crawlProgressAtom = atom<CrawlProgress>({
   status: "idle",
@@ -27,8 +30,8 @@ export const crawlProgressAtom = atom<CrawlProgress>({
 });
 
 // Flow mapping atoms
-export const badgeLinksAtom = atom<BadgeLink[]>([]);
-export const checkedLinksAtom = atom<Set<string>>(new Set());
+export const badgeLinksAtom = atom<FlowLink[]>([]);
+export const checkedLinksAtom = atom<Set<string>>(new Set<string>());
 export const flowProgressAtom = atom<FlowProgress>({
   status: "idle",
   message: "",
@@ -45,7 +48,7 @@ export const flowProgressAtom = atom<FlowProgress>({
 });
 
 // Manifest data atom
-export const manifestDataAtom = atom<any>(null);
+export const manifestDataAtom = atom<ManifestData | null>(null);
 
 // Element filters atoms
 export const elementFiltersAtom = atom<ElementFilters>({
@@ -65,3 +68,30 @@ export const categorizedElementsAtom = atom<CategorizedElements | null>(null);
 
 // Selected page URL for element data
 export const selectedPageUrlAtom = atom<string>("");
+
+// Project selection state
+export const projectsAtom = atom<Project[]>([]);
+export const activeProjectIdAtom = atom<string | null>(null);
+
+// Markup tab state
+export const markupFiltersAtom = atom<ElementFilters>({
+  headings: false,
+  buttons: true,
+  inputs: true,
+  textareas: false,
+  selects: false,
+  images: false,
+  links: true,
+  paragraphs: false,
+  divs: false,
+  other: false,
+});
+
+export const activeMarkupPageAtom = atom<{
+  pageId: string | null;
+  pageUrl: string | null;
+  pageName?: string;
+} | null>(null);
+
+export const isMarkupRenderingAtom = atom(false);
+export const markupStatusAtom = atom<string>("");

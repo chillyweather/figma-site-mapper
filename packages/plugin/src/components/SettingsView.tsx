@@ -8,7 +8,6 @@ import {
 } from "@tabler/icons-react";
 import { SettingsViewProps } from "../types/index";
 import { FocusedInput } from "./common/FocusedInput";
-import { FocusedTextarea } from "./common/FocusedTextarea";
 import {
   estimateDataSize,
   getPresetConfig,
@@ -33,6 +32,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleSampleSizeChange,
   defaultLanguageOnly,
   handleDefaultLanguageOnlyChange,
+  fullRefresh,
+  handleFullRefreshChange,
   showBrowser,
   handleShowBrowserChange,
   detectInteractiveElements,
@@ -45,14 +46,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleCaptureOnlyVisibleElementsChange,
   authMethod,
   handleAuthMethodChange,
-  loginUrl,
-  handleLoginUrlChange,
-  username,
-  handleUsernameChange,
-  password,
-  handlePasswordChange,
-  cookies,
-  handleCookiesChange,
   authStatus,
   isLoading,
   jobId,
@@ -308,6 +301,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </label>
       <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
         Detects language from URL patterns like /en/, /fr/, ?lang=de, etc.
+      </div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontSize: "12px",
+          cursor: "pointer",
+          marginTop: "8px",
+        }}
+      >
+        <input
+          id="full-refresh-checkbox"
+          type="checkbox"
+          checked={fullRefresh}
+          onChange={handleFullRefreshChange}
+          disabled={isLoading || !!jobId}
+          style={{ marginRight: "8px" }}
+        />
+        Treat this crawl as a full refresh
+      </label>
+      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+        When enabled, pages not visited in this crawl are removed from the
+        project.
       </div>
       <label
         style={{
@@ -616,8 +632,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       >
         <option value="none">No Authentication</option>
         <option value="manual">Manual (Browser Session)</option>
-        <option value="credentials">Auto Login (Username/Password)</option>
-        <option value="cookies">Import Cookies</option>
       </select>
 
       {authMethod === "manual" && (
@@ -693,78 +707,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               Authentication failed
             </div>
           )}
-        </div>
-      )}
-
-      {authMethod === "credentials" && (
-        <div id="auth-credentials-inputs" style={{ marginBottom: "8px" }}>
-          <FocusedInput
-            id="login-url-input"
-            key="login-url-input"
-            type="url"
-            value={loginUrl}
-            onChange={handleLoginUrlChange}
-            placeholder="Login page URL (e.g., https://example.com/login)"
-            disabled={isLoading || !!jobId}
-            style={{
-              width: "100%",
-              padding: "8px",
-              boxSizing: "border-box",
-              marginBottom: "6px",
-            }}
-          />
-          <FocusedInput
-            id="username-input"
-            key="username-input"
-            type="text"
-            value={username}
-            onChange={handleUsernameChange}
-            placeholder="Username or Email"
-            disabled={isLoading || !!jobId}
-            style={{
-              width: "100%",
-              padding: "8px",
-              boxSizing: "border-box",
-              marginBottom: "6px",
-            }}
-          />
-          <FocusedInput
-            id="password-input"
-            key="password-input"
-            type="password"
-            value={password}
-            onChange={handlePasswordChange}
-            placeholder="Password"
-            disabled={isLoading || !!jobId}
-            style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
-          />
-          <div style={{ fontSize: "10px", color: "#666", marginTop: "4px" }}>
-            We'll automatically navigate to the login page and authenticate
-          </div>
-        </div>
-      )}
-
-      {authMethod === "cookies" && (
-        <div id="auth-cookies-inputs" style={{ marginBottom: "8px" }}>
-          <FocusedTextarea
-            id="cookies-textarea"
-            key="cookies-textarea"
-            value={cookies}
-            onChange={handleCookiesChange}
-            placeholder="Paste cookies here (format: name=value; sessionid=abc123)"
-            disabled={isLoading || !!jobId}
-            style={{
-              width: "100%",
-              padding: "8px",
-              boxSizing: "border-box",
-              minHeight: "60px",
-              resize: "vertical",
-            }}
-          />
-          <div style={{ fontSize: "10px", color: "#666", marginTop: "4px" }}>
-            Copy cookies from your browser's developer tools (F12 → Application
-            → Cookies)
-          </div>
         </div>
       )}
 

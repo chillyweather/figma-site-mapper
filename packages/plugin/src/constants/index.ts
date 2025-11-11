@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   requestDelay: "1000",
   maxDepth: "2",
   defaultLanguageOnly: true,
+  fullRefresh: false,
   sampleSize: "3",
   showBrowser: false,
   detectInteractiveElements: true,

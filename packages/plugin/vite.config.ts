@@ -1,22 +1,28 @@
-import { defineConfig } from 'vite'
-import { viteSingleFile } from 'vite-plugin-singlefile'
-import { resolve } from 'path'
+import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
+import { resolve } from "path";
 
 export default defineConfig({
   plugins: [viteSingleFile()],
-  root: resolve(__dirname, 'src'),
+  root: resolve(__dirname, "src"),
   build: {
-    outDir: resolve(__dirname, 'dist'),
+    outDir: resolve(__dirname, "dist"),
     minify: false,
     emptyOutDir: false,
+    target: "es2018",
     rollupOptions: {
-      input: resolve(__dirname, 'src/ui.html'),
+      input: resolve(__dirname, "src/ui.html"),
       output: {
-        dir: resolve(__dirname, 'dist'),
+        dir: resolve(__dirname, "dist"),
       },
     },
   },
   define: {
-    global: 'globalThis',
+    global: "globalThis",
   },
-})
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "es2018",
+    },
+  },
+});

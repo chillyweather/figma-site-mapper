@@ -8,12 +8,26 @@
  * 4. Creating arrow connectors
  */
 
-import { FlowLink } from "../types";
-import { startCrawl, getJobStatus, fetchManifest } from "../services/apiClient";
+import { FlowLink, ManifestData } from "../types";
+import { getJobStatus, getPage, recrawlPage } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
 import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
+import {
+  buildManifestFromProject,
+  buildManifestFromPageIds,
+} from "../utils/buildManifestFromProject";
+
+async function getActiveProjectId(): Promise<string | null> {
+  try {
+    const stored = await figma.clientStorage.getAsync("activeProjectId");
+    return stored || null;
+  } catch (error) {
+    console.error("Failed to load active project id", error);
+    return null;
+  }
+}
 
 /**
  * Extract domain from URL string without using URL constructor
@@ -21,12 +35,9 @@ import { loadDomainCookies } from "./uiMessageHandlers";
  */
 function extractDomain(url: string): string | null {
   try {
-    // Remove protocol
     let domain = url.replace(/^https?:\/\//, "");
-    // Remove path and query string
     domain = domain.split("/")[0];
     domain = domain.split("?")[0];
-    // Remove port if present
     domain = domain.split(":")[0];
     return domain;
   } catch (error) {
@@ -70,7 +81,6 @@ export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
   const selectedLink = selectedLinks[0];
   console.log("📊 Creating flow for:", selectedLink);
 
-  // Initialize progress
   sendProgressUpdate({
     status: "building",
     message: "Creating flow page...",
@@ -171,22 +181,24 @@ async function createFlowPage(selectedLink: FlowLink): Promise<void> {
  */
 function generateFlowPageName(
   currentPageName: string,
-  linkText: string
+  _linkText: string
 ): string {
-  const pageMatch = currentPageName.match(/^(\s*)([\d-]+)_(.*)/);
+  // New convention:
+  // Source page (any non-flow page) -> "    flow_1_Loading..." (4 spaces indent)
+  // Flow page "    flow_1_*" -> next becomes "        flow_2_Loading..." (8 spaces indent)
+  // Indent = flowLevel * 4 spaces.
 
-  if (!pageMatch) {
-    return `Flow_${linkText}`;
+  const flowMatch = currentPageName.match(/^\s*flow_(\d+)/i);
+
+  if (!flowMatch) {
+    const indent = " ".repeat(4); // level 1
+    return `${indent}flow_1_Loading...`;
   }
 
-  const currentIndent = pageMatch[1];
-  const currentHierarchy = pageMatch[2];
-  const newHierarchy = `${currentHierarchy}-${linkText}`;
-  const currentLevel = currentHierarchy.split("-").length;
-  const newLevel = currentLevel + 1;
-  const newIndent = "  ".repeat(Math.max(0, newLevel - 1));
-
-  return `${newIndent}${newHierarchy}_Loading...`;
+  const currentLevel = parseInt(flowMatch[1], 10);
+  const nextLevel = currentLevel + 1;
+  const indent = " ".repeat(nextLevel * 4);
+  return `${indent}flow_${nextLevel}_Loading...`;
 }
 
 /**
@@ -390,6 +402,11 @@ async function createFlowVisualization(
  * Check if page is a flow page (hierarchical naming pattern)
  */
 function isFlowPage(pageName: string): boolean {
+  // Recognize new indentation-based flow naming: optional spaces then flow_<number>
+  if (/^\s*flow_\d+/i.test(pageName)) {
+    return true;
+  }
+  // Backward compatibility: old hierarchical pattern
   const hierarchyMatch = pageName.match(/^\s*([\d-]+)_/);
   return hierarchyMatch ? hierarchyMatch[1].includes("-") : false;
 }
@@ -774,11 +791,11 @@ async function cloneSourceElements(
 
   if (overlayFrames.length > 0) {
     const linkNumber = badgeElement.characters;
-    const highlightNamePattern = `link_${linkNumber}_highlight:`;
+    const highlightBaseName = `link_${linkNumber}_highlight`;
 
     const highlights = overlayFrames[0].findAll(
       (node: SceneNode) =>
-        node.type === "RECTANGLE" && node.name.startsWith(highlightNamePattern)
+        node.type === "RECTANGLE" && node.name.startsWith(highlightBaseName)
     ) as RectangleNode[];
 
     if (highlights.length > 0) {
@@ -895,11 +912,82 @@ async function fetchAndRenderTargetPage(
   x: number,
   y: number
 ): Promise<void> {
-  figma.notify(`Crawling target page: ${url}...`);
+  figma.notify(`Loading target page: ${url}...`);
+
+  const projectId = await getActiveProjectId();
+  if (!projectId) {
+    figma.notify(
+      "Select a project in the plugin UI before loading target pages.",
+      { error: true }
+    );
+    return;
+  }
+
+  const settings = await loadSettings();
+  const detectInteractiveElements =
+    settings.detectInteractiveElements !== false;
 
   try {
-    // Load settings to get user preferences
-    const settings = await loadSettings();
+    const cachedPage = await getPage(projectId, { url });
+
+    if (cachedPage) {
+      console.log(
+        `📥 Using cached page ${cachedPage._id} for target URL ${cachedPage.url}`
+      );
+
+      const manifestData = await buildManifestFromPageIds(
+        projectId,
+        url,
+        [cachedPage._id],
+        {
+          detectInteractiveElements,
+        }
+      );
+
+      if (!manifestData.tree) {
+        sendProgressUpdate({
+          status: "error",
+          message: "Cached page did not contain renderable data",
+          progress: 0,
+          currentStep: 3,
+          totalSteps: 5,
+          steps: [
+            { name: "Create flow page", status: "complete" },
+            { name: "Clone source elements", status: "complete" },
+            { name: "Crawl target page", status: "error" },
+            { name: "Render target page", status: "pending" },
+            { name: "Create arrows", status: "pending" },
+          ],
+        });
+        figma.notify("Cached page missing data. Please recrawl.", {
+          error: true,
+        });
+        return;
+      }
+
+      sendProgressUpdate({
+        status: "building",
+        message: "Rendering target page from database...",
+        progress: 80,
+        currentStep: 3,
+        totalSteps: 5,
+        steps: [
+          { name: "Create flow page", status: "complete" },
+          { name: "Clone source elements", status: "complete" },
+          { name: "Crawl target page", status: "complete" },
+          { name: "Render target page", status: "in-progress" },
+          { name: "Create arrows", status: "pending" },
+        ],
+      });
+
+      await finalizeFlowRendering(flowPage, manifestData, x, y, settings);
+      return;
+    }
+  } catch (error) {
+    console.log("No cached page available. Falling back to recrawl.", error);
+  }
+
+  try {
     const showBrowser = settings.showBrowser || false;
 
     // Try to load cached cookies for this domain
@@ -925,30 +1013,155 @@ async function fetchAndRenderTargetPage(
       );
     }
 
-    const result = await startCrawl({
+    const result = await recrawlPage({
       url,
-      maxRequestsPerCrawl: 1,
-      screenshotWidth: 1440,
+      projectId,
       deviceScaleFactor: 1,
       delay: 0,
       requestDelay: 1000,
-      maxDepth: 0,
-      defaultLanguageOnly: false,
-      sampleSize: 1,
-      showBrowser: showBrowser, // Use setting from storage
-      detectInteractiveElements: true,
-      auth: auth, // Pass cookies if available
+      auth,
+      styleExtraction: settings.extractStyles
+        ? {
+            enabled: true,
+            preset: settings.styleExtractionPreset,
+            extractInteractiveElements: settings.extractInteractive,
+            extractStructuralElements: settings.extractStructural,
+            extractTextElements: settings.extractContentBlocks,
+            extractFormElements: settings.extractFormElements,
+            extractMediaElements: settings.extractCustomComponents,
+            extractColors: settings.extractColors,
+            extractTypography: settings.extractTypography,
+            extractSpacing: settings.extractSpacing,
+            extractLayout: settings.extractLayout,
+            extractBorders: settings.extractBorders,
+            includeSelectors: settings.extractCSSVariables,
+            includeComputedStyles: settings.extractLayout,
+          }
+        : undefined,
     });
 
     const jobId = result.jobId;
-    console.log(`Started crawl job ${jobId} for target page`);
+    console.log(`Started recrawl job ${jobId} for target page`);
 
-    // Poll for completion
-    await pollForCompletion(jobId, flowPage, x, y);
+    await pollForCompletion(jobId, flowPage, x, y, settings, url);
   } catch (error) {
-    console.error("Failed to crawl target page:", error);
-    figma.notify("Error: Could not crawl target page.", { error: true });
+    console.error("Failed to load target page via recrawl:", error);
+    sendProgressUpdate({
+      status: "error",
+      message: "Error loading target page",
+      progress: 0,
+      currentStep: 3,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "complete" },
+        { name: "Clone source elements", status: "complete" },
+        { name: "Crawl target page", status: "error" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
+    figma.notify("Error: Could not load target page.", { error: true });
   }
+}
+
+async function finalizeFlowRendering(
+  flowPage: PageNode,
+  manifestData: ManifestData,
+  x: number,
+  y: number,
+  settings: any
+): Promise<void> {
+  const tree = manifestData.tree;
+
+  if (!tree) {
+    sendProgressUpdate({
+      status: "error",
+      message: "No manifest data available for rendering",
+      progress: 0,
+      currentStep: 3,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "complete" },
+        { name: "Clone source elements", status: "complete" },
+        { name: "Crawl target page", status: "error" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
+    figma.notify("No data available to render target page", {
+      error: true,
+    });
+    return;
+  }
+
+  if (tree.title) {
+    const cleanTitle = tree.title.replace(/^[0-9]+_/, "");
+    flowPage.name = flowPage.name.replace("_Loading...", `_${cleanTitle}`);
+  }
+
+  const highlightAllElements =
+    settings && typeof settings.highlightAllElements === "boolean"
+      ? settings.highlightAllElements
+      : false;
+
+  const highlightElementFilters = settings?.highlightElementFilters || null;
+
+  await renderTargetPage(flowPage, manifestData, x, y, {
+    highlightAllElements,
+    highlightElementFilters,
+    includeInteractiveOverlay: false,
+  });
+
+  sendProgressUpdate({
+    status: "building",
+    message: "Creating arrows...",
+    progress: 90,
+    currentStep: 4,
+    totalSteps: 5,
+    steps: [
+      { name: "Create flow page", status: "complete" },
+      { name: "Clone source elements", status: "complete" },
+      { name: "Crawl target page", status: "complete" },
+      { name: "Render target page", status: "complete" },
+      { name: "Create arrows", status: "in-progress" },
+    ],
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  sendProgressUpdate({
+    status: "complete",
+    message: "Flow visualization complete!",
+    progress: 100,
+    currentStep: 5,
+    totalSteps: 5,
+    steps: [
+      { name: "Create flow page", status: "complete" },
+      { name: "Clone source elements", status: "complete" },
+      { name: "Crawl target page", status: "complete" },
+      { name: "Render target page", status: "complete" },
+      { name: "Create arrows", status: "complete" },
+    ],
+  });
+
+  setTimeout(() => {
+    sendProgressUpdate({
+      status: "idle",
+      message: "",
+      progress: 0,
+      currentStep: 0,
+      totalSteps: 5,
+      steps: [
+        { name: "Create flow page", status: "pending" },
+        { name: "Clone source elements", status: "pending" },
+        { name: "Crawl target page", status: "pending" },
+        { name: "Render target page", status: "pending" },
+        { name: "Create arrows", status: "pending" },
+      ],
+    });
+  }, 3000);
+
+  figma.notify("Flow visualization complete!");
 }
 
 /**
@@ -958,16 +1171,18 @@ async function pollForCompletion(
   jobId: string,
   flowPage: PageNode,
   x: number,
-  y: number
+  y: number,
+  settings: any,
+  targetUrl: string
 ): Promise<void> {
   let attempts = 0;
 
   const pollInterval = setInterval(async () => {
     attempts++;
 
-    // Update progress during polling
     const pollProgress =
       40 + Math.min(40, (attempts / POLLING_CONFIG.MAX_ATTEMPTS) * 40);
+
     sendProgressUpdate({
       status: "building",
       message: `Crawling target page... (${attempts}/${POLLING_CONFIG.MAX_ATTEMPTS})`,
@@ -1006,116 +1221,82 @@ async function pollForCompletion(
     try {
       const statusResult = await getJobStatus(jobId);
 
-      if (
-        statusResult.status === "completed" &&
-        statusResult.result?.manifestUrl
-      ) {
-        clearInterval(pollInterval);
+      if (statusResult.status !== "completed") {
+        return;
+      }
 
-        // Update progress: Rendering target page
+      if (!statusResult.result || !statusResult.result.projectId) {
+        throw new Error("Job completed without project context");
+      }
+
+      clearInterval(pollInterval);
+
+      const detectInteractiveElements =
+        statusResult.result.detectInteractiveElements !== false;
+      const projectId = statusResult.result.projectId as string;
+      const startUrl = statusResult.result.startUrl || targetUrl;
+      const visitedPageIds = Array.isArray(statusResult.result.visitedPageIds)
+        ? statusResult.result.visitedPageIds.filter(
+            (value: unknown): value is string => typeof value === "string"
+          )
+        : [];
+
+      sendProgressUpdate({
+        status: "building",
+        message: "Rendering target page...",
+        progress: 80,
+        currentStep: 3,
+        totalSteps: 5,
+        steps: [
+          { name: "Create flow page", status: "complete" },
+          { name: "Clone source elements", status: "complete" },
+          { name: "Crawl target page", status: "complete" },
+          { name: "Render target page", status: "in-progress" },
+          { name: "Create arrows", status: "pending" },
+        ],
+      });
+
+      let manifestData: ManifestData;
+
+      if (visitedPageIds.length > 0) {
+        manifestData = await buildManifestFromPageIds(
+          projectId,
+          startUrl,
+          visitedPageIds,
+          {
+            detectInteractiveElements,
+          }
+        );
+      } else {
+        manifestData = await buildManifestFromProject(projectId, startUrl, {
+          detectInteractiveElements,
+        });
+      }
+
+      if (!manifestData.tree) {
         sendProgressUpdate({
-          status: "building",
-          message: "Rendering target page...",
-          progress: 80,
+          status: "error",
+          message: "No crawl data returned for target page",
+          progress: 0,
           currentStep: 3,
           totalSteps: 5,
           steps: [
             { name: "Create flow page", status: "complete" },
             { name: "Clone source elements", status: "complete" },
-            { name: "Crawl target page", status: "complete" },
-            { name: "Render target page", status: "in-progress" },
+            { name: "Crawl target page", status: "error" },
+            { name: "Render target page", status: "pending" },
             { name: "Create arrows", status: "pending" },
           ],
         });
-
-        const manifestData = await fetchManifest(
-          statusResult.result.manifestUrl
-        );
-        console.log("Target page crawl completed, rendering...");
-
-        // Update flow page name with target title
-        if (manifestData.tree?.title) {
-          const cleanTitle = manifestData.tree.title.replace(/^\d+_/, "");
-          flowPage.name = flowPage.name.replace(
-            "_Loading...",
-            `_${cleanTitle}`
-          );
-        }
-
-        // Load settings to check if element highlights should be shown
-        const settings = await loadSettings();
-        const highlightAllElements = settings?.highlightAllElements || false;
-        const highlightElementFilters =
-          settings?.highlightElementFilters || null;
-        console.log(
-          `🎨 Highlight all elements setting: ${highlightAllElements}`
-        );
-        console.log(`🎨 Element filters:`, highlightElementFilters);
-
-        await renderTargetPage(
-          flowPage,
-          manifestData,
-          x,
-          y,
-          highlightAllElements,
-          highlightElementFilters
-        );
-
-        // Update progress: Creating arrows
-        sendProgressUpdate({
-          status: "building",
-          message: "Creating arrows...",
-          progress: 90,
-          currentStep: 4,
-          totalSteps: 5,
-          steps: [
-            { name: "Create flow page", status: "complete" },
-            { name: "Clone source elements", status: "complete" },
-            { name: "Crawl target page", status: "complete" },
-            { name: "Render target page", status: "complete" },
-            { name: "Create arrows", status: "in-progress" },
-          ],
+        figma.notify("No crawl data returned for target page", {
+          error: true,
         });
-
-        // Small delay to show arrow creation step
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Flow complete
-        sendProgressUpdate({
-          status: "complete",
-          message: "Flow visualization complete!",
-          progress: 100,
-          currentStep: 5,
-          totalSteps: 5,
-          steps: [
-            { name: "Create flow page", status: "complete" },
-            { name: "Clone source elements", status: "complete" },
-            { name: "Crawl target page", status: "complete" },
-            { name: "Render target page", status: "complete" },
-            { name: "Create arrows", status: "complete" },
-          ],
-        });
-
-        // Reset to idle after 3 seconds
-        setTimeout(() => {
-          sendProgressUpdate({
-            status: "idle",
-            message: "",
-            progress: 0,
-            currentStep: 0,
-            totalSteps: 5,
-            steps: [
-              { name: "Create flow page", status: "pending" },
-              { name: "Clone source elements", status: "pending" },
-              { name: "Crawl target page", status: "pending" },
-              { name: "Render target page", status: "pending" },
-              { name: "Create arrows", status: "pending" },
-            ],
-          });
-        }, 3000);
-
-        figma.notify("Flow visualization complete!");
+        return;
       }
+
+      console.log("Target page crawl completed, rendering...");
+
+      await finalizeFlowRendering(flowPage, manifestData, x, y, settings);
     } catch (error) {
       console.error("Error polling for target page status:", error);
     }

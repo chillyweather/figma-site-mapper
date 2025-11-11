@@ -66,19 +66,23 @@ export function categorizeElementType(
 /**
  * Maps ElementType to CategorizedElements keys
  */
-const elementTypeToCategoryKey: Record<ElementType, keyof CategorizedElements> =
-  {
-    heading: "headings",
-    button: "buttons",
-    input: "inputs",
-    textarea: "textareas",
-    select: "selects",
-    image: "images",
-    link: "links",
-    paragraph: "paragraphs",
-    div: "divs",
-    other: "other",
-  };
+export const elementTypeToCategoryKey: Record<
+  ElementType,
+  keyof CategorizedElements
+> = {
+  heading: "headings",
+  button: "buttons",
+  input: "inputs",
+  textarea: "textareas",
+  select: "selects",
+  image: "images",
+  link: "links",
+  paragraph: "paragraphs",
+  div: "divs",
+  other: "other",
+};
+
+export const LINK_LIKE_TYPES = new Set<ElementType>(["button", "link"]);
 
 /**
  * Categorizes a flat array of extracted elements into organized categories

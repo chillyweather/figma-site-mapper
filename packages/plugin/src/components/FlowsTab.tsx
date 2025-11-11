@@ -1,9 +1,9 @@
 import React from "react";
-import { BadgeLink, FlowProgress as FlowProgressType } from "../types/index";
+import { FlowLink, FlowProgress as FlowProgressType } from "../types/index";
 import { FlowProgress } from "./FlowProgress";
 
 interface FlowsTabProps {
-  badgeLinks: BadgeLink[];
+  badgeLinks: FlowLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (id: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -60,7 +60,7 @@ export const FlowsTab: React.FC<FlowsTabProps> = ({
               Found {badgeLinks.length} element
               {badgeLinks.length !== 1 ? "s" : ""}
             </h4>
-            {badgeLinks.map((link: BadgeLink) => (
+            {badgeLinks.map((link: FlowLink) => (
               <div
                 key={link.id}
                 style={{

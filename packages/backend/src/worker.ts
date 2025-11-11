@@ -1,6 +1,10 @@
+import "dotenv/config";
 import { Worker, Job } from "bullmq";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
+import { connectDB } from "./db.js";
+
+await connectDB();
 
 const processor = async (job: Job) => {
   const {
@@ -12,16 +16,18 @@ const processor = async (job: Job) => {
     requestDelay,
     maxDepth,
     defaultLanguageOnly,
+    fullRefresh,
     sampleSize,
     showBrowser,
     detectInteractiveElements,
     highlightAllElements,
+    projectId,
     auth,
     styleExtraction,
   } = job.data;
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
   console.log(
-    `📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, sampleSize=${sampleSize}`
+    `📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`
   );
   console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
   if (auth) {
@@ -34,7 +40,7 @@ const processor = async (job: Job) => {
   }
 
   try {
-    await runCrawler(
+    const result = await runCrawler(
       url,
       publicUrl,
       maxRequestsPerCrawl,
@@ -48,10 +54,20 @@ const processor = async (job: Job) => {
       showBrowser,
       detectInteractiveElements,
       highlightAllElements,
+      fullRefresh === true,
+      projectId,
       auth,
       styleExtraction
     );
+    await job.updateData({
+      ...job.data,
+      visitedUrls: result.visitedUrls,
+      visitedPageIds: result.visitedPageIds,
+      pageCount: result.pageCount,
+      lastCompletedAt: new Date().toISOString(),
+    });
     console.log(`✅ Finished job ${job.id}`);
+    return result;
   } catch (error) {
     console.error(`❌ Job ${job.id} failed:`, error);
     throw error;

@@ -7,6 +7,7 @@ export interface PluginSettings {
   requestDelay: string;
   maxDepth: string;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   sampleSize: string;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
@@ -36,17 +37,18 @@ export interface PluginSettings {
   detectPatterns: boolean;
 }
 
-export interface BadgeLink {
-  id: string;
-  text: string;
-  url: string;
+export interface Project {
+  _id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FlowProgress {
   status: "idle" | "building" | "complete" | "error";
   message: string;
   progress: number;
-  currentStep: number;
+  currentStep?: number; // Optional pointer to current step index
   totalSteps: number;
   steps: FlowStep[];
 }
@@ -55,6 +57,18 @@ export interface FlowStep {
   name: string;
   status: "pending" | "in-progress" | "complete" | "error";
 }
+
+export type ElementType =
+  | "heading"
+  | "button"
+  | "input"
+  | "textarea"
+  | "select"
+  | "image"
+  | "link"
+  | "paragraph"
+  | "div"
+  | "other";
 
 export interface CrawlProgress {
   status: "idle" | "crawling" | "rendering" | "complete" | "error";
@@ -72,20 +86,33 @@ export interface FlowLink {
   url: string;
 }
 
-// Element extraction types
+// Mode for the Mapping/Flows view
 export type ElementMode = "flow" | "styling";
 
-export type ElementType =
-  | "heading"
-  | "button"
-  | "input"
-  | "textarea"
-  | "select"
-  | "image"
-  | "link"
-  | "paragraph"
-  | "div"
-  | "other";
+export interface InteractiveElement {
+  type: "link" | "button";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  href?: string;
+  text?: string;
+}
+
+export interface TreeNode {
+  url: string;
+  title: string;
+  screenshot: string[];
+  thumbnail: string;
+  pageId?: string;
+  children: TreeNode[];
+  interactiveElements?: InteractiveElement[];
+  styleData?: {
+    elements?: ExtractedElement[];
+    cssVariables?: Record<string, unknown> | null;
+    tokens?: string[] | null;
+  };
+}
 
 export interface ElementFilters {
   headings: boolean;
@@ -104,7 +131,7 @@ export interface ExtractedElement {
   selector: string;
   tagName: string;
   type: string;
-  elementType: ElementType; // Categorized type
+  elementType?: ElementType; // Categorized type
   classes: string[];
   id?: string;
   boundingBox: {
@@ -128,7 +155,6 @@ export interface ExtractedElement {
     borderStyle?: string;
     display?: string;
     position?: string;
-    width?: string;
     height?: string;
   };
   text?: string;
@@ -138,8 +164,10 @@ export interface ExtractedElement {
   // Additional properties for future expansion
   value?: string;
   placeholder?: string;
+  checked?: boolean;
   src?: string;
   alt?: string;
+  styleTokens?: string[];
 }
 
 export interface CategorizedElements {
@@ -174,9 +202,11 @@ export interface SettingsViewProps {
   sampleSize: string;
   handleSampleSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   defaultLanguageOnly: boolean;
+  fullRefresh: boolean;
   handleDefaultLanguageOnlyChange: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => void;
+  handleFullRefreshChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showBrowser: boolean;
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   detectInteractiveElements: boolean;
@@ -198,15 +228,7 @@ export interface SettingsViewProps {
   ) => void;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  loginUrl: string;
-  handleLoginUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  username: string;
-  handleUsernameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  password: string;
-  handlePasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  cookies: string;
-  handleCookiesChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  authStatus: "idle" | "authenticating" | "success" | "failed";
+  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
   isLoading: boolean;
   jobId: string | null;
   switchToMain: () => void;
@@ -259,6 +281,14 @@ export interface SettingsViewProps {
 }
 
 export interface MainViewProps {
+  projects: Project[];
+  activeProjectId: string | null;
+  onProjectChange: (projectId: string | null) => void;
+  onCreateProject: (name: string) => Promise<void>;
+  onRefreshProjects: () => Promise<void>;
+  isProjectLoading: boolean;
+  isCreatingProject: boolean;
+  projectError: string | null;
   url: string;
   handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
@@ -267,7 +297,7 @@ export interface MainViewProps {
   status: string;
   handleClose: () => void;
   switchToSettings: () => void;
-  badgeLinks: BadgeLink[];
+  badgeLinks: FlowLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -284,6 +314,22 @@ export interface MainViewProps {
   manifestData: any;
   selectedPageUrl: string;
   onPageSelection: (pageUrl: string) => void;
+  markupFilters: ElementFilters;
+  supportedMarkupFilters: Array<keyof ElementFilters>;
+  onMarkupFilterChange: (
+    filter: keyof ElementFilters,
+    checked: boolean
+  ) => void;
+  onRenderMarkup: () => void;
+  onClearMarkup: () => void;
+  isMarkupRendering: boolean;
+  markupStatus: string;
+  activeMarkupPage: {
+    pageId: string | null;
+    pageUrl: string | null;
+    pageName?: string;
+  } | null;
+  selectedMarkupFilterCount: number;
 }
 
 export interface CrawlingTabProps {
@@ -292,13 +338,32 @@ export interface CrawlingTabProps {
   isLoading: boolean;
   jobId: string | null;
   handleSubmit: (e: React.FormEvent) => void;
+  handleRenderSnapshot: () => void;
   status: string;
   handleClose: () => void;
   crawlProgress: CrawlProgress;
+  projectSelected: boolean;
+  isRenderingSnapshot: boolean;
+}
+
+export interface MarkupTabProps {
+  filters: ElementFilters;
+  supportedFilters: Array<keyof ElementFilters>;
+  onFilterChange: (filter: keyof ElementFilters, checked: boolean) => void;
+  onRender: () => void;
+  onClear: () => void;
+  isRendering: boolean;
+  status: string;
+  activePage: {
+    pageId: string | null;
+    pageUrl: string | null;
+    pageName?: string;
+  } | null;
+  selectedFilterCount: number;
 }
 
 export interface MappingTabProps {
-  badgeLinks: BadgeLink[];
+  badgeLinks: FlowLink[];
   checkedLinks: Set<string>;
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
@@ -316,6 +381,8 @@ export interface MappingTabProps {
   manifestData: any;
   selectedPageUrl: string;
   onPageSelection: (pageUrl: string) => void;
+  handleRenderSnapshot: () => void;
+  isRenderingSnapshot: boolean;
 }
 
 export interface FocusedInputProps {
