@@ -1,10 +1,13 @@
+import "dotenv/config";
 import { Worker } from "bullmq";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
+import { connectDB } from "./db.js";
+await connectDB();
 const processor = async (job) => {
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, auth, styleExtraction, } = job.data;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, } = job.data;
     console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
-    console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, sampleSize=${sampleSize}`);
+    console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`);
     console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
     if (auth) {
         console.log(`🔐 Authentication: ${auth.method}`);
@@ -13,8 +16,16 @@ const processor = async (job) => {
         console.log(`🎨 Style Extraction: enabled (preset: ${styleExtraction.preset})`);
     }
     try {
-        await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, auth, styleExtraction);
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction);
+        await job.updateData({
+            ...job.data,
+            visitedUrls: result.visitedUrls,
+            visitedPageIds: result.visitedPageIds,
+            pageCount: result.pageCount,
+            lastCompletedAt: new Date().toISOString(),
+        });
         console.log(`✅ Finished job ${job.id}`);
+        return result;
     }
     catch (error) {
         console.error(`❌ Job ${job.id} failed:`, error);

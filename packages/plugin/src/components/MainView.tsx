@@ -5,7 +5,7 @@ import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
 import { MarkupTab } from "./MarkupTab";
 import { StylingTab } from "./StylingTab";
-import { TokensTab } from "./TokensTab";
+
 
 export const MainView: React.FC<MainViewProps> = ({
   projects,
@@ -58,7 +58,7 @@ export const MainView: React.FC<MainViewProps> = ({
   const [elementStylesStatus, setElementStylesStatus] = useState("");
 
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "flows" | "styling" | "markup" | "tokens"
+    "crawling" | "flows" | "styling" | "markup"
   >("crawling");
   const [newProjectName, setNewProjectName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -293,25 +293,7 @@ export const MainView: React.FC<MainViewProps> = ({
             >
               Styling
             </button>
-            <button
-              id="tokens-tab-button"
-              onClick={() => setActiveTab("tokens")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "tokens" ? "600" : "400",
-                color: activeTab === "tokens" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "tokens"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
-            >
-              Tokens
-            </button>
+
           </div>
 
           {activeTab === "crawling" && (
@@ -367,7 +349,7 @@ export const MainView: React.FC<MainViewProps> = ({
             />
           )}
 
-          {activeTab === "tokens" && <TokensTab />}
+
         </>
       )}
     </div>

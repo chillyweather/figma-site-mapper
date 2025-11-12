@@ -7,7 +7,7 @@
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
 import { DEFAULT_SETTINGS } from "../../constants";
-import { buildTokensTable } from "../../figmaRendering/buildTokensTable";
+
 import {
   startCrawl,
   getJobStatus,
@@ -857,55 +857,7 @@ async function handleGetLastManifest(): Promise<void> {
   }
 }
 
-/**
- * Handle building tokens table
- */
-async function handleBuildTokensTable(msg: {
-  cssVariables: any;
-  pageUrl: string;
-}): Promise<void> {
-  try {
-    await buildTokensTable(msg.cssVariables, msg.pageUrl);
-  } catch (error) {
-    console.error("Failed to build tokens table:", error);
-    figma.notify("Error: Could not build tokens table.", {
-      error: true,
-    });
-  }
-}
 
-/**
- * Handle building tokens tables for all pages
- */
-async function handleBuildAllTokensTables(msg: {
-  pages: Array<{ cssVariables: any; pageUrl: string }>;
-}): Promise<void> {
-  try {
-    console.log(`🔨 Building tables for ${msg.pages.length} pages`);
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const page of msg.pages) {
-      try {
-        await buildTokensTable(page.cssVariables, page.pageUrl);
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to build table for ${page.pageUrl}:`, error);
-        errorCount++;
-      }
-    }
-
-    figma.notify(
-      `✅ Built ${successCount} token table(s)${errorCount > 0 ? ` (${errorCount} failed)` : ""}`,
-      { timeout: 3000 }
-    );
-  } catch (error) {
-    console.error("Failed to build tokens tables:", error);
-    figma.notify("Error: Could not build tokens tables.", {
-      error: true,
-    });
-  }
-}
 
 /**
  * Main message router for UI messages

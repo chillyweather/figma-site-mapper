@@ -16,13 +16,11 @@ interface StylingTabProps {
 
 interface GlobalStylesData {
   cssVariables: Record<string, string>;
-  tokens: string[];
   pages: Array<{
     pageId: string;
     url: string;
     title: string;
     cssVariableCount: number;
-    tokenCount: number;
   }>;
 }
 
@@ -90,8 +88,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
 
 
   const canRenderGlobalStyles = hasProject && globalStylesData && 
-    (globalStylesData.cssVariables && Object.keys(globalStylesData.cssVariables).length > 0 ||
-     globalStylesData.tokens && globalStylesData.tokens.length > 0);
+    globalStylesData.cssVariables && Object.keys(globalStylesData.cssVariables).length > 0;
 
   const canRenderElementStyles = hasProject && selectedElementId && selectedElementInfo;
 
@@ -132,9 +129,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
               <div>
                 CSS Variables: {Object.keys(globalStylesData.cssVariables || {}).length}
               </div>
-              <div>
-                Style Tokens: {globalStylesData.tokens?.length || 0}
-              </div>
+
               <div>
                 Source Pages: {globalStylesData.pages?.length || 0}
               </div>

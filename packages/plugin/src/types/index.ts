@@ -110,7 +110,7 @@ export interface TreeNode {
   styleData?: {
     elements?: ExtractedElement[];
     cssVariables?: Record<string, unknown> | null;
-    tokens?: string[] | null;
+
   };
 }
 
