@@ -93,17 +93,15 @@ export const StylingTab: React.FC<StylingTabProps> = ({
   const canRenderElementStyles = hasProject && selectedElementId && selectedElementInfo;
 
   return (
-    <div style={{ padding: "0 16px 16px 16px" }}>
+    <div className="container">
       {/* Project Status */}
       {!hasProject && (
         <div
+          className="status-display"
           style={{
-            padding: "12px",
-            backgroundColor: "#fff3cd",
-            border: "1px solid #ffc107",
-            borderRadius: "4px",
-            marginBottom: "16px",
-            fontSize: "11px",
+            background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+            border: "1px solid #fbbf24",
+            color: "#92400e",
           }}
         >
           Select a project to access styling features.
@@ -111,56 +109,50 @@ export const StylingTab: React.FC<StylingTabProps> = ({
       )}
 
       {/* Global Styles Section */}
-      <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>
+      <div style={{ marginBottom: "32px" }}>
+        <h4 className="section-header">
           Global Styles
-        </div>
+        </h4>
         
         <div
+          className="status-display"
           style={{
-            padding: "12px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "6px",
-            marginBottom: "12px",
+            background: globalStylesData 
+              ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+              : "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            border: globalStylesData ? "1px solid #34d399" : "1px solid #e2e8f0",
+            color: globalStylesData ? "#065f46" : "#64748b",
           }}
         >
           {globalStylesData ? (
-            <div style={{ fontSize: "11px", color: "#495057" }}>
-              <div>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: "4px" }}>
                 CSS Variables: {Object.keys(globalStylesData.cssVariables || {}).length}
               </div>
-
               <div>
                 Source Pages: {globalStylesData.pages?.length || 0}
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: "11px", color: "#6c757d" }}>
-              Loading styles...
-            </div>
+            <div>Loading styles...</div>
           )}
         </div>
 
         <button
           onClick={onRenderGlobalStyles}
           disabled={!canRenderGlobalStyles || isRenderingGlobalStyles}
+          className={`button-primary ${!canRenderGlobalStyles || isRenderingGlobalStyles ? 'button-flow-disabled' : ''}`}
           style={{
-            padding: "10px 16px",
-            backgroundColor: canRenderGlobalStyles && !isRenderingGlobalStyles ? "#6f42c1" : "#ccc",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: canRenderGlobalStyles && !isRenderingGlobalStyles ? "pointer" : "not-allowed",
-            fontSize: "14px",
-            fontWeight: 500,
-            width: "100%",
+            background: canRenderGlobalStyles && !isRenderingGlobalStyles 
+              ? "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
+              : undefined,
           }}
         >
           {isRenderingGlobalStyles ? "Rendering..." : "Render Global Styles"}
         </button>
 
         {globalStylesStatus && (
-          <div style={{ fontSize: "11px", color: "#6c757d", marginTop: "8px", textAlign: "center" }}>
+          <div className="status-display" style={{ textAlign: "center" }}>
             {globalStylesStatus}
           </div>
         )}
@@ -168,28 +160,30 @@ export const StylingTab: React.FC<StylingTabProps> = ({
 
       {/* Element Styles Section */}
       <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>
+        <h4 className="section-header">
           Element Styles
-        </div>
+        </h4>
 
         {/* Current Page Info */}
         <div
+          className="status-display"
           style={{
-            padding: "12px",
-            backgroundColor: isPageReady ? "#e7f3ff" : "#f8f9fa",
-            borderRadius: "6px",
-            marginBottom: "12px",
+            background: isPageReady 
+              ? "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)"
+              : "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            border: isPageReady ? "1px solid #60a5fa" : "1px solid #e2e8f0",
+            color: isPageReady ? "#1e40af" : "#64748b",
           }}
         >
-          <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
+          <div style={{ fontWeight: 600, marginBottom: "4px" }}>
             Active Page
           </div>
           {isPageReady ? (
-            <div style={{ fontSize: "11px", color: "#343a40" }}>
+            <div style={{ fontSize: "12px" }}>
               {currentPageUrl}
             </div>
           ) : (
-            <div style={{ fontSize: "11px", color: "#6c757d" }}>
+            <div>
               Open one of the generated screenshot pages to enable element styling.
             </div>
           )}
@@ -197,31 +191,35 @@ export const StylingTab: React.FC<StylingTabProps> = ({
 
         {/* Selected Element Info */}
         {isPageReady && (
-          <div style={{ marginBottom: "12px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, marginBottom: "8px" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <div className="section-header" style={{ fontSize: "12px", marginBottom: "8px" }}>
               Selected Element
             </div>
             
             {selectedElementInfo ? (
               <div
+                className="status-display"
                 style={{
-                  padding: "12px",
-                  backgroundColor: "#e7f3ff",
-                  border: "1px solid #b3d9ff",
-                  borderRadius: "4px",
-                  fontSize: "11px",
+                  background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
+                  border: "1px solid #60a5fa",
+                  color: "#1e40af",
                 }}
               >
-                <div style={{ fontWeight: 500, marginBottom: "4px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "4px" }}>
                   {selectedElementInfo.type}
                   {selectedElementInfo.text ? ` (${selectedElementInfo.text.substring(0, 30)}${selectedElementInfo.text.length > 30 ? '...' : ''})` : ''}
                 </div>
-                <div style={{ color: "#6c757d", fontSize: "10px" }}>
+                <div style={{ fontSize: "10px", opacity: 0.8 }}>
                   ID: {selectedElementInfo.id.substring(0, 8)}...
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: "11px", color: "#6c757d", textAlign: "center", padding: "8px" }}>
+              <div className="status-display" style={{ 
+                textAlign: "center",
+                background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                border: "1px solid #fbbf24",
+                color: "#92400e",
+              }}>
                 Select a badge or highlight frame to enable element styling
               </div>
             )}
@@ -231,23 +229,18 @@ export const StylingTab: React.FC<StylingTabProps> = ({
         <button
           onClick={() => selectedElementId && onRenderElementStyles(selectedElementId)}
           disabled={!canRenderElementStyles || isRenderingElementStyles}
+          className={`button-primary ${!canRenderElementStyles || isRenderingElementStyles ? 'button-flow-disabled' : ''}`}
           style={{
-            padding: "10px 16px",
-            backgroundColor: canRenderElementStyles && !isRenderingElementStyles ? "#fd7e14" : "#ccc",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: canRenderElementStyles && !isRenderingElementStyles ? "pointer" : "not-allowed",
-            fontSize: "14px",
-            fontWeight: 500,
-            width: "100%",
+            background: canRenderElementStyles && !isRenderingElementStyles 
+              ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+              : undefined,
           }}
         >
           {isRenderingElementStyles ? "Rendering..." : "Render Element Styles"}
         </button>
 
         {elementStylesStatus && (
-          <div style={{ fontSize: "11px", color: "#6c757d", marginTop: "8px", textAlign: "center" }}>
+          <div className="status-display" style={{ textAlign: "center" }}>
             {elementStylesStatus}
           </div>
         )}

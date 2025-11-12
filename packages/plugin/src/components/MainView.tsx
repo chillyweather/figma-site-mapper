@@ -160,34 +160,21 @@ export const MainView: React.FC<MainViewProps> = ({
   );
 
   return (
-    <div id="main-view" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div id="main-view" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div
         id="main-header"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-          padding: "16px 16px 0 16px",
-        }}
+        className="header"
       >
         <h3
           id="main-title"
-          style={{ margin: "0", fontSize: "14px", fontWeight: 600 }}
+          className="header-title"
         >
           Figma Site Mapper
         </h3>
         <button
           id="main-settings-button"
           onClick={switchToSettings}
-          style={{
-            background: "none",
-            border: "1px solid #ccc",
-            padding: "4px 8px",
-            cursor: "pointer",
-            fontSize: "12px",
-            borderRadius: "3px",
-          }}
+          className="settings-button"
         >
           <IconSettings size={16} />
         </button>
@@ -197,103 +184,59 @@ export const MainView: React.FC<MainViewProps> = ({
 
       {!projectSelected ? (
         <div
+          className="container"
           style={{
-            padding: "0 16px 16px 16px",
-            color: "#495057",
-            fontSize: "13px",
+            color: "#6b7280",
+            fontSize: "14px",
+            textAlign: "center",
+            padding: "40px 20px",
+            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            margin: "20px",
           }}
         >
-          Select or create a project to enable crawling, flows, styling, and
-          tokens.
+          <p style={{ margin: "0 0 8px 0", fontWeight: 500 }}>
+            No project selected
+          </p>
+          <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5 }}>
+            Select or create a project to enable crawling, flows, styling, and markup features.
+          </p>
         </div>
       ) : (
         <>
           <div
             id="tab-navigation"
-            style={{
-              display: "flex",
-              marginBottom: "16px",
-              borderBottom: "1px solid #e0e0e0",
-              padding: "0 16px",
-            }}
+            className="tab-navigation"
           >
             <button
               id="crawling-tab-button"
               onClick={() => setActiveTab("crawling")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "crawling" ? "600" : "400",
-                color: activeTab === "crawling" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "crawling"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "crawling" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Crawling
             </button>
             <button
               id="markup-tab-button"
               onClick={() => setActiveTab("markup")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "markup" ? "600" : "400",
-                color: activeTab === "markup" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "markup"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "markup" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Markup
             </button>
             <button
               id="flows-tab-button"
               onClick={() => setActiveTab("flows")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "flows" ? "600" : "400",
-                color: activeTab === "flows" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "flows"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "flows" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Flows
             </button>
             <button
               id="styling-tab-button"
               onClick={() => setActiveTab("styling")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "styling" ? "600" : "400",
-                color: activeTab === "styling" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "styling"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "styling" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Styling
             </button>
-
           </div>
 
           {activeTab === "crawling" && (

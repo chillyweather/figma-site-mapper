@@ -16,41 +16,42 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   projectSelected,
   isRenderingSnapshot,
 }) => (
-  <div id="crawling-tab" style={{ padding: "0 16px 16px 16px" }}>
+  <div id="crawling-tab" className="container">
     {!projectSelected && (
       <div
+        className="status-display"
         style={{
-          padding: "8px",
-          backgroundColor: "#fff3cd",
-          border: "1px solid #ffeeba",
-          borderRadius: "4px",
-          fontSize: "11px",
-          marginBottom: "12px",
-          color: "#856404",
+          background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+          border: "1px solid #fbbf24",
+          color: "#92400e",
         }}
       >
         Select or create a project to enable crawling.
       </div>
     )}
-    <div id="crawl-form" style={{ marginBottom: "16px" }}>
-      <FocusedInput
-        id="url-input"
-        key="url-input"
-        type="url"
-        value={url}
-        onChange={handleUrlChange}
-        placeholder="https://example.com"
-        required
-        disabled={
-          isLoading || isRenderingSnapshot || !!jobId || !projectSelected
-        }
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "8px",
-        }}
-      />
+    
+    <div id="crawl-form" style={{ marginBottom: "20px" }}>
+      <div className="form-group">
+        <label htmlFor="url-input" className="form-label">
+          Website URL
+        </label>
+        <FocusedInput
+          id="url-input"
+          key="url-input"
+          type="url"
+          value={url}
+          onChange={handleUrlChange}
+          placeholder="https://example.com"
+          required
+          disabled={
+            isLoading || isRenderingSnapshot || !!jobId || !projectSelected
+          }
+          className="form-input"
+        />
+        <div className="form-hint">
+          Enter the complete URL of the website you want to crawl and map.
+        </div>
+      </div>
 
       <button
         id="start-crawl-button"
@@ -62,7 +63,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           !url.trim() ||
           !projectSelected
         }
-        style={{ width: "100%", padding: "8px 16px", marginBottom: "8px" }}
+        className={`button-primary ${(!url.trim() || !projectSelected || isLoading || isRenderingSnapshot || !!jobId) ? 'button-flow-disabled' : ''}`}
       >
         {isLoading
           ? "Starting..."
@@ -81,11 +82,9 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
         disabled={
           isLoading || isRenderingSnapshot || !!jobId || !projectSelected
         }
+        className={`button-secondary ${(!projectSelected || isLoading || isRenderingSnapshot || !!jobId) ? 'button-flow-disabled' : ''}`}
         style={{
-          width: "100%",
-          padding: "8px 16px",
-          marginBottom: "8px",
-          backgroundColor: isRenderingSnapshot ? "#adb5bd" : "#343a40",
+          background: isRenderingSnapshot ? undefined : "linear-gradient(135deg, #374151 0%, #1f2937 100%)",
           color: "white",
           border: "none",
         }}
@@ -102,14 +101,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
     {status && (
       <div
         id="crawl-status-display"
-        style={{
-          padding: "8px",
-          backgroundColor: "#f0f0f0",
-          borderRadius: "4px",
-          fontSize: "11px",
-          marginBottom: "12px",
-          wordBreak: "break-all",
-        }}
+        className="status-display"
       >
         {status}
       </div>
@@ -118,12 +110,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
     <button
       id="close-plugin-button"
       onClick={handleClose}
-      style={{
-        width: "100%",
-        padding: "6px 16px",
-        backgroundColor: "transparent",
-        border: "1px solid #ccc",
-      }}
+      className="button-secondary"
     >
       Close
     </button>
