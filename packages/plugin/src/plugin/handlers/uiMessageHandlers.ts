@@ -61,21 +61,38 @@ async function handleLoadSettings(): Promise<void> {
 /** Load active project and send to UI */
 async function handleLoadProject(): Promise<void> {
   try {
+    console.log("🔍 [LOAD PROJECT] Loading project from clientStorage...");
     const projectId = await figma.clientStorage.getAsync("activeProjectId");
+    console.log("🔍 [LOAD PROJECT] Retrieved projectId:", projectId);
+    console.log("🔍 [LOAD PROJECT] projectId type:", typeof projectId);
+    console.log("🔍 [LOAD PROJECT] Sending to UI:", {
+      type: "project-loaded",
+      projectId,
+    });
     figma.ui.postMessage({ type: "project-loaded", projectId });
   } catch (error) {
-    console.error("Failed to load project", error);
+    console.error("❌ [LOAD PROJECT] Failed to load project", error);
     figma.ui.postMessage({ type: "project-error" });
   }
 }
 
 /** Save active project */
-async function handleSaveProject(msg: { projectId: string | null }): Promise<void> {
+async function handleSaveProject(msg: {
+  projectId: string | null;
+}): Promise<void> {
   try {
+    console.log("💾 [SAVE PROJECT] Saving project to clientStorage...");
+    console.log("💾 [SAVE PROJECT] projectId:", msg.projectId);
+    console.log("💾 [SAVE PROJECT] projectId type:", typeof msg.projectId);
     activeProjectIdRef = msg.projectId || null;
     await figma.clientStorage.setAsync("activeProjectId", msg.projectId);
+    console.log("✅ [SAVE PROJECT] Successfully saved to clientStorage");
+
+    // Verify it was saved
+    const verified = await figma.clientStorage.getAsync("activeProjectId");
+    console.log("🔍 [SAVE PROJECT] Verification read:", verified);
   } catch (error) {
-    console.error("Failed to save project", error);
+    console.error("❌ [SAVE PROJECT] Failed to save project", error);
   }
 }
 

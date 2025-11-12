@@ -57,26 +57,31 @@ export function useProjects(): UseProjectsResult {
 
   useEffect(() => {
     // Load active project from clientStorage on mount
-    parent.postMessage({ pluginMessage: { type: 'load-project' } }, '*');
+    console.log("📤 [useProjects] Requesting load-project from plugin...");
+    parent.postMessage({ pluginMessage: { type: "load-project" } }, "*");
 
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
       if (!msg) return;
 
-      if (msg.type === 'project-loaded') {
+      if (msg.type === "project-loaded") {
+        console.log("📥 [useProjects] Received project-loaded:", msg.projectId);
+        console.log("📥 [useProjects] projectId type:", typeof msg.projectId);
         setHasLoadedStoredProject(true);
         const storedId =
-          typeof msg.projectId === 'string' && msg.projectId.length > 0
+          typeof msg.projectId === "string" && msg.projectId.length > 0
             ? msg.projectId
             : null;
+        console.log("📥 [useProjects] Setting projectId to:", storedId);
         setProjectId(storedId);
-      } else if (msg.type === 'project-error') {
+      } else if (msg.type === "project-error") {
+        console.log("📥 [useProjects] Received project-error");
         setHasLoadedStoredProject(true);
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [setProjectId, setHasLoadedStoredProject]);
 
   useEffect(() => {
@@ -86,14 +91,33 @@ export function useProjects(): UseProjectsResult {
   }, [projects.length, refresh]);
 
   useEffect(() => {
+    console.log("🔄 [useProjects auto-select effect] Triggered");
+    console.log(
+      "🔄 [useProjects auto-select] hasLoadedStoredProject:",
+      hasLoadedStoredProject
+    );
+    console.log(
+      "🔄 [useProjects auto-select] projects.length:",
+      projects.length
+    );
+    console.log(
+      "🔄 [useProjects auto-select] activeProjectId:",
+      activeProjectId
+    );
+
     if (!hasLoadedStoredProject) {
+      console.log(
+        "⏸️  [useProjects auto-select] Waiting for stored project to load"
+      );
       return;
     }
 
     if (projects.length === 0) {
-      if (activeProjectId !== null) {
-        setProjectId(null);
-      }
+      console.log(
+        "⏸️  [useProjects auto-select] Projects not loaded yet, waiting..."
+      );
+      // Don't clear activeProjectId while projects are still loading
+      // The stored project might be valid once the projects list loads
       return;
     }
 
@@ -101,11 +125,29 @@ export function useProjects(): UseProjectsResult {
       activeProjectId !== null &&
       projects.some((project) => project._id === activeProjectId);
 
+    console.log("🔍 [useProjects auto-select] hasActive:", hasActive);
+    console.log(
+      "🔍 [useProjects auto-select] Available project IDs:",
+      projects.map((p) => p._id)
+    );
+
     if (!hasActive) {
       const nextProjectId = projects[0]?._id ?? null;
+      console.log(
+        "⚠️  [useProjects auto-select] Active project not found, defaulting to:",
+        nextProjectId
+      );
       if (nextProjectId !== activeProjectId) {
+        console.log(
+          "🔄 [useProjects auto-select] Setting projectId to first project:",
+          nextProjectId
+        );
         setProjectId(nextProjectId);
       }
+    } else {
+      console.log(
+        "✅ [useProjects auto-select] Active project is valid, keeping it"
+      );
     }
   }, [hasLoadedStoredProject, projects, activeProjectId, setProjectId]);
 
@@ -145,10 +187,24 @@ export function useProjects(): UseProjectsResult {
 
   const setActiveProjectId = useCallback(
     (projectId: string | null) => {
+      console.log(
+        "🔄 [useProjects.setActiveProjectId] Called with:",
+        projectId
+      );
+      console.log(
+        "🔄 [useProjects.setActiveProjectId] projectId type:",
+        typeof projectId
+      );
       setHasLoadedStoredProject(true);
       setProjectId(projectId);
       // Save to clientStorage whenever it changes
-      parent.postMessage({ pluginMessage: { type: 'save-project', projectId } }, '*');
+      console.log(
+        "📤 [useProjects.setActiveProjectId] Sending save-project message"
+      );
+      parent.postMessage(
+        { pluginMessage: { type: "save-project", projectId } },
+        "*"
+      );
     },
     [setProjectId, setHasLoadedStoredProject]
   );
