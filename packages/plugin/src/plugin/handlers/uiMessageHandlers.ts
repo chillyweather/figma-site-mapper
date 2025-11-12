@@ -21,6 +21,7 @@ import {
   handleRenderElementStylesRequest,
   handleSelectElementStyle,
 } from "./stylingHandlers";
+import { handleGetElementSelection } from "../events/pageEventHandlers";
 import {
   buildManifestFromProject,
   buildManifestFromPageIds,
@@ -950,6 +951,9 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
     case "select-element-style":
       await handleSelectElementStyle((msg as any).elementId);
+      break;
+    case "get-element-selection":
+      handleGetElementSelection();
       break;
     case "open-auth-session":
       await handleOpenAuthSession(msg);

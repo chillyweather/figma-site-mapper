@@ -362,33 +362,33 @@ export async function handleRenderElementStylesRequest(
     // Load all required fonts before creating text nodes
     await loadStylingFonts();
 
+    // Fetch element data from backend
+    const backendUrl = "http://localhost:3006";
+    const elementResponse = await fetch(
+      `${backendUrl}/styles/element?projectId=${activeProjectId}&elementId=${elementId}`
+    );
+    
+    if (!elementResponse.ok) {
+      figma.notify("Failed to fetch element data", { error: true });
+      return;
+    }
+    
+    const responseData = await elementResponse.json();
+    const elementData = responseData.element;
+    console.log("Fetched element data:", elementData);
+
     // Create new page for element styles
     const elementStylesPage = figma.createPage();
-    elementStylesPage.name = `🎨 Element ${elementId.substring(0, 8)}`;
+    elementStylesPage.name = `🎨 ${elementData.type || 'Element'} ${elementId.substring(0, 8)}`;
 
     // Insert page at the end
     figma.root.appendChild(elementStylesPage);
     figma.currentPage = elementStylesPage;
 
-    // TODO: Implement actual element styles rendering
-    // For now, just create a placeholder frame
-    const frame = figma.createFrame();
-    frame.name = `Element ${elementId}`;
-    frame.x = 100;
-    frame.y = 100;
-    frame.resize(400, 300);
-    frame.fills = [{ type: "SOLID", color: { r: 0.9, g: 0.7, b: 0.7 } }];
+    // Create element styles table
+    await createElementStylesTable(elementStylesPage, elementData);
 
-    const text = figma.createText();
-    text.characters = `Element ${elementId}\nStyles - Coming Soon`;
-    text.fontSize = 16;
-    text.x = 120;
-    text.y = 200;
-
-    elementStylesPage.appendChild(frame);
-    elementStylesPage.appendChild(text);
-
-    figma.notify("✨ Element styles page created!");
+    figma.notify("✨ Element styles table created!");
   } catch (error) {
     console.error("Failed to render element styles:", error);
     figma.notify("Error creating element styles page", { error: true });
@@ -537,6 +537,276 @@ function createVariableRow(
     } catch (error) {
       console.error(
         `Failed to create color for ${variableName}: ${variableValue}`,
+        error
+      );
+      colorSample.fills = [
+        { type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } },
+      ];
+    }
+
+    sampleContainer.appendChild(colorSample);
+  }
+
+  rowFrame.appendChild(nameContainer);
+  rowFrame.appendChild(valueContainer);
+  rowFrame.appendChild(sampleContainer);
+
+  return rowFrame;
+}
+
+/**
+ * Helper function to create an element styles table
+ */
+async function createElementStylesTable(
+  page: PageNode,
+  elementData: any
+): Promise<void> {
+  const styles = elementData.styles || {};
+  const styleEntries = Object.entries(styles);
+
+  if (styleEntries.length === 0) {
+    const text = figma.createText();
+    text.characters = "No styles found for this element";
+    text.fontSize = 16;
+    text.x = 100;
+    text.y = 100;
+    page.appendChild(text);
+    return;
+  }
+
+  // Create main container with auto-layout
+  const mainFrame = figma.createFrame();
+  mainFrame.name = "Element Styles Table";
+  mainFrame.layoutMode = "VERTICAL";
+  mainFrame.primaryAxisSizingMode = "AUTO";
+  mainFrame.counterAxisSizingMode = "FIXED";
+  mainFrame.resize(740, mainFrame.height);
+  mainFrame.paddingLeft = 20;
+  mainFrame.paddingRight = 20;
+  mainFrame.paddingTop = 20;
+  mainFrame.paddingBottom = 20;
+  mainFrame.itemSpacing = 16;
+  mainFrame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
+  mainFrame.cornerRadius = 8;
+
+  // Add title
+  const titleText = createStyledText(
+    `${elementData.type || 'Element'} Styles (${styleEntries.length} properties)`,
+    18,
+    "Bold"
+  );
+  titleText.fills = [{ type: "SOLID", color: { r: 0.1, g: 0.1, b: 0.1 } }];
+  mainFrame.appendChild(titleText);
+
+  // Add element info
+  if (elementData.text || elementData.selector) {
+    const infoFrame = figma.createFrame();
+    infoFrame.name = "element-info";
+    infoFrame.layoutMode = "VERTICAL";
+    infoFrame.primaryAxisSizingMode = "AUTO";
+    infoFrame.counterAxisSizingMode = "FIXED";
+    infoFrame.resize(700, infoFrame.height);
+    infoFrame.itemSpacing = 4;
+    infoFrame.fills = [{ type: "SOLID", color: { r: 0.95, g: 0.95, b: 0.95 } }];
+    infoFrame.paddingLeft = 12;
+    infoFrame.paddingRight = 12;
+    infoFrame.paddingTop = 8;
+    infoFrame.paddingBottom = 8;
+    infoFrame.cornerRadius = 4;
+
+    if (elementData.text) {
+      const textLabel = createStyledText("Text:", 12, "Medium");
+      textLabel.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
+      const textValue = createStyledText(elementData.text, 12, "Regular");
+      textValue.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4 } }];
+      
+      infoFrame.appendChild(textLabel);
+      infoFrame.appendChild(textValue);
+    }
+
+    if (elementData.selector) {
+      const selectorLabel = createStyledText("Selector:", 12, "Medium");
+      selectorLabel.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
+      const selectorValue = createStyledText(elementData.selector, 12, "Regular");
+      selectorValue.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4 } }];
+      
+      infoFrame.appendChild(selectorLabel);
+      infoFrame.appendChild(selectorValue);
+    }
+
+    mainFrame.appendChild(infoFrame);
+  }
+
+  // Add header row
+  const headerFrame = figma.createFrame();
+  headerFrame.name = "header";
+  headerFrame.layoutMode = "HORIZONTAL";
+  headerFrame.primaryAxisSizingMode = "FIXED";
+  headerFrame.counterAxisSizingMode = "AUTO";
+  headerFrame.resize(700, headerFrame.height);
+  headerFrame.paddingLeft = 12;
+  headerFrame.paddingRight = 12;
+  headerFrame.paddingTop = 8;
+  headerFrame.paddingBottom = 8;
+  headerFrame.itemSpacing = 16;
+  headerFrame.fills = [{ type: "SOLID", color: { r: 0.92, g: 0.92, b: 0.92 } }];
+  headerFrame.cornerRadius = 4;
+
+  // Header columns
+  const headers = [
+    { text: "Property", width: 250 },
+    { text: "Value", width: 300 },
+    { text: "Preview", width: 80 },
+  ];
+
+  headers.forEach(({ text: headerText, width }) => {
+    const headerCol = figma.createFrame();
+    headerCol.name = "header-col";
+    headerCol.layoutMode = "HORIZONTAL";
+    headerCol.primaryAxisSizingMode = "FIXED";
+    headerCol.counterAxisSizingMode = "AUTO";
+    headerCol.resize(width, headerCol.height);
+    headerCol.fills = [];
+
+    const text = createStyledText(headerText, 11, "Bold");
+    text.fills = [{ type: "SOLID", color: { r: 0.3, g: 0.3, b: 0.3 } }];
+    headerCol.appendChild(text);
+
+    headerFrame.appendChild(headerCol);
+  });
+
+  mainFrame.appendChild(headerFrame);
+
+  // Add style property rows
+  styleEntries.forEach(([propertyName, propertyValue]) => {
+    const row = createStylePropertyRow(propertyName, String(propertyValue), 700);
+    mainFrame.appendChild(row);
+  });
+
+  // Position in viewport
+  page.appendChild(mainFrame);
+
+  // Position to the right of existing content
+  const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
+  let rightmostX = 0;
+  let topmostY = 0;
+
+  if (allNodes.length > 0) {
+    allNodes.forEach((node) => {
+      const nodeRight = node.x + node.width;
+      if (nodeRight > rightmostX) {
+        rightmostX = nodeRight;
+      }
+      if (node.y < topmostY || topmostY === 0) {
+        topmostY = node.y;
+      }
+    });
+    mainFrame.x = rightmostX + 200;
+    mainFrame.y = topmostY;
+  } else {
+    mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
+    mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+  }
+
+  // Select and zoom to the frame
+  page.selection = [mainFrame];
+  figma.viewport.scrollAndZoomIntoView([mainFrame]);
+}
+
+/**
+ * Helper function to create a style property row with auto-layout
+ */
+function createStylePropertyRow(
+  propertyName: string,
+  propertyValue: string,
+  width: number
+): FrameNode {
+  const rowFrame = figma.createFrame();
+  rowFrame.name = "style-row";
+  rowFrame.layoutMode = "HORIZONTAL";
+  rowFrame.primaryAxisSizingMode = "FIXED";
+  rowFrame.counterAxisSizingMode = "AUTO";
+  rowFrame.resize(width, rowFrame.height);
+  rowFrame.paddingLeft = 12;
+  rowFrame.paddingRight = 12;
+  rowFrame.paddingTop = 12;
+  rowFrame.paddingBottom = 12;
+  rowFrame.itemSpacing = 16;
+  rowFrame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+  rowFrame.strokes = [{ type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } }];
+  rowFrame.strokeWeight = 1;
+  rowFrame.cornerRadius = 4;
+
+  // Property name container (fixed width)
+  const nameContainer = figma.createFrame();
+  nameContainer.name = "property-name";
+  nameContainer.layoutMode = "HORIZONTAL";
+  nameContainer.primaryAxisSizingMode = "FIXED";
+  nameContainer.counterAxisSizingMode = "AUTO";
+  nameContainer.resize(250, nameContainer.height);
+  nameContainer.fills = [];
+
+  const nameText = createStyledText(propertyName, 12, "Medium");
+  nameContainer.appendChild(nameText);
+
+  // Value container (grows to fill space)
+  const valueContainer = figma.createFrame();
+  valueContainer.name = "property-value";
+  valueContainer.layoutMode = "HORIZONTAL";
+  valueContainer.primaryAxisSizingMode = "FIXED";
+  valueContainer.counterAxisSizingMode = "AUTO";
+  valueContainer.resize(300, valueContainer.height);
+  valueContainer.fills = [];
+
+  const valueText = createStyledText(propertyValue, 12, "Regular");
+  valueText.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.4, b: 0.4 } }];
+  valueContainer.appendChild(valueText);
+
+  // Sample container (color preview if applicable)
+  const sampleContainer = figma.createFrame();
+  sampleContainer.name = "sample";
+  sampleContainer.layoutMode = "HORIZONTAL";
+  sampleContainer.primaryAxisSizingMode = "FIXED";
+  sampleContainer.counterAxisSizingMode = "AUTO";
+  sampleContainer.resize(80, sampleContainer.height);
+  sampleContainer.fills = [];
+  sampleContainer.primaryAxisAlignItems = "CENTER";
+  sampleContainer.counterAxisAlignItems = "CENTER";
+
+  if (isColorValue(propertyValue)) {
+    const colorSample = figma.createRectangle();
+    colorSample.name = "color-preview";
+    colorSample.resize(48, 24);
+    colorSample.cornerRadius = 4;
+
+    try {
+      const paint = colorToPaint(propertyValue);
+      if (
+        paint &&
+        paint.color &&
+        !isNaN(paint.color.r) &&
+        !isNaN(paint.color.g) &&
+        !isNaN(paint.color.b) &&
+        paint.color.r >= 0 &&
+        paint.color.r <= 1 &&
+        paint.color.g >= 0 &&
+        paint.color.g <= 1 &&
+        paint.color.b >= 0 &&
+        paint.color.b <= 1
+      ) {
+        colorSample.fills = [paint];
+        colorSample.strokes = [
+          { type: "SOLID", color: { r: 0.8, g: 0.8, b: 0.8 } },
+        ];
+        colorSample.strokeWeight = 1;
+      } else {
+        colorSample.fills = [
+          { type: "SOLID", color: { r: 0.9, g: 0.9, b: 0.9 } },
+        ];
+      }
+    } catch (error) {
+      console.error(
+        `Failed to create color for ${propertyName}: ${propertyValue}`,
         error
       );
       colorSample.fills = [

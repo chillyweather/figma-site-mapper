@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
@@ -51,6 +51,7 @@ export const MainView: React.FC<MainViewProps> = ({
 }) => {
   // Styling state
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementInfo, setSelectedElementInfo] = useState<{ id: string; type: string; text?: string } | null>(null);
   const [isRenderingGlobalStyles, setIsRenderingGlobalStyles] = useState(false);
   const [isRenderingElementStyles, setIsRenderingElementStyles] = useState(false);
   const [globalStylesStatus, setGlobalStylesStatus] = useState("");
@@ -63,6 +64,30 @@ export const MainView: React.FC<MainViewProps> = ({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const projectSelected = Boolean(activeProjectId);
+
+  // Handle element selection messages from plugin
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (msg?.type === "element-selection-changed") {
+        setSelectedElementId(msg.elementId || null);
+        setSelectedElementInfo(msg.elementInfo || null);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Request current selection on mount and tab change
+  useEffect(() => {
+    if (activeTab === "styling") {
+      parent.postMessage(
+        { pluginMessage: { type: "get-element-selection" } },
+        "*"
+      );
+    }
+  }, [activeTab]);
 
   // Styling handlers
   const handleRenderGlobalStyles = () => {
@@ -338,6 +363,7 @@ export const MainView: React.FC<MainViewProps> = ({
               globalStylesStatus={globalStylesStatus}
               elementStylesStatus={elementStylesStatus}
               selectedElementId={selectedElementId}
+              selectedElementInfo={selectedElementInfo}
             />
           )}
 

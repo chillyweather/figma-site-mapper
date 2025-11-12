@@ -11,6 +11,7 @@ interface StylingTabProps {
   globalStylesStatus: string;
   elementStylesStatus: string;
   selectedElementId: string | null;
+  selectedElementInfo: { id: string; type: string; text?: string } | null;
 }
 
 interface GlobalStylesData {
@@ -25,13 +26,7 @@ interface GlobalStylesData {
   }>;
 }
 
-interface ElementData {
-  _id: string;
-  type: string;
-  styles?: Record<string, string>;
-  text?: string;
-  selector: string;
-}
+
 
 export const StylingTab: React.FC<StylingTabProps> = ({
   onRenderGlobalStyles,
@@ -41,12 +36,11 @@ export const StylingTab: React.FC<StylingTabProps> = ({
   globalStylesStatus,
   elementStylesStatus,
   selectedElementId,
+  selectedElementInfo,
 }) => {
   const activeProjectId = useAtomValue(activeProjectIdAtom);
   const [currentPageUrl, setCurrentPageUrl] = useState<string | null>(null);
   const [globalStylesData, setGlobalStylesData] = useState<GlobalStylesData | null>(null);
-  const [availableElements, setAvailableElements] = useState<ElementData[]>([]);
-  const [isLoadingElements, setIsLoadingElements] = useState(false);
 
   // Check if we have project and styling data
   const hasProject = Boolean(activeProjectId);
@@ -77,12 +71,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
     }
   }, [hasProject]);
 
-  // Fetch elements when current page URL changes
-  useEffect(() => {
-    if (hasProject && isPageReady) {
-      fetchPageElements();
-    }
-  }, [hasProject, isPageReady]);
+
 
   const fetchGlobalStyles = async () => {
     if (!activeProjectId) return;
@@ -96,44 +85,15 @@ export const StylingTab: React.FC<StylingTabProps> = ({
     }
   };
 
-  const fetchPageElements = async () => {
-    if (!activeProjectId || !currentPageUrl) return;
 
-    setIsLoadingElements(true);
-    try {
-      const response = await fetch(`${BACKEND_URL}/elements?projectId=${activeProjectId}&url=${encodeURIComponent(currentPageUrl)}`);
-      const data = await response.json();
-      const elementsData = (data as { elements: ElementData[] }).elements || [];
-      setAvailableElements(elementsData.filter(el => el.styles && Object.keys(el.styles).length > 0));
-    } catch (error) {
-      console.error("Failed to fetch elements:", error);
-      setAvailableElements([]);
-    } finally {
-      setIsLoadingElements(false);
-    }
-  };
 
-  const handleElementSelect = (elementId: string) => {
-    if (selectedElementId === elementId) {
-      // Deselect if already selected
-      parent.postMessage(
-        { pluginMessage: { type: "select-element-style", elementId: null } },
-        "*"
-      );
-    } else {
-      // Select new element
-      parent.postMessage(
-        { pluginMessage: { type: "select-element-style", elementId } },
-        "*"
-      );
-    }
-  };
+
 
   const canRenderGlobalStyles = hasProject && globalStylesData && 
     (globalStylesData.cssVariables && Object.keys(globalStylesData.cssVariables).length > 0 ||
      globalStylesData.tokens && globalStylesData.tokens.length > 0);
 
-  const canRenderElementStyles = hasProject && selectedElementId && availableElements.length > 0;
+  const canRenderElementStyles = hasProject && selectedElementId && selectedElementInfo;
 
   return (
     <div style={{ padding: "0 16px 16px 16px" }}>
@@ -240,54 +200,34 @@ export const StylingTab: React.FC<StylingTabProps> = ({
           )}
         </div>
 
-        {/* Elements List */}
+        {/* Selected Element Info */}
         {isPageReady && (
           <div style={{ marginBottom: "12px" }}>
             <div style={{ fontSize: "11px", fontWeight: 600, marginBottom: "8px" }}>
-              Available Elements
+              Selected Element
             </div>
             
-            {isLoadingElements ? (
-              <div style={{ fontSize: "11px", color: "#6c757d", textAlign: "center", padding: "8px" }}>
-                Loading elements...
-              </div>
-            ) : availableElements.length === 0 ? (
-              <div style={{ fontSize: "11px", color: "#6c757d", textAlign: "center", padding: "8px" }}>
-                No styled elements found on this page.
+            {selectedElementInfo ? (
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "#e7f3ff",
+                  border: "1px solid #b3d9ff",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                }}
+              >
+                <div style={{ fontWeight: 500, marginBottom: "4px" }}>
+                  {selectedElementInfo.type}
+                  {selectedElementInfo.text ? ` (${selectedElementInfo.text.substring(0, 30)}${selectedElementInfo.text.length > 30 ? '...' : ''})` : ''}
+                </div>
+                <div style={{ color: "#6c757d", fontSize: "10px" }}>
+                  ID: {selectedElementInfo.id.substring(0, 8)}...
+                </div>
               </div>
             ) : (
-              <div style={{ maxHeight: "120px", overflowY: "auto", border: "1px solid #e9ecef", borderRadius: "4px" }}>
-                {availableElements.map((element) => (
-                  <label
-                    key={element._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "8px 12px",
-                      borderBottom: "1px solid #f1f3f4",
-                      cursor: "pointer",
-                      fontSize: "11px",
-                      backgroundColor: selectedElementId === element._id ? "#e3f2fd" : "white",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="selectedElement"
-                      value={element._id}
-                      checked={selectedElementId === element._id}
-                      onChange={() => handleElementSelect(element._id)}
-                      style={{ marginRight: "8px" }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 500 }}>
-                        {element.type} {element.text ? `(${element.text.substring(0, 30)}${element.text.length > 30 ? '...' : ''})` : ''}
-                      </div>
-                      <div style={{ color: "#6c757d", fontSize: "10px" }}>
-                        {Object.keys(element.styles || {}).length} style properties
-                      </div>
-                    </div>
-                  </label>
-                ))}
+              <div style={{ fontSize: "11px", color: "#6c757d", textAlign: "center", padding: "8px" }}>
+                Select a badge or highlight frame to enable element styling
               </div>
             )}
           </div>

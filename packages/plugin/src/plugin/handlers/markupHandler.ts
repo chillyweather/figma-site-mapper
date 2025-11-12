@@ -255,6 +255,8 @@ export async function handleRenderMarkupRequest({
       highlightRect.setPluginData("MARKUP_ELEMENT", JSON.stringify(metadata));
       highlightRect.setPluginData("PAGE_ID", pageId ?? "");
       highlightRect.setPluginData("dbId", record._id);
+      highlightRect.setPluginData("elementType", elementType);
+      highlightRect.setPluginData("elementText", transformed.text || "");
       highlightRect.setPluginData("link", transformed.href || "");
       highlightRect.setPluginData("ordinalNumber", String(highlightNumber));
 
@@ -352,6 +354,8 @@ export async function handleRenderMarkupRequest({
       );
       badgeGroup.setPluginData("PAGE_ID", pageId ?? "");
       badgeGroup.setPluginData("dbId", record._id);
+      badgeGroup.setPluginData("elementType", elementType);
+      badgeGroup.setPluginData("elementText", transformed.text || "");
       badgeGroup.setPluginData("link", transformed.href || "");
       badgeGroup.setPluginData("ordinalNumber", String(highlightNumber));
       if (targetUrlForPluginData) {
