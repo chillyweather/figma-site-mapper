@@ -25,6 +25,7 @@ export function useProjects(): UseProjectsResult {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const [hasLoadedStoredProject, setHasLoadedStoredProject] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -39,15 +40,6 @@ export function useProjects(): UseProjectsResult {
       if (!isMountedRef.current) return;
       setProjects(result.projects);
       setError(null);
-      const hasActive =
-        activeProjectId &&
-        result.projects.some((project) => project._id === activeProjectId);
-      if (!hasActive) {
-        const nextProjectId = result.projects[0]
-          ? result.projects[0]._id
-          : null;
-        setProjectId(nextProjectId);
-      }
     } catch (err) {
       console.error("Failed to load projects", err);
       if (!isMountedRef.current) return;
@@ -61,13 +53,61 @@ export function useProjects(): UseProjectsResult {
         setIsLoading(false);
       }
     }
-  }, [activeProjectId, setProjectId, setProjects]);
+  }, [setProjects]);
+
+  useEffect(() => {
+    // Load active project from clientStorage on mount
+    parent.postMessage({ pluginMessage: { type: 'load-project' } }, '*');
+
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'project-loaded') {
+        setHasLoadedStoredProject(true);
+        const storedId =
+          typeof msg.projectId === 'string' && msg.projectId.length > 0
+            ? msg.projectId
+            : null;
+        setProjectId(storedId);
+      } else if (msg.type === 'project-error') {
+        setHasLoadedStoredProject(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [setProjectId, setHasLoadedStoredProject]);
 
   useEffect(() => {
     if (projects.length === 0) {
       refresh();
     }
   }, [projects.length, refresh]);
+
+  useEffect(() => {
+    if (!hasLoadedStoredProject) {
+      return;
+    }
+
+    if (projects.length === 0) {
+      if (activeProjectId !== null) {
+        setProjectId(null);
+      }
+      return;
+    }
+
+    const hasActive =
+      activeProjectId !== null &&
+      projects.some((project) => project._id === activeProjectId);
+
+    if (!hasActive) {
+      const nextProjectId = projects[0]?._id ?? null;
+      if (nextProjectId !== activeProjectId) {
+        setProjectId(nextProjectId);
+      }
+    }
+  }, [hasLoadedStoredProject, projects, activeProjectId, setProjectId]);
 
   const createProject = useCallback(
     async (name: string) => {
@@ -83,6 +123,7 @@ export function useProjects(): UseProjectsResult {
         if (!isMountedRef.current) return;
         setProjects((prev) => [result.project, ...prev]);
         setProjectId(result.project._id);
+        setHasLoadedStoredProject(true);
         setError(null);
       } catch (err) {
         console.error("Failed to create project", err);
@@ -99,14 +140,17 @@ export function useProjects(): UseProjectsResult {
         }
       }
     },
-    [setProjectId, setProjects]
+    [setProjectId, setProjects, setHasLoadedStoredProject]
   );
 
   const setActiveProjectId = useCallback(
     (projectId: string | null) => {
+      setHasLoadedStoredProject(true);
       setProjectId(projectId);
+      // Save to clientStorage whenever it changes
+      parent.postMessage({ pluginMessage: { type: 'save-project', projectId } }, '*');
     },
-    [setProjectId]
+    [setProjectId, setHasLoadedStoredProject]
   );
 
   return {

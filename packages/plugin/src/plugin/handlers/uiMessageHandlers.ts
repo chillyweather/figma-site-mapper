@@ -58,6 +58,27 @@ async function handleLoadSettings(): Promise<void> {
   }
 }
 
+/** Load active project and send to UI */
+async function handleLoadProject(): Promise<void> {
+  try {
+    const projectId = await figma.clientStorage.getAsync("activeProjectId");
+    figma.ui.postMessage({ type: "project-loaded", projectId });
+  } catch (error) {
+    console.error("Failed to load project", error);
+    figma.ui.postMessage({ type: "project-error" });
+  }
+}
+
+/** Save active project */
+async function handleSaveProject(msg: { projectId: string | null }): Promise<void> {
+  try {
+    activeProjectIdRef = msg.projectId || null;
+    await figma.clientStorage.setAsync("activeProjectId", msg.projectId);
+  } catch (error) {
+    console.error("Failed to save project", error);
+  }
+}
+
 let hasRenderedSitemap = false;
 let activeProjectIdRef: string | null = null;
 
@@ -709,209 +730,6 @@ export async function handleSaveSettings(msg: any): Promise<void> {
 }
 
 /**
-export async function handleGetStatus(msg: any): Promise<void> {
-  const { jobId } = msg;
-
-  try {
-    const result = await getJobStatus(lastJobId);
-    const projectId = (result.result && result.result.projectId) || null;
-    const startUrl = (result.result && result.result.startUrl) || null;
-    const detectInteractiveElements =
-      result.result && result.result.detectInteractiveElements !== false;
-
-    if (result.status === "completed" && projectId && startUrl) {
-      if (hasRenderedSitemap) {
-        console.log("⚠️ Skipping duplicate sitemap rendering");
-        return;
-      }
-
-      hasRenderedSitemap = true;
-      console.log("🎉 Job completed, rendering sitemap");
-
-      figma.ui.postMessage({
-        type: "status-update",
-        jobId,
-        status: "rendering",
-        detailedProgress: {
-          stage: hasSubsetPages
-            ? "Fetching job subset..."
-            : "Fetching crawl data...",
-          progress: 5,
-        },
-      });
-
-      try {
-        let manifestData = null as null | ManifestData;
-        let subsetUsed = false;
-
-        if (hasSubsetPages) {
-          try {
-            manifestData = await buildManifestFromPageIds(
-              projectId,
-              startUrl,
-              visitedPageIds,
-              {
-                detectInteractiveElements: detectInteractiveFromJob,
-              }
-            );
-            subsetUsed = true;
-          } catch (subsetError) {
-            console.warn(
-              "Failed to build manifest from page ids, falling back to full project",
-              subsetError
-            );
-            subsetUsed = false;
-            manifestData = null;
-          }
-        }
-
-        if (!manifestData) {
-          manifestData = await buildManifestFromProject(
-            projectId,
-            startUrl,
-            {
-              detectInteractiveElements: detectInteractiveFromJob,
-            }
-          );
-          subsetUsed = false;
-        }
-
-        if (subsetUsed && !manifestData.tree) {
-          console.warn(
-            "Subset manifest contained no tree data, using full project manifest instead"
-          );
-          manifestData = await buildManifestFromProject(projectId, startUrl, {
-            detectInteractiveElements: detectInteractiveFromJob,
-          });
-          subsetUsed = false;
-        }
-
-        if (!manifestData.tree) {
-          figma.ui.postMessage({
-            type: "status-update",
-            jobId,
-            status: "error",
-            detailedProgress: {
-              stage: "No pages available in crawl",
-              progress: 100,
-            },
-          });
-          figma.notify("Error: No crawled pages found for this project.", {
-            error: true,
-          });
-          hasRenderedSitemap = false;
-          return;
-        }
-
-        await figma.clientStorage.setAsync("lastProjectId", projectId);
-        await figma.clientStorage.setAsync("lastStartUrl", startUrl);
-        await figma.clientStorage.setAsync("lastJobId", jobId);
-        await figma.clientStorage.setAsync(
-          "lastDetectInteractiveElements",
-          detectInteractiveFromJob
-        );
-
-        const subsetMetadataStored = await persistLastJobSubset(
-          subsetUsed
-            ? {
-                jobId,
-                projectId,
-                startUrl,
-                pageIds: visitedPageIds,
-                detectInteractiveElements: detectInteractiveFromJob,
-                storedAt: Date.now(),
-              }
-            : null
-        );
-        if (subsetMetadataStored) {
-          console.log(
-            subsetUsed
-              ? "💾 Stored job subset metadata in clientStorage"
-              : "💾 Cleared job subset metadata in clientStorage"
-          );
-        }
-
-        figma.ui.postMessage({
-          type: "manifest-data",
-          manifestData,
-        });
-
-        let highlightAllElements = false;
-        let highlightElementFilters = null;
-        try {
-          const storedSettings = await figma.clientStorage.getAsync("settings");
-          const merged = storedSettings
-            ? Object.assign({}, DEFAULT_SETTINGS, storedSettings)
-            : DEFAULT_SETTINGS;
-          highlightAllElements = !!merged.highlightAllElements;
-          highlightElementFilters = merged.highlightElementFilters || null;
-        } catch (error) {
-          console.log("Could not load settings for highlightAllElements");
-        }
-
-        await renderSitemap(
-          manifestData,
-          screenshotWidth,
-          detectInteractiveFromJob,
-          highlightAllElements,
-          (stage: string, progress: number) => {
-            figma.ui.postMessage({
-              type: "status-update",
-              jobId,
-              status: "rendering",
-              detailedProgress: {
-                stage,
-                progress,
-              },
-            });
-          },
-          highlightElementFilters
-        );
-
-        figma.ui.postMessage({
-          type: "status-update",
-          jobId,
-          status: "completed",
-          detailedProgress: {
-            stage: "Complete!",
-            progress: 100,
-          },
-        });
-
-        figma.notify("Sitemap created successfully!");
-        return;
-      } catch (error) {
-        hasRenderedSitemap = false;
-        console.error("Failed to assemble manifest data:", error);
-        figma.notify("Error: Could not fetch crawl results from backend.", {
-          error: true,
-        });
-        figma.ui.postMessage({
-          type: "status-update",
-          jobId,
-          status: "error",
-          detailedProgress: {
-            stage: "Failed to build sitemap",
-            progress: 100,
-          },
-        });
-        return;
-      }
-    }
-
-    figma.ui.postMessage({
-      type: "status-update",
-      jobId,
-      status: result.status,
-      progress: result.progress,
-      detailedProgress: result.detailedProgress,
-    });
-  } catch (error) {
-    console.error("Failed to get job status:", error);
-    figma.notify("Error: Could not get job status.", { error: true });
-  }
-}
-/**
  * Handle close message from UI
  */
 export function handleClose(): void {
@@ -1084,6 +902,12 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
     case "load-settings":
       await handleLoadSettings();
+      break;
+    case "load-project":
+      await handleLoadProject();
+      break;
+    case "save-project":
+      await handleSaveProject({ projectId: msg.projectId ?? null });
       break;
     case "get-status":
       await handleGetStatus(

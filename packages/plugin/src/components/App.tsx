@@ -475,6 +475,14 @@ export const App: React.FC = () => {
       handleExtractCSSVariablesChange={handleExtractCSSVariablesChange}
       detectPatterns={settings.detectPatterns}
       handleDetectPatternsChange={handleDetectPatternsChange}
+      projects={projects}
+      activeProjectId={activeProjectId}
+      onProjectChange={handleProjectChange}
+      onCreateProject={handleCreateProject}
+      onRefreshProjects={refresh}
+      isProjectLoading={isProjectLoading}
+      isCreatingProject={isCreatingProject}
+      projectError={projectError}
     />
   ) : (
     <MainView
