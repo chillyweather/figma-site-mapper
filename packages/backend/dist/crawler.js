@@ -717,7 +717,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 log.info("Network idle timeout, continuing anyway");
             });
             // CAPTCHA detection and handling
-            const captchaIndicators = await page.evaluate(() => {
+            const captchaDetection = await page.evaluate(() => {
                 const captchaSelectors = [
                     '[src*="captcha"]',
                     '[class*="captcha"]',
@@ -728,26 +728,69 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     ".g-recaptcha",
                     '[src*="hcaptcha"]',
                     ".h-captcha",
+                ];
+                // Check for CAPTCHA elements (primary detection method)
+                const foundElements = [];
+                captchaSelectors.forEach((selector) => {
+                    if (document.querySelector(selector)) {
+                        foundElements.push(selector);
+                    }
+                });
+                // Check for Cloudflare browser verification specifically
+                const cloudflareSelectors = [
                     '[class*="cf-browser-verification"]',
-                    '[id*="cf-wrapper"]', // Cloudflare
+                    '[id*="cf-wrapper"]',
+                    '.cf-im-under-attack',
+                    '.cf-browser-verification',
                 ];
-                // Check for CAPTCHA elements
-                const hasElements = captchaSelectors.some((selector) => document.querySelector(selector));
-                // Check for CAPTCHA-related text in body
-                const bodyText = document.body.textContent?.toLowerCase() || "";
-                const captchaTexts = [
-                    "verify you are human",
-                    "prove you are not a robot",
-                    "captcha",
-                    "shieldsquare",
-                    "security check",
-                ];
-                const hasText = captchaTexts.some((text) => bodyText.includes(text));
-                // Check for CAPTCHA-related titles
-                const titleText = document.title.toLowerCase();
-                const hasCaptchaTitle = captchaTexts.some((text) => titleText.includes(text));
-                return hasElements || hasText || hasCaptchaTitle;
+                const foundCloudflare = [];
+                cloudflareSelectors.forEach((selector) => {
+                    if (document.querySelector(selector)) {
+                        foundCloudflare.push(selector);
+                    }
+                });
+                // More specific text-based detection (only if elements found)
+                let hasSpecificText = false;
+                let hasCaptchaTitle = false;
+                if (foundElements.length > 0 || foundCloudflare.length > 0) {
+                    const bodyText = document.body.textContent?.toLowerCase() || "";
+                    const specificCaptchaTexts = [
+                        "verify you are human",
+                        "prove you are not a robot",
+                        "please complete the security check",
+                        "robot check",
+                        "i'm not a robot",
+                    ];
+                    hasSpecificText = specificCaptchaTexts.some((text) => bodyText.includes(text));
+                    // Check for CAPTCHA-specific titles
+                    const titleText = document.title.toLowerCase();
+                    const captchaTitles = [
+                        "security check",
+                        "human verification",
+                        "captcha",
+                        "are you a robot",
+                    ];
+                    hasCaptchaTitle = captchaTitles.some((text) => titleText.includes(text));
+                }
+                return {
+                    hasCaptcha: (foundElements.length > 0 && (hasSpecificText || hasCaptchaTitle)) || foundCloudflare.length > 0,
+                    foundElements,
+                    foundCloudflare,
+                    hasSpecificText,
+                    hasCaptchaTitle,
+                    pageTitle: document.title,
+                };
             });
+            const captchaIndicators = captchaDetection.hasCaptcha;
+            // Log detailed detection info for debugging
+            if (captchaIndicators) {
+                log.info(`🚨 CAPTCHA detection details for ${request.url}:`);
+                log.info(`   Found elements: ${captchaDetection.foundElements.join(', ') || 'none'}`);
+                log.info(`   Found Cloudflare: ${captchaDetection.foundCloudflare.join(', ') || 'none'}`);
+                log.info(`   Specific text: ${captchaDetection.hasSpecificText}`);
+                log.info(`   CAPTCHA title: ${captchaDetection.hasCaptchaTitle}`);
+                log.info(`   Page title: "${captchaDetection.pageTitle}"`);
+            }
             if (captchaIndicators) {
                 log.info(`🚨 CAPTCHA detected on ${request.url}`);
                 log.info(`👤 Please solve CAPTCHA manually in the browser window. Waiting up to 2 minutes...`);
