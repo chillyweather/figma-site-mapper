@@ -9,28 +9,26 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy backend package.json
 COPY packages/backend/package.json ./packages/backend/
 
-# --- FIX IS HERE ---
-# 1. Install ALL dependencies (including dev) to run the build
+# Install ALL dependencies (including dev) to run the build
 RUN pnpm install --filter backend
 
-# 2. Copy all source code
+# Copy all source code
 COPY . .
 
-# 3. Run the build (this will now find 'tsc')
+# Run the build (this will now find 'tsc')
 RUN pnpm --filter backend build
-
-# 4. Re-install *only* production dependencies for a clean final node_modules
-RUN pnpm install --filter backend --prod
-# --- END FIX ---
 
 # Stage 2: Create the final production image
 FROM node:18-alpine
 RUN npm install -g pnpm
 WORKDIR /app
 
-# Copy only production dependencies from builder stage
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/backend/node_modules ./packages/backend/node_modules
+# Copy package manifests for production install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/backend/package.json ./packages/backend/
+
+# Install only production dependencies
+RUN pnpm install --filter backend --prod
 
 # Copy the built backend code
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
