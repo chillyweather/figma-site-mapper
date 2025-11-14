@@ -6,17 +6,22 @@ WORKDIR /app
 # Copy dependency manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy backend package.json to leverage Docker layer caching
+# Copy backend package.json
 COPY packages/backend/package.json ./packages/backend/
 
-# Install ONLY backend production dependencies
-RUN pnpm install --filter backend --prod
+# --- FIX IS HERE ---
+# 1. Install ALL dependencies (including dev) to run the build
+RUN pnpm install --filter backend
 
-# Copy the rest of the source code
+# 2. Copy all source code
 COPY . .
 
-# Build the backend (TypeScript -> JavaScript)
+# 3. Run the build (this will now find 'tsc')
 RUN pnpm --filter backend build
+
+# 4. Re-install *only* production dependencies for a clean final node_modules
+RUN pnpm install --filter backend --prod
+# --- END FIX ---
 
 # Stage 2: Create the final production image
 FROM node:18-alpine
@@ -37,5 +42,4 @@ ENV NODE_ENV=production
 EXPOSE 3006
 
 # The command to start the API server
-# We will override this for the worker
 CMD ["node", "packages/backend/dist/index.js"]
