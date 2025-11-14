@@ -5,6 +5,8 @@ import path from "path";
 import { Types } from "mongoose";
 import { Page } from "./models/Page.js";
 import { Element } from "./models/Element.js";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { s3Client, BUCKET_NAME, PUBLIC_URL_BASE } from "./s3Client.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -226,136 +228,108 @@ function getSafeFilename(url: string): string {
 async function sliceScreenshot(
   imageBuffer: Buffer,
   url: string,
-  publicUrl: string,
+  _publicUrl: string, // No longer used, but keep signature
   maxHeight: number = 4096,
   overlap: number = 0
 ): Promise<string[]> {
-  try {
-    const image = sharp(imageBuffer);
-    const metadata = await image.metadata();
-
-    if (!metadata.height || !metadata.width) {
-      throw new Error("Could not get image dimensions");
-    }
-
-    const { width, height } = metadata;
-
-    console.log(
-      `📐 Original screenshot dimensions: ${width}x${height} for ${url}`
+  if (!BUCKET_NAME) {
+    throw new Error(
+      "S3_BUCKET_NAME is not configured. Cannot upload screenshots."
     );
-
-    // Validate dimensions
-    if (width <= 0 || height <= 0) {
-      throw new Error(`Invalid image dimensions: ${width}x${height}`);
-    }
-
-    // If image is already small enough, return as single slice
-    if (height <= maxHeight) {
-      const safeFileName = getSafeFilename(url);
-      const screenshotFileName = `${safeFileName}.png`;
-      const screenshotPath = path.join(screenshotDir, screenshotFileName);
-
-      await image.toFile(screenshotPath);
-      return [`${publicUrl}/screenshots/${screenshotFileName}`];
-    }
-
-    // Fix for edge case where height is less than overlap
-    if (height <= overlap) {
-      console.log(
-        `⚠️  Image height (${height}) <= overlap (${overlap}), saving as single slice`
-      );
-      const safeFileName = getSafeFilename(url);
-      const screenshotFileName = `${safeFileName}.png`;
-      const screenshotPath = path.join(screenshotDir, screenshotFileName);
-
-      await image.toFile(screenshotPath);
-      return [`${publicUrl}/screenshots/${screenshotFileName}`];
-    }
-
-    // More accurate calculation for number of slices
-    const numSlices = Math.max(
-      1,
-      Math.ceil((height - maxHeight) / (maxHeight - overlap)) + 1
-    );
-    const slices: string[] = [];
-
-    console.log(
-      `🖼️  Slicing large screenshot (${width}x${height}) into ${numSlices} pieces for ${url}`
-    );
-
-    for (let i = 0; i < numSlices; i++) {
-      // Calculate the starting position for this slice
-      let sliceTop = i * (maxHeight - overlap);
-      let sliceHeight = maxHeight;
-
-      // For the last slice, adjust height to not exceed image bounds
-      if (i === numSlices - 1) {
-        sliceHeight = height - sliceTop;
-        // If the last slice would be too small, adjust the previous slice instead
-        if (sliceHeight < overlap) {
-          sliceTop = height - maxHeight;
-          sliceHeight = maxHeight;
-        }
-      }
-
-      console.log(
-        `📝 Processing slice ${i + 1}/${numSlices}: top=${sliceTop}, height=${sliceHeight}, image bounds=${height}`
-      );
-
-      console.log(
-        `📝 Processing slice ${i + 1}/${numSlices}: top=${sliceTop}, height=${sliceHeight}`
-      );
-
-      // Validate extract bounds before attempting extraction
-      if (sliceTop >= height) {
-        console.error(`❌ Invalid sliceTop: ${sliceTop} >= ${height}`);
-        continue;
-      }
-
-      if (sliceTop + sliceHeight > height) {
-        console.error(
-          `❌ Invalid extract area: ${sliceTop} + ${sliceHeight} = ${sliceTop + sliceHeight} > ${height}`
-        );
-        continue;
-      }
-
-      const safeFileName = getSafeFilename(url);
-      const sliceFileName = `${safeFileName}_slice_${i + 1}_of_${numSlices}.png`;
-      const slicePath = path.join(screenshotDir, sliceFileName);
-
-      try {
-        // Extract slice from original image - use clone to avoid modifying original
-        await image
-          .clone()
-          .extract({
-            left: 0,
-            top: sliceTop,
-            width: width,
-            height: sliceHeight,
-          })
-          .toFile(slicePath);
-
-        slices.push(`${publicUrl}/screenshots/${sliceFileName}`);
-        console.log(
-          `📸 Created slice ${i + 1}/${numSlices}: ${width}x${sliceHeight}px at y=${sliceTop}`
-        );
-      } catch (error) {
-        console.error(
-          `❌ Failed to create slice ${i + 1}/${numSlices}:`,
-          error instanceof Error ? error.message : String(error)
-        );
-        throw error;
-      }
-    }
-
-    return slices;
-  } catch (error) {
-    console.error(
-      `❌ sliceScreenshot failed for ${url}:`,
-      error instanceof Error ? error.message : String(error)
-    );
-    throw error;
   }
+
+  const image = sharp(imageBuffer);
+  const metadata = await image.metadata();
+  const { width, height } = metadata;
+
+  if (!height || !width || width <= 0 || height <= 0) {
+    throw new Error("Could not get valid image dimensions");
+  }
+
+  const safeFileNameBase = getSafeFilename(url);
+  const slices: string[] = [];
+
+  // Uploader helper function
+  const uploadSlice = async (buffer: Buffer, fileName: string) => {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: fileName,
+        Body: buffer,
+        ACL: "public-read", // Makes the image viewable by the public
+        ContentType: "image/png",
+      })
+    );
+    const publicUrl = `${PUBLIC_URL_BASE}/${fileName}`;
+    slices.push(publicUrl);
+    return publicUrl;
+  };
+
+  // Case 1: Image is small enough, no slicing needed
+  if (height <= maxHeight || height <= overlap) {
+    const screenshotFileName = `${safeFileNameBase}.png`;
+    const buffer = await image.toBuffer();
+    await uploadSlice(buffer, screenshotFileName);
+    console.log(`📸 Uploaded single screenshot: ${screenshotFileName}`);
+    return slices;
+  }
+
+  // Case 2: Image is large and needs slicing
+  const numSlices = Math.max(
+    1,
+    Math.ceil((height - maxHeight) / (maxHeight - overlap)) + 1
+  );
+
+  console.log(
+    `🖼️  Slicing and uploading large screenshot (${width}x${height}) into ${numSlices} pieces for ${url}`
+  );
+
+  for (let i = 0; i < numSlices; i++) {
+    let sliceTop = i * (maxHeight - overlap);
+    let sliceHeight = maxHeight;
+
+    if (i === numSlices - 1) {
+      sliceHeight = height - sliceTop;
+      if (sliceHeight < overlap) {
+        sliceTop = height - maxHeight;
+        sliceHeight = maxHeight;
+      }
+    }
+
+    if (sliceTop >= height || sliceTop + sliceHeight > height) {
+      console.error(
+        `❌ Invalid slice dimensions for ${url}, skipping slice ${i}`
+      );
+      continue;
+    }
+
+    const sliceFileName = `${safeFileNameBase}_slice_${i + 1}_of_${numSlices}.png`;
+
+    try {
+      // Extract slice to a buffer instead of a file
+      const buffer = await image
+        .clone()
+        .extract({
+          left: 0,
+          top: sliceTop,
+          width: width,
+          height: sliceHeight,
+        })
+        .png() // Ensure format is PNG
+        .toBuffer();
+
+      // Upload the buffer
+      const publicUrl = await uploadSlice(buffer, sliceFileName);
+      console.log(`📸 Uploaded slice ${i + 1}/${numSlices}: ${publicUrl}`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to create or upload slice ${i + 1}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  return slices;
 }
 
 function countTreeNodes(node: PageData & { children: PageData[] }): number {
@@ -1072,8 +1046,8 @@ export async function runCrawler(
           const cloudflareSelectors = [
             '[class*="cf-browser-verification"]',
             '[id*="cf-wrapper"]',
-            '.cf-im-under-attack',
-            '.cf-browser-verification',
+            ".cf-im-under-attack",
+            ".cf-browser-verification",
           ];
           const foundCloudflare: string[] = [];
           cloudflareSelectors.forEach((selector) => {
@@ -1089,12 +1063,12 @@ export async function runCrawler(
             const bodyText = document.body.textContent?.toLowerCase() || "";
             const specificCaptchaTexts = [
               "verify you are human",
-              "prove you are not a robot", 
+              "prove you are not a robot",
               "please complete the security check",
               "robot check",
               "i'm not a robot",
             ];
-            hasSpecificText = specificCaptchaTexts.some((text) => 
+            hasSpecificText = specificCaptchaTexts.some((text) =>
               bodyText.includes(text)
             );
 
@@ -1102,7 +1076,7 @@ export async function runCrawler(
             const titleText = document.title.toLowerCase();
             const captchaTitles = [
               "security check",
-              "human verification", 
+              "human verification",
               "captcha",
               "are you a robot",
             ];
@@ -1112,7 +1086,10 @@ export async function runCrawler(
           }
 
           return {
-            hasCaptcha: (foundElements.length > 0 && (hasSpecificText || hasCaptchaTitle)) || foundCloudflare.length > 0,
+            hasCaptcha:
+              (foundElements.length > 0 &&
+                (hasSpecificText || hasCaptchaTitle)) ||
+              foundCloudflare.length > 0,
             foundElements,
             foundCloudflare,
             hasSpecificText,
@@ -1122,12 +1099,16 @@ export async function runCrawler(
         });
 
         const captchaIndicators = captchaDetection.hasCaptcha;
-        
+
         // Log detailed detection info for debugging
         if (captchaIndicators) {
           log.info(`🚨 CAPTCHA detection details for ${request.url}:`);
-          log.info(`   Found elements: ${captchaDetection.foundElements.join(', ') || 'none'}`);
-          log.info(`   Found Cloudflare: ${captchaDetection.foundCloudflare.join(', ') || 'none'}`);
+          log.info(
+            `   Found elements: ${captchaDetection.foundElements.join(", ") || "none"}`
+          );
+          log.info(
+            `   Found Cloudflare: ${captchaDetection.foundCloudflare.join(", ") || "none"}`
+          );
           log.info(`   Specific text: ${captchaDetection.hasSpecificText}`);
           log.info(`   CAPTCHA title: ${captchaDetection.hasCaptchaTitle}`);
           log.info(`   Page title: "${captchaDetection.pageTitle}"`);
