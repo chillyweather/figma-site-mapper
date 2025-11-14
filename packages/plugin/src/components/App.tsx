@@ -392,17 +392,8 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
-  useEffect(() => {
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "set-active-project",
-          projectId: activeProjectId != null ? activeProjectId : null,
-        },
-      },
-      "*"
-    );
-  }, [activeProjectId]);
+  // Note: Project persistence is handled by useProjects.setActiveProjectId
+  // via the 'save-project' message, so no separate useEffect needed here
 
   return currentView === "styling" ? (
     <StylingView onBack={switchToMain} />
@@ -475,6 +466,14 @@ export const App: React.FC = () => {
       handleExtractCSSVariablesChange={handleExtractCSSVariablesChange}
       detectPatterns={settings.detectPatterns}
       handleDetectPatternsChange={handleDetectPatternsChange}
+      projects={projects}
+      activeProjectId={activeProjectId}
+      onProjectChange={handleProjectChange}
+      onCreateProject={handleCreateProject}
+      onRefreshProjects={refresh}
+      isProjectLoading={isProjectLoading}
+      isCreatingProject={isCreatingProject}
+      projectError={projectError}
     />
   ) : (
     <MainView

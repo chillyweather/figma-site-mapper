@@ -110,7 +110,7 @@ export interface TreeNode {
   styleData?: {
     elements?: ExtractedElement[];
     cssVariables?: Record<string, unknown> | null;
-    tokens?: string[] | null;
+
   };
 }
 
@@ -278,6 +278,15 @@ export interface SettingsViewProps {
   ) => void;
   detectPatterns: boolean;
   handleDetectPatternsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  // Project-related props
+  projects: Project[];
+  activeProjectId: string | null;
+  onProjectChange: (projectId: string | null) => void;
+  onCreateProject: (name: string) => Promise<void>;
+  onRefreshProjects: () => Promise<void>;
+  isProjectLoading: boolean;
+  isCreatingProject: boolean;
+  projectError: string | null;
 }
 
 export interface MainViewProps {
@@ -330,6 +339,9 @@ export interface MainViewProps {
     pageName?: string;
   } | null;
   selectedMarkupFilterCount: number;
+  // Styling snapshot props
+  handleRenderSnapshot: () => void;
+  isRenderingSnapshot: boolean;
 }
 
 export interface CrawlingTabProps {

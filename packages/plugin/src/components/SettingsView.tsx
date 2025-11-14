@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   IconSettings,
   IconKey,
@@ -78,36 +78,203 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleExtractCSSVariablesChange,
   detectPatterns,
   handleDetectPatternsChange,
-}) => (
-  <div
-    id="settings-view"
-    style={{ padding: "16px", fontFamily: "Inter, sans-serif" }}
-  >
+  // Project-related props
+  projects,
+  activeProjectId,
+  onProjectChange,
+  onCreateProject,
+  onRefreshProjects,
+  isProjectLoading,
+  isCreatingProject,
+  projectError,
+}) => {
+  const [newProjectName, setNewProjectName] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleProjectSelect = useCallback(
+    (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value;
+      onProjectChange(value ? value : null);
+      setLocalError(null);
+    },
+    [onProjectChange]
+  );
+
+  const handleCreateProjectWrapper = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const trimmed = newProjectName.trim();
+      if (!trimmed) {
+        setLocalError("Project name is required.");
+        return;
+      }
+
+      try {
+        setLocalError(null);
+        await onCreateProject(trimmed);
+        setNewProjectName("");
+      } catch (error) {
+        setLocalError(
+          error instanceof Error
+            ? error.message
+            : "Unable to create project right now."
+        );
+      }
+    },
+    [newProjectName, onCreateProject]
+  );
+  return (
     <div
-      id="settings-header"
-      style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}
+      id="settings-view"
+      style={{ padding: "16px", fontFamily: "Inter, sans-serif" }}
     >
-      <button
-        id="settings-back-button"
-        onClick={switchToMain}
-        style={{
-          background: "none",
-          border: "none",
-          padding: "4px 8px",
-          marginRight: "8px",
-          cursor: "pointer",
-          fontSize: "14px",
-        }}
+      <div
+        id="settings-header"
+        style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}
       >
-        ← Back
-      </button>
-      <h3
-        id="settings-title"
-        style={{ margin: "0", fontSize: "14px", fontWeight: 600 }}
-      >
-        Settings
-      </h3>
-    </div>
+        <button
+          id="settings-back-button"
+          onClick={switchToMain}
+          style={{
+            background: "none",
+            border: "none",
+            padding: "4px 8px",
+            marginRight: "8px",
+            cursor: "pointer",
+            fontSize: "14px",
+          }}
+        >
+          ← Back
+        </button>
+        <h3
+          id="settings-title"
+          style={{ margin: "0", fontSize: "14px", fontWeight: 600 }}
+        >
+          Settings
+        </h3>
+      </div>
+
+      {/* Project Selection Section */}
+      <div id="project-selection-section" style={{ marginBottom: "16px" }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "12px",
+            marginBottom: "4px",
+            fontWeight: "500",
+          }}
+        >
+          Project
+        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <select
+            id="project-select"
+            value={activeProjectId ? activeProjectId : ""}
+            onChange={handleProjectSelect}
+            disabled={isProjectLoading}
+            style={{
+              flex: 1,
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              fontSize: "12px",
+            }}
+          >
+            <option value="">Select a project…</option>
+            {projects.map((project) => (
+              <option key={project._id} value={project._id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setLocalError(null);
+              void onRefreshProjects();
+            }}
+            disabled={isProjectLoading}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              backgroundColor: isProjectLoading ? "#f1f3f5" : "white",
+              fontSize: "11px",
+              cursor: isProjectLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {isProjectLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleCreateProjectWrapper}
+          style={{ display: "flex", gap: "8px", marginBottom: "8px" }}
+        >
+          <input
+            type="text"
+            value={newProjectName}
+            onChange={(event) => setNewProjectName(event.target.value)}
+            placeholder="New project name"
+            disabled={isCreatingProject}
+            style={{
+              flex: 1,
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #ced4da",
+              fontSize: "12px",
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isCreatingProject}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "4px",
+              border: "none",
+              backgroundColor: isCreatingProject ? "#adb5bd" : "#0066cc",
+              color: "white",
+              fontSize: "12px",
+              cursor: isCreatingProject ? "not-allowed" : "pointer",
+              fontWeight: 500,
+            }}
+          >
+            {isCreatingProject ? "Creating…" : "Create Project"}
+          </button>
+        </form>
+
+        {(projectError || localError) && (
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#721c24",
+              backgroundColor: "#f8d7da",
+              border: "1px solid #f5c6cb",
+              borderRadius: "4px",
+              padding: "8px",
+              marginBottom: "8px",
+            }}
+          >
+            {projectError || localError}
+          </div>
+        )}
+
+        {!projects.length && !isProjectLoading && !activeProjectId && (
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#495057",
+              backgroundColor: "#e9ecef",
+              borderRadius: "4px",
+              padding: "8px",
+            }}
+          >
+            Create your first project to start crawling.
+          </div>
+        )}
+      </div>
 
     <div id="screenshot-settings-section" style={{ marginBottom: "16px" }}>
       <label
@@ -1162,5 +1329,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
     </div>
-  </div>
-);
+</div>
+  );
+};

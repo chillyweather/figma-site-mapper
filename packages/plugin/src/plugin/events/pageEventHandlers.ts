@@ -53,6 +53,51 @@ function notifyActiveScreenshotPage(): void {
 }
 
 /**
+ * Notify UI about element selection for styling
+ */
+function notifyElementSelection(): void {
+  const selection = figma.currentPage.selection;
+  
+  if (selection.length === 0) {
+    figma.ui.postMessage({
+      type: "element-selection-changed",
+      elementId: null,
+      elementInfo: null,
+    });
+    return;
+  }
+
+  // Look for selected node with dbId in pluginData
+  const selectedNode = selection.find(node => {
+    const dbId = node.getPluginData("dbId");
+    return dbId && dbId.length > 0;
+  });
+
+  if (selectedNode) {
+    const dbId = selectedNode.getPluginData("dbId");
+    const elementType = selectedNode.getPluginData("elementType") || selectedNode.type;
+    const elementText = selectedNode.getPluginData("elementText") || 
+                       (selectedNode.type === "TEXT" ? (selectedNode as TextNode).characters?.substring(0, 50) : "");
+
+    figma.ui.postMessage({
+      type: "element-selection-changed",
+      elementId: dbId,
+      elementInfo: {
+        id: dbId,
+        type: elementType,
+        text: elementText,
+      },
+    });
+  } else {
+    figma.ui.postMessage({
+      type: "element-selection-changed",
+      elementId: null,
+      elementInfo: null,
+    });
+  }
+}
+
+/**
  * Handle page change event
  */
 export function handlePageChange(): void {
@@ -68,6 +113,14 @@ export function handleSelectionChange(): void {
   console.log("Selection changed, updating mapping tab");
   updateMappingTab();
   notifyActiveScreenshotPage();
+  notifyElementSelection();
+}
+
+/**
+ * Handle get-element-selection request from UI
+ */
+export function handleGetElementSelection(): void {
+  notifyElementSelection();
 }
 
 /**
@@ -81,5 +134,6 @@ export function initializePageEventListeners(): void {
   setTimeout(() => {
     updateMappingTab();
     notifyActiveScreenshotPage();
+    notifyElementSelection();
   }, 1000);
 }

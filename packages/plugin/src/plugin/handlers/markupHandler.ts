@@ -249,12 +249,16 @@ export async function handleRenderMarkupRequest({
         href: transformed.href,
         text: transformed.text,
         pageId,
+        ordinalNumber: highlightNumber,
       };
 
       highlightRect.setPluginData("MARKUP_ELEMENT", JSON.stringify(metadata));
       highlightRect.setPluginData("PAGE_ID", pageId ?? "");
       highlightRect.setPluginData("dbId", record._id);
+      highlightRect.setPluginData("elementType", elementType);
+      highlightRect.setPluginData("elementText", transformed.text || "");
       highlightRect.setPluginData("link", transformed.href || "");
+      highlightRect.setPluginData("ordinalNumber", String(highlightNumber));
 
       markupContainer.appendChild(highlightRect);
 
@@ -281,6 +285,7 @@ export async function handleRenderMarkupRequest({
       }
 
       let badgeText: TextNode | null = null;
+      let targetUrlForPluginData: string | null = null;
       if (badgeFontLoaded) {
         badgeText = figma.createText();
         badgeText.fontName = badgeFont;
@@ -326,6 +331,7 @@ export async function handleRenderMarkupRequest({
               badgeText.hyperlink = hyperlinkTarget;
               badgeText.setPluginData("TARGET_URL", validUrl);
               highlightRect.setPluginData("TARGET_URL", validUrl);
+              targetUrlForPluginData = validUrl;
             }
           } catch (hyperlinkError) {
             console.warn(
@@ -347,6 +353,14 @@ export async function handleRenderMarkupRequest({
         JSON.stringify(Object.assign({}, metadata, { kind: "badge" }))
       );
       badgeGroup.setPluginData("PAGE_ID", pageId ?? "");
+      badgeGroup.setPluginData("dbId", record._id);
+      badgeGroup.setPluginData("elementType", elementType);
+      badgeGroup.setPluginData("elementText", transformed.text || "");
+      badgeGroup.setPluginData("link", transformed.href || "");
+      badgeGroup.setPluginData("ordinalNumber", String(highlightNumber));
+      if (targetUrlForPluginData) {
+        badgeGroup.setPluginData("TARGET_URL", targetUrlForPluginData);
+      }
 
       markupContainer.appendChild(badgeGroup);
 

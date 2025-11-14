@@ -42,49 +42,51 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
   const isPageReady = Boolean(activePage && activePage.pageId);
 
   return (
-    <div style={{ padding: "0 16px 16px 16px" }}>
+    <div className="container">
       <div
+        className="status-display"
         style={{
-          padding: "12px",
-          backgroundColor: "#f8f9fa",
-          borderRadius: "6px",
-          marginBottom: "16px",
+          background: isPageReady 
+            ? "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)"
+            : "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+          border: isPageReady ? "1px solid #60a5fa" : "1px solid #fbbf24",
+          color: isPageReady ? "#1e40af" : "#92400e",
         }}
       >
-        <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "4px" }}>
+        <div style={{ fontWeight: 600, marginBottom: "4px" }}>
           Active Page
         </div>
         {isPageReady ? (
-          <div style={{ fontSize: "11px", color: "#343a40" }}>
+          <div style={{ fontSize: "12px" }}>
             {activePage?.pageName || activePage?.pageUrl || "Screenshot"}
           </div>
         ) : (
-          <div style={{ fontSize: "11px", color: "#6c757d" }}>
+          <div>
             Open one of the generated screenshot pages to enable markup.
           </div>
         )}
       </div>
 
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>
+      <div className="form-group">
+        <h4 className="section-header">
           Element Types
-        </div>
+        </h4>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: "8px 12px",
+            gap: "12px 16px",
+            background: "#ffffff",
+            padding: "16px",
+            borderRadius: "8px",
+            border: "1px solid #e5e7eb",
           }}
         >
           {supportedFilters.map((filterKey) => (
             <label
               key={filterKey}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "11px",
-              }}
+              className="checkbox-label"
+              style={{ fontSize: "12px" }}
             >
               <input
                 type="checkbox"
@@ -97,26 +99,19 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
             </label>
           ))}
         </div>
+        <div className="form-hint">
+          {selectedFilterCount} type{selectedFilterCount !== 1 ? "s" : ""} selected
+        </div>
       </div>
 
       <button
         onClick={onRender}
         disabled={!isPageReady || isRendering || selectedFilterCount === 0}
+        className={`button-primary ${(!isPageReady || selectedFilterCount === 0 || isRendering) ? 'button-flow-disabled' : ''}`}
         style={{
-          width: "100%",
-          padding: "10px 16px",
-          backgroundColor:
-            !isPageReady || selectedFilterCount === 0 ? "#adb5bd" : "#0066cc",
-          border: "none",
-          color: "white",
-          fontSize: "12px",
-          fontWeight: 600,
-          borderRadius: "4px",
-          cursor:
-            !isPageReady || selectedFilterCount === 0 || isRendering
-              ? "not-allowed"
-              : "pointer",
-          marginBottom: "8px",
+          background: (!isPageReady || selectedFilterCount === 0 || isRendering)
+            ? undefined
+            : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
         }}
       >
         {isRendering ? "Working…" : "Render Highlights"}
@@ -125,32 +120,13 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
       <button
         onClick={onClear}
         disabled={!isPageReady || isRendering}
-        style={{
-          width: "100%",
-          padding: "9px 16px",
-          backgroundColor: "white",
-          border: "1px solid #ced4da",
-          color: !isPageReady || isRendering ? "#868e96" : "#343a40",
-          fontSize: "12px",
-          fontWeight: 500,
-          borderRadius: "4px",
-          cursor: !isPageReady || isRendering ? "not-allowed" : "pointer",
-          marginBottom: "12px",
-        }}
+        className={`button-secondary ${(!isPageReady || isRendering) ? 'button-flow-disabled' : ''}`}
       >
         Clear Highlights
       </button>
 
       {status && (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#495057",
-            backgroundColor: "#f1f3f5",
-            borderRadius: "4px",
-            padding: "8px",
-          }}
-        >
+        <div className="status-display" style={{ textAlign: "center" }}>
           {status}
         </div>
       )}

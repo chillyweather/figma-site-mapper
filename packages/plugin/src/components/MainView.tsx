@@ -1,11 +1,11 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { IconSettings } from "@tabler/icons-react";
 import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
 import { MarkupTab } from "./MarkupTab";
-import { ElementStylingTab } from "./ElementStylingTab";
-import { TokensTab } from "./TokensTab";
+import { StylingTab } from "./StylingTab";
+
 
 export const MainView: React.FC<MainViewProps> = ({
   projects,
@@ -37,8 +37,6 @@ export const MainView: React.FC<MainViewProps> = ({
   manifestData: _manifestData,
   selectedPageUrl: _selectedPageUrl,
   onPageSelection: _onPageSelection,
-  handleRenderSnapshot,
-  isRenderingSnapshot,
   markupFilters,
   supportedMarkupFilters,
   onMarkupFilterChange,
@@ -48,14 +46,83 @@ export const MainView: React.FC<MainViewProps> = ({
   markupStatus,
   activeMarkupPage,
   selectedMarkupFilterCount,
+  handleRenderSnapshot,
+  isRenderingSnapshot,
 }) => {
+  // Styling state
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedElementInfo, setSelectedElementInfo] = useState<{ id: string; type: string; text?: string } | null>(null);
+  const [isRenderingGlobalStyles, setIsRenderingGlobalStyles] = useState(false);
+  const [isRenderingElementStyles, setIsRenderingElementStyles] = useState(false);
+  const [globalStylesStatus, setGlobalStylesStatus] = useState("");
+  const [elementStylesStatus, setElementStylesStatus] = useState("");
+
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "flows" | "styling" | "markup" | "tokens"
+    "crawling" | "flows" | "styling" | "markup"
   >("crawling");
   const [newProjectName, setNewProjectName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const projectSelected = Boolean(activeProjectId);
+
+  // Handle element selection messages from plugin
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (msg?.type === "element-selection-changed") {
+        setSelectedElementId(msg.elementId || null);
+        setSelectedElementInfo(msg.elementInfo || null);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Request current selection on mount and tab change
+  useEffect(() => {
+    if (activeTab === "styling") {
+      parent.postMessage(
+        { pluginMessage: { type: "get-element-selection" } },
+        "*"
+      );
+    }
+  }, [activeTab]);
+
+  // Styling handlers
+  const handleRenderGlobalStyles = () => {
+    setIsRenderingGlobalStyles(true);
+    setGlobalStylesStatus("Rendering global styles...");
+    
+    parent.postMessage(
+      { pluginMessage: { type: "render-global-styles" } },
+      "*"
+    );
+    
+    // Reset after a delay (actual completion handled by plugin message)
+    setTimeout(() => {
+      setIsRenderingGlobalStyles(false);
+      setGlobalStylesStatus("");
+    }, 3000);
+  };
+
+  const handleRenderElementStyles = (elementId: string) => {
+    if (!elementId) return;
+    
+    setIsRenderingElementStyles(true);
+    setElementStylesStatus("Rendering element styles...");
+    
+    parent.postMessage(
+      { pluginMessage: { type: "render-element-styles", elementId } },
+      "*"
+    );
+    
+    // Reset after a delay (actual completion handled by plugin message)
+    setTimeout(() => {
+      setIsRenderingElementStyles(false);
+      setElementStylesStatus("");
+    }, 3000);
+  };
 
   const handleProjectSelect = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -93,276 +160,82 @@ export const MainView: React.FC<MainViewProps> = ({
   );
 
   return (
-    <div id="main-view" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div id="main-view" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div
         id="main-header"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-          padding: "16px 16px 0 16px",
-        }}
+        className="header"
       >
         <h3
           id="main-title"
-          style={{ margin: "0", fontSize: "14px", fontWeight: 600 }}
+          className="header-title"
         >
           Figma Site Mapper
         </h3>
         <button
           id="main-settings-button"
           onClick={switchToSettings}
-          style={{
-            background: "none",
-            border: "1px solid #ccc",
-            padding: "4px 8px",
-            cursor: "pointer",
-            fontSize: "12px",
-            borderRadius: "3px",
-          }}
+          className="settings-button"
         >
           <IconSettings size={16} />
         </button>
       </div>
 
-      <div
-        style={{
-          padding: "0 16px 16px 16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label
-            htmlFor="project-select"
-            style={{ fontSize: "12px", fontWeight: 600, minWidth: "60px" }}
-          >
-            Project
-          </label>
-          <select
-            id="project-select"
-            value={activeProjectId ? activeProjectId : ""}
-            onChange={handleProjectSelect}
-            disabled={isProjectLoading}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              fontSize: "12px",
-            }}
-          >
-            <option value="">Select a project…</option>
-            {projects.map((project) => (
-              <option key={project._id} value={project._id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => {
-              setLocalError(null);
-              void onRefreshProjects();
-            }}
-            disabled={isProjectLoading}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              backgroundColor: isProjectLoading ? "#f1f3f5" : "white",
-              fontSize: "11px",
-              cursor: isProjectLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            {isProjectLoading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-
-        <form
-          onSubmit={handleCreateProject}
-          style={{ display: "flex", gap: "8px" }}
-        >
-          <input
-            type="text"
-            value={newProjectName}
-            onChange={(event) => setNewProjectName(event.target.value)}
-            placeholder="New project name"
-            disabled={isCreatingProject}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              fontSize: "12px",
-            }}
-          />
-          <button
-            type="submit"
-            disabled={isCreatingProject}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "4px",
-              border: "none",
-              backgroundColor: isCreatingProject ? "#adb5bd" : "#0066cc",
-              color: "white",
-              fontSize: "12px",
-              cursor: isCreatingProject ? "not-allowed" : "pointer",
-              fontWeight: 500,
-            }}
-          >
-            {isCreatingProject ? "Creating…" : "Create Project"}
-          </button>
-        </form>
-
-        {(projectError || localError) && (
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#721c24",
-              backgroundColor: "#f8d7da",
-              border: "1px solid #f5c6cb",
-              borderRadius: "4px",
-              padding: "8px",
-            }}
-          >
-            {projectError || localError}
-          </div>
-        )}
-
-        {!projects.length && !isProjectLoading && !projectSelected && (
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#495057",
-              backgroundColor: "#e9ecef",
-              borderRadius: "4px",
-              padding: "8px",
-            }}
-          >
-            Create your first project to start crawling.
-          </div>
-        )}
-      </div>
+      {/* Project-related UI moved to SettingsView */}
 
       {!projectSelected ? (
         <div
+          className="container"
           style={{
-            padding: "0 16px 16px 16px",
-            color: "#495057",
-            fontSize: "13px",
+            color: "#6b7280",
+            fontSize: "14px",
+            textAlign: "center",
+            padding: "40px 20px",
+            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            borderRadius: "12px",
+            border: "1px solid #e2e8f0",
+            margin: "20px",
           }}
         >
-          Select or create a project to enable crawling, flows, styling, and
-          tokens.
+          <p style={{ margin: "0 0 8px 0", fontWeight: 500 }}>
+            No project selected
+          </p>
+          <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5 }}>
+            Select or create a project to enable crawling, flows, styling, and markup features.
+          </p>
         </div>
       ) : (
         <>
           <div
             id="tab-navigation"
-            style={{
-              display: "flex",
-              marginBottom: "16px",
-              borderBottom: "1px solid #e0e0e0",
-              padding: "0 16px",
-            }}
+            className="tab-navigation"
           >
             <button
               id="crawling-tab-button"
               onClick={() => setActiveTab("crawling")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "crawling" ? "600" : "400",
-                color: activeTab === "crawling" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "crawling"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "crawling" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Crawling
             </button>
             <button
               id="markup-tab-button"
               onClick={() => setActiveTab("markup")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "markup" ? "600" : "400",
-                color: activeTab === "markup" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "markup"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "markup" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Markup
             </button>
             <button
               id="flows-tab-button"
               onClick={() => setActiveTab("flows")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "flows" ? "600" : "400",
-                color: activeTab === "flows" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "flows"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "flows" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Flows
             </button>
             <button
               id="styling-tab-button"
               onClick={() => setActiveTab("styling")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "styling" ? "600" : "400",
-                color: activeTab === "styling" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "styling"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
+              className={`tab-button ${activeTab === "styling" ? "tab-button-active" : "tab-button-inactive"}`}
             >
               Styling
-            </button>
-            <button
-              id="tokens-tab-button"
-              onClick={() => setActiveTab("tokens")}
-              style={{
-                background: "none",
-                border: "none",
-                padding: "8px 16px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: activeTab === "tokens" ? "600" : "400",
-                color: activeTab === "tokens" ? "#000" : "#666",
-                borderBottom:
-                  activeTab === "tokens"
-                    ? "2px solid #0066cc"
-                    : "2px solid transparent",
-              }}
-            >
-              Tokens
             </button>
           </div>
 
@@ -407,10 +280,19 @@ export const MainView: React.FC<MainViewProps> = ({
           )}
 
           {activeTab === "styling" && (
-            <ElementStylingTab handleShowStyling={handleShowStyling} />
+            <StylingTab
+              onRenderGlobalStyles={handleRenderGlobalStyles}
+              onRenderElementStyles={handleRenderElementStyles}
+              isRenderingGlobalStyles={isRenderingGlobalStyles}
+              isRenderingElementStyles={isRenderingElementStyles}
+              globalStylesStatus={globalStylesStatus}
+              elementStylesStatus={elementStylesStatus}
+              selectedElementId={selectedElementId}
+              selectedElementInfo={selectedElementInfo}
+            />
           )}
 
-          {activeTab === "tokens" && <TokensTab />}
+
         </>
       )}
     </div>
