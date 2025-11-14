@@ -28,13 +28,6 @@ export async function buildServer(): Promise<FastifyInstance> {
     prefix: "/static/",
   });
 
-  // await server.register(async function (fastify) {
-  //   await fastify.register(fastifyStatic, {
-  //     root: path.join(__dirname, "..", "screenshots"),
-  //     prefix: "/screenshots/",
-  //   });
-  // });
-
   server.get("/", async () => {
     return { hello: "world" };
   });

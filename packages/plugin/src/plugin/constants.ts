@@ -1,4 +1,5 @@
-export const BACKEND_URL = "http://localhost:3006";
+export const BACKEND_URL = "https://fsm.dmdz.dev";
+// export const BACKEND_URL = "http://localhost:3006";
 export const DEFAULT_SCREENSHOT_WIDTH = 1440;
 
 export const UI_CONFIG = {

@@ -1,6 +1,7 @@
 # Node & PNPM
 # =================================
 node_modules/
+notes/
 .npmrc
 npm-debug.log*
 pnpm-debug.log*

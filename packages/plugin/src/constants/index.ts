@@ -52,4 +52,5 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 export const PROJECT_SETTINGS_KEY = "figma-sitemapper-project";
 export const SETTINGS_KEY = "figma-sitemapper-settings";
-export const BACKEND_URL = "http://localhost:3006";
+// export const BACKEND_URL = "http://localhost:3006";
+export const BACKEND_URL = "https://fsm.dmdz.dev";
