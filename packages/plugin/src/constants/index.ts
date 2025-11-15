@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   // Style Extraction - OFF by default, user opts in
   extractStyles: false,
   styleExtractionPreset: "smart",
+
   // Custom preset defaults (smart preset values)
   extractInteractive: true,
   extractStructural: true,
