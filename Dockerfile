@@ -1,5 +1,5 @@
 # Stage 1: Build the monorepo
-FROM node:18-alpine AS builder
+FROM node:18-slim AS builder
 RUN npm install -g pnpm
 WORKDIR /app
 
@@ -19,7 +19,23 @@ COPY . .
 RUN pnpm --filter backend build
 
 # Stage 2: Create the final production image
-FROM node:18-alpine
+FROM node:18-slim
+
+# Install system dependencies for Playwright
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libgbm1 \
+    libasound2 \
+    libxshmfence1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN npm install -g pnpm
 WORKDIR /app
 
@@ -29,6 +45,9 @@ COPY packages/backend/package.json ./packages/backend/
 
 # Install only production dependencies
 RUN pnpm install --filter backend --prod
+
+# Install Playwright browsers (Chromium only to save space)
+RUN npx playwright install chromium
 
 # Copy the built backend code
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
