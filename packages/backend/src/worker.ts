@@ -76,9 +76,11 @@ const processor = async (job: Job) => {
 
 const worker = new Worker("crawl-jobs", processor, {
   connection,
-  autorun: true, // Keep worker running automatically
-  removeOnComplete: { count: 100 }, // Keep last 100 completed jobs
-  removeOnFail: { count: 50 }, // Keep last 50 failed jobs
+  autorun: true,
+  removeOnComplete: { count: 100 },
+  removeOnFail: { count: 50 },
+  lockDuration: 300000, // 5 minutes (in milliseconds)
+  lockRenewTime: 150000, // Renew lock every 2.5 minutes
 });
 
 worker.on("completed", (job: Job) => {
