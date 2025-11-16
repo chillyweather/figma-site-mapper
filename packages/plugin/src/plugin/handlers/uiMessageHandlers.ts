@@ -914,6 +914,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
       await handleSetActiveProject(msg.projectId || null);
       break;
 
+    case "render-project-snapshot":
+      await handleRenderProjectSnapshot(msg);
+      break;
+
     case "render-markup": {
       const projectId = await getActiveProjectId();
       await handleRenderMarkupRequest({
