@@ -461,11 +461,11 @@ body {
   transform: translateY(-1px);
 }
 
-.flows-link-item input[type="checkbox"] {
+.flows-link-item input[type="radio"] {
   margin-right: 12px;
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: 50%;
   border: 1px solid #d1d5db;
   cursor: pointer;
 }

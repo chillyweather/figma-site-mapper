@@ -33,13 +33,13 @@ export function useFlowMapping() {
   const handleLinkCheck = useCallback(
     (linkId: string, checked: boolean) => {
       setCheckedLinks((prev: Set<string>) => {
-        const newSet = new Set(prev);
         if (checked) {
-          newSet.add(linkId);
+          // For radio buttons, only keep the newly selected link
+          return new Set([linkId]);
         } else {
-          newSet.delete(linkId);
+          // If unchecking, clear all selections
+          return new Set();
         }
-        return newSet;
       });
     },
     [setCheckedLinks]

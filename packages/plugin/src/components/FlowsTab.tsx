@@ -53,11 +53,12 @@ export const FlowsTab: React.FC<FlowsTabProps> = ({
                 key={link.id}
                 className="flows-link-item"
               >
-                <input
-                  type="checkbox"
-                  checked={checkedLinks.has(link.id)}
-                  onChange={(e) => handleLinkCheck(link.id, e.target.checked)}
-                />
+                 <input
+                   type="radio"
+                   name="flow-link-selection"
+                   checked={checkedLinks.has(link.id)}
+                   onChange={(e) => handleLinkCheck(link.id, e.target.checked)}
+                 />
                 <div className="flows-link-content">
                   <div className="flows-link-text">
                     {link.text}
