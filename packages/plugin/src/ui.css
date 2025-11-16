@@ -453,56 +453,62 @@ body {
   border: 1px solid #e5e7eb;
   transition: all 0.15s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
 }
 
 .flows-link-item:hover {
   border-color: #d1d5db;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  background: #f9fafb;
 }
 
-.flows-link-item input[type="radio"] {
-  margin-right: 8px;
-  width: 16px;
-  height: 16px;
+.flows-link-item:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: #f3f4f6;
+}
+
+.flows-link-badge {
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  border: 1px solid #d1d5db;
-  cursor: pointer;
+  background: #3b82f6;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.flows-link-item-selected {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.flows-link-item-selected:hover {
+  background: #bfdbfe;
+}
+
+.flows-link-item-selected .flows-link-badge {
+  background: #2563eb;
 }
 
 .flows-link-content {
   flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
-.flows-link-text {
-  font-size: 12px;
-  font-weight: 500;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
 }
 
 .flows-link-url {
   font-size: 11px;
   color: #3b82f6;
-  text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: color 0.15s ease;
-  max-width: 200px;
-}
-
-.flows-link-url:hover {
-  color: #2563eb;
-  text-decoration: underline;
+  display: block;
+  width: 100%;
 }
 
 .flows-footer {

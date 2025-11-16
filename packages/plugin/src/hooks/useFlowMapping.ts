@@ -34,11 +34,14 @@ export function useFlowMapping() {
     (linkId: string, checked: boolean) => {
       setCheckedLinks((prev: Set<string>) => {
         if (checked) {
-          // For radio buttons, only keep the newly selected link
+          // Select the new link
           return new Set([linkId]);
-        } else {
-          // If unchecking, clear all selections
+        } else if (prev.has(linkId)) {
+          // If clicking the same link, deselect it
           return new Set();
+        } else {
+          // Otherwise select the new link
+          return new Set([linkId]);
         }
       });
     },
