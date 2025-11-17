@@ -14,7 +14,8 @@ import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 import { buildManifestFromProject } from "../utils/buildManifestFromProject";
-import type { TreeNode } from "../../types";
+import type { TreeNode, ElementType } from "../../types";
+import { ELEMENT_HIGHLIGHT_COLORS } from "../../figmaRendering/utils/createScreenshotPages";
 
 async function getActiveProjectId(): Promise<string | null> {
   try {
@@ -24,6 +25,15 @@ async function getActiveProjectId(): Promise<string | null> {
     console.error("Failed to load active project id", error);
     return null;
   }
+}
+
+function getHighlightColorFromType(elementType?: string | null): RGB | null {
+  if (!elementType) {
+    return null;
+  }
+
+  const color = ELEMENT_HIGHLIGHT_COLORS[elementType as ElementType];
+  return color || null;
 }
 
 /**
@@ -721,50 +731,79 @@ async function createElementStylesTable(
     }
   }
 
-  // Find the element's highlight badge number
+  // Find the element's highlight badge number and color
   let badgeNumber: number | null = null;
-  if (screenshotFrame) {
-    const overlayFrames = page.findAll(
-      (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
-    ) as FrameNode[];
+  let badgeColor: { r: number; g: number; b: number } = { r: 0.9, g: 0.45, b: 0.1 }; // Default orange
 
-    if (overlayFrames.length > 0) {
-      const overlay = overlayFrames[0];
-      // Find badge groups containing this element ID
-      const badgeGroups = overlay.findAll(
-        (node: SceneNode) =>
-          node.type === "GROUP" &&
-          node.name.startsWith("link_") &&
-          node.name.endsWith("_badge")
-      ) as GroupNode[];
+  const overlayFrames = page.findAll(
+    (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
+  ) as FrameNode[];
 
-      for (const badgeGroup of badgeGroups) {
-        const pluginData = badgeGroup.getPluginData("dbId");
-        if (pluginData === elementId) {
-          const match = badgeGroup.name.match(/link_(\d+)_badge/);
-          if (match) {
-            badgeNumber = parseInt(match[1], 10);
-            break;
-          }
-        }
-      }
+  if (overlayFrames.length > 0) {
+    const overlay = overlayFrames[0];
 
-      // If not found in badges, try highlights
-      if (badgeNumber === null) {
-        const highlights = overlay.findAll(
-          (node: SceneNode) =>
-            node.type === "RECTANGLE" && node.name.includes("_highlight")
-        ) as RectangleNode[];
+    // Find badge groups containing this element ID
+    const badgeGroups = overlay.findAll(
+      (node: SceneNode) =>
+        node.type === "GROUP" &&
+        (node.name.startsWith("link_") || node.name.startsWith("element_")) &&
+        node.name.endsWith("_badge")
+    ) as GroupNode[];
 
-        for (const highlight of highlights) {
-          const pluginData = highlight.getPluginData("dbId");
-          if (pluginData === elementId) {
-            const match = highlight.name.match(/(?:link|element)_(\d+)_highlight/);
-            if (match) {
-              badgeNumber = parseInt(match[1], 10);
-              break;
+    for (const badgeGroup of badgeGroups) {
+      const pluginData = badgeGroup.getPluginData("dbId");
+      const ordinalData = badgeGroup.getPluginData("ordinalNumber");
+      const elementTypeData = badgeGroup.getPluginData("elementType");
+
+      if (pluginData === elementId && ordinalData) {
+        badgeNumber = parseInt(ordinalData, 10);
+
+        const typeColor = getHighlightColorFromType(elementTypeData);
+        if (typeColor) {
+          badgeColor = typeColor;
+        } else {
+          // Extract color from the badge circle as a fallback
+          const badgeCircle = badgeGroup.findOne(
+            (node: SceneNode) =>
+              node.type === "ELLIPSE" &&
+              (node.name.includes("badge_circle") || node.name.includes("badge-circle"))
+          ) as EllipseNode | null;
+
+          if (
+            badgeCircle &&
+            badgeCircle.fills &&
+            Array.isArray(badgeCircle.fills) &&
+            badgeCircle.fills.length > 0
+          ) {
+            const fill = badgeCircle.fills[0];
+            if (fill.type === "SOLID" && fill.color) {
+              badgeColor = fill.color;
             }
           }
+        }
+        break;
+      }
+    }
+
+    // If not found in badges, try highlights
+    if (badgeNumber === null) {
+      const highlights = overlay.findAll(
+        (node: SceneNode) =>
+          node.type === "RECTANGLE" && node.name.includes("_highlight")
+      ) as RectangleNode[];
+
+      for (const highlight of highlights) {
+        const pluginData = highlight.getPluginData("dbId");
+        const ordinalData = highlight.getPluginData("ordinalNumber");
+        const elementTypeData = highlight.getPluginData("elementType");
+
+        if (pluginData === elementId && ordinalData) {
+          badgeNumber = parseInt(ordinalData, 10);
+          const typeColor = getHighlightColorFromType(elementTypeData);
+          if (typeColor) {
+            badgeColor = typeColor;
+          }
+          break;
         }
       }
     }
@@ -772,26 +811,33 @@ async function createElementStylesTable(
 
   // Add badge to the table if we found a number
   if (badgeNumber !== null) {
+    const badgeSize = 24;
     const badge = figma.createEllipse();
-    badge.name = "element-badge";
-    badge.resize(32, 32);
-    badge.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.5, b: 0.9 } }];
+    badge.name = "styles-table-badge-circle";
+    badge.resize(badgeSize, badgeSize);
+    badge.fills = [{ type: "SOLID", color: badgeColor }];
+    badge.strokes = [];
 
     const badgeText = figma.createText();
     await figma.loadFontAsync({ family: "Inter", style: "Bold" });
     badgeText.fontName = { family: "Inter", style: "Bold" };
-    badgeText.fontSize = 14;
+    badgeText.fontSize = 11;
     badgeText.characters = badgeNumber.toString();
     badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+    badgeText.name = "styles-table-badge-text";
 
-    // Position badge in top-left corner of table
-    badge.x = mainFrame.x - 16;
-    badge.y = mainFrame.y - 16;
-    badgeText.x = badge.x + (32 - badgeText.width) / 2;
-    badgeText.y = badge.y + (32 - badgeText.height) / 2;
+    // Position badge in top-left corner of table (overlapping)
+    badge.x = mainFrame.x - 12;
+    badge.y = mainFrame.y - 12;
+    badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
+    badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
 
     page.appendChild(badge);
     page.appendChild(badgeText);
+    
+    console.log(`✅ Added badge #${badgeNumber} to styles table`);
+  } else {
+    console.log(`⚠️ Could not find badge for element ID: ${elementId}`);
   }
 
   // Select and zoom to the frame
