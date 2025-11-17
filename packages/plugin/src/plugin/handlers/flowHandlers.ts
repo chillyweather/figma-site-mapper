@@ -664,6 +664,14 @@ async function cloneFlowBreadcrumb(
   return currentX;
 }
 
+function getAbsolutePosition(node: SceneNode): { x: number; y: number } {
+  const transform = node.absoluteTransform;
+  return {
+    x: transform[0][2],
+    y: transform[1][2],
+  };
+}
+
 /**
  * Find which Source frame a clicked_link belongs to based on position
  * A clicked_link belongs to a frame if it's positioned over it
@@ -672,12 +680,17 @@ function findAssociatedFrame(
   clickedLink: RectangleNode,
   sourceFrames: FrameNode[]
 ): FrameNode | null {
+  const clickedPosition = getAbsolutePosition(clickedLink);
+
   for (const frame of sourceFrames) {
     // Check if clicked_link is within the frame bounds
+    const framePosition = getAbsolutePosition(frame);
     const isWithinX =
-      clickedLink.x >= frame.x && clickedLink.x <= frame.x + frame.width;
+      clickedPosition.x >= framePosition.x &&
+      clickedPosition.x <= framePosition.x + frame.width;
     const isWithinY =
-      clickedLink.y >= frame.y && clickedLink.y <= frame.y + frame.height;
+      clickedPosition.y >= framePosition.y &&
+      clickedPosition.y <= framePosition.y + frame.height;
 
     if (isWithinX && isWithinY) {
       return frame;
@@ -693,10 +706,15 @@ function isClickedLinkOnFrame(
   clickedLink: RectangleNode,
   frame: FrameNode
 ): boolean {
+  const clickedPosition = getAbsolutePosition(clickedLink);
+  const framePosition = getAbsolutePosition(frame);
+
   const isWithinX =
-    clickedLink.x >= frame.x && clickedLink.x <= frame.x + frame.width;
+    clickedPosition.x >= framePosition.x &&
+    clickedPosition.x <= framePosition.x + frame.width;
   const isWithinY =
-    clickedLink.y >= frame.y && clickedLink.y <= frame.y + frame.height;
+    clickedPosition.y >= framePosition.y &&
+    clickedPosition.y <= framePosition.y + frame.height;
   return isWithinX && isWithinY;
 }
 
@@ -750,6 +768,9 @@ async function cloneSourceElements(
   screenshotClone.y = y;
   flowPage.appendChild(screenshotClone);
 
+  const sourceScreenshotPosition = getAbsolutePosition(screenshotFrame);
+  const clonedScreenshotPosition = getAbsolutePosition(screenshotClone);
+
   // Remove Page Overlay from the cloned screenshot (only needed on target page)
   // This ensures breadcrumb screenshots show only the base image + clicked_link highlight
   const clonedOverlay = screenshotClone.findOne(
@@ -774,10 +795,11 @@ async function cloneSourceElements(
     // Check if this clicked_link is associated with the screenshot we're cloning
     if (isClickedLinkOnFrame(clickedLink, screenshotFrame)) {
       const clickedLinkClone = clickedLink.clone();
-      const offsetX = clickedLink.x - screenshotFrame.x;
-      const offsetY = clickedLink.y - screenshotFrame.y;
-      clickedLinkClone.x = x + offsetX;
-      clickedLinkClone.y = y + offsetY;
+      const clickedLinkPosition = getAbsolutePosition(clickedLink);
+      const offsetX = clickedLinkPosition.x - sourceScreenshotPosition.x;
+      const offsetY = clickedLinkPosition.y - sourceScreenshotPosition.y;
+      clickedLinkClone.x = clonedScreenshotPosition.x + offsetX;
+      clickedLinkClone.y = clonedScreenshotPosition.y + offsetY;
       flowPage.appendChild(clickedLinkClone);
       console.log(`Copied existing ${clickedLink.name} to new Source frame`);
     }
@@ -811,12 +833,12 @@ async function cloneSourceElements(
       highlightClone.name = `clicked_link_${flowStepNumber}: ${originalText}`;
 
       // Get absolute coordinates of the highlight relative to the page
-      const overlayFrame = originalHighlight.parent as FrameNode;
-      const absoluteX = overlayFrame.x + originalHighlight.x;
-      const absoluteY = overlayFrame.y + originalHighlight.y;
-      
-      highlightClone.x = absoluteX;
-      highlightClone.y = absoluteY;
+      const highlightPosition = getAbsolutePosition(originalHighlight);
+      const offsetX = highlightPosition.x - sourceScreenshotPosition.x;
+      const offsetY = highlightPosition.y - sourceScreenshotPosition.y;
+
+      highlightClone.x = clonedScreenshotPosition.x + offsetX;
+      highlightClone.y = clonedScreenshotPosition.y + offsetY;
       flowPage.appendChild(highlightClone);
 
       console.log(
