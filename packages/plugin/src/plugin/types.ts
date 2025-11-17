@@ -7,12 +7,14 @@ export interface BadgeLink {
   id: string;
   text: string;
   url: string;
+  badgeNumber?: number;
 }
 
 export interface FlowLink {
   id: string;
   text: string;
   url: string;
+  badgeNumber?: number;
 }
 
 export interface ManifestData {

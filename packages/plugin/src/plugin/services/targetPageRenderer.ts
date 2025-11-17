@@ -336,6 +336,8 @@ async function createBadge(
   badgeText.fontSize = 9;
   badgeText.characters = linkCounter.toString();
   badgeText.name = `link_${linkCounter}_badge_text`;
+  
+  console.log(`🏷️ Creating badge ${linkCounter} for element: "${element.text || element.href}" with URL: "${element.href}"`);
 
   // Add hyperlink
   try {

@@ -55,7 +55,7 @@ export const FlowsTab: React.FC<FlowsTabProps> = ({
                 onClick={() => handleLinkCheck(link.id, !checkedLinks.has(link.id))}
               >
                 <div className="flows-link-badge">
-                  {index + 1}
+                  {link.badgeNumber ?? index + 1}
                 </div>
                 <div className="flows-link-content">
                   <div className="flows-link-url">

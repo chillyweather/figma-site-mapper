@@ -84,6 +84,7 @@ export interface FlowLink {
   id: string;
   text: string;
   url: string;
+  badgeNumber?: number;
 }
 
 // Mode for the Mapping/Flows view

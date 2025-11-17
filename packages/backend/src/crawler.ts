@@ -1382,6 +1382,22 @@ export async function runCrawler(
               }
             });
 
+            // Sort elements by visual position (top-to-bottom, left-to-right)
+            elements.sort((a, b) => {
+              if (Math.abs(a.y - b.y) < 5) {
+                // If elements are on the same line, sort by x position
+                return a.x - b.x;
+              }
+              // Otherwise sort by y position
+              return a.y - b.y;
+            });
+
+            // Debug: Log element order
+            console.log("🔍 Element order after sorting:");
+            elements.forEach((el, index) => {
+              console.log(`  ${index + 1}. ${el.type}: "${el.text}" -> ${el.href}`);
+            });
+
             return elements;
           });
 
