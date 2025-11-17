@@ -377,16 +377,11 @@ export async function handleRenderElementStylesRequest(
     const elementData = responseData.element;
     console.log("Fetched element data:", elementData);
 
-    // Create new page for element styles
-    const elementStylesPage = figma.createPage();
-    elementStylesPage.name = `🎨 ${elementData.type || 'Element'} ${elementId.substring(0, 8)}`;
+    // Use current page instead of creating new page
+    const currentPage = figma.currentPage;
 
-    // Insert page at the end
-    figma.root.appendChild(elementStylesPage);
-    figma.currentPage = elementStylesPage;
-
-    // Create element styles table
-    await createElementStylesTable(elementStylesPage, elementData);
+    // Create element styles table on current page
+    await createElementStylesTable(currentPage, elementData, elementId);
 
     figma.notify("✨ Element styles table created!");
   } catch (error) {
@@ -559,7 +554,8 @@ function createVariableRow(
  */
 async function createElementStylesTable(
   page: PageNode,
-  elementData: any
+  elementData: any,
+  elementId: string
 ): Promise<void> {
   const styles = elementData.styles || {};
   const styleEntries = Object.entries(styles);
@@ -686,26 +682,116 @@ async function createElementStylesTable(
   // Position in viewport
   page.appendChild(mainFrame);
 
-  // Position to the right of existing content
-  const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
-  let rightmostX = 0;
-  let topmostY = 0;
+  // Find the screenshot frame on this page
+  const screenshotFrames = page.findAll(
+    (node: SceneNode) =>
+      node.type === "FRAME" && node.name.includes("Screenshots")
+  ) as FrameNode[];
 
-  if (allNodes.length > 0) {
-    allNodes.forEach((node) => {
-      const nodeRight = node.x + node.width;
-      if (nodeRight > rightmostX) {
-        rightmostX = nodeRight;
-      }
-      if (node.y < topmostY || topmostY === 0) {
-        topmostY = node.y;
-      }
-    });
-    mainFrame.x = rightmostX + 200;
-    mainFrame.y = topmostY;
+  let screenshotFrame: FrameNode | null = null;
+  if (screenshotFrames.length > 0) {
+    screenshotFrame = screenshotFrames[0];
+  }
+
+  // Position to the right of the screenshot frame if found
+  if (screenshotFrame) {
+    mainFrame.x = screenshotFrame.x + screenshotFrame.width + 100;
+    mainFrame.y = screenshotFrame.y;
   } else {
-    mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
-    mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+    // Fallback: position to the right of existing content
+    const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
+    let rightmostX = 0;
+    let topmostY = 0;
+
+    if (allNodes.length > 0) {
+      allNodes.forEach((node) => {
+        const nodeRight = node.x + node.width;
+        if (nodeRight > rightmostX) {
+          rightmostX = nodeRight;
+        }
+        if (node.y < topmostY || topmostY === 0) {
+          topmostY = node.y;
+        }
+      });
+      mainFrame.x = rightmostX + 200;
+      mainFrame.y = topmostY;
+    } else {
+      mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
+      mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+    }
+  }
+
+  // Find the element's highlight badge number
+  let badgeNumber: number | null = null;
+  if (screenshotFrame) {
+    const overlayFrames = page.findAll(
+      (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
+    ) as FrameNode[];
+
+    if (overlayFrames.length > 0) {
+      const overlay = overlayFrames[0];
+      // Find badge groups containing this element ID
+      const badgeGroups = overlay.findAll(
+        (node: SceneNode) =>
+          node.type === "GROUP" &&
+          node.name.startsWith("link_") &&
+          node.name.endsWith("_badge")
+      ) as GroupNode[];
+
+      for (const badgeGroup of badgeGroups) {
+        const pluginData = badgeGroup.getPluginData("dbId");
+        if (pluginData === elementId) {
+          const match = badgeGroup.name.match(/link_(\d+)_badge/);
+          if (match) {
+            badgeNumber = parseInt(match[1], 10);
+            break;
+          }
+        }
+      }
+
+      // If not found in badges, try highlights
+      if (badgeNumber === null) {
+        const highlights = overlay.findAll(
+          (node: SceneNode) =>
+            node.type === "RECTANGLE" && node.name.includes("_highlight")
+        ) as RectangleNode[];
+
+        for (const highlight of highlights) {
+          const pluginData = highlight.getPluginData("dbId");
+          if (pluginData === elementId) {
+            const match = highlight.name.match(/(?:link|element)_(\d+)_highlight/);
+            if (match) {
+              badgeNumber = parseInt(match[1], 10);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Add badge to the table if we found a number
+  if (badgeNumber !== null) {
+    const badge = figma.createEllipse();
+    badge.name = "element-badge";
+    badge.resize(32, 32);
+    badge.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.5, b: 0.9 } }];
+
+    const badgeText = figma.createText();
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    badgeText.fontName = { family: "Inter", style: "Bold" };
+    badgeText.fontSize = 14;
+    badgeText.characters = badgeNumber.toString();
+    badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+
+    // Position badge in top-left corner of table
+    badge.x = mainFrame.x - 16;
+    badge.y = mainFrame.y - 16;
+    badgeText.x = badge.x + (32 - badgeText.width) / 2;
+    badgeText.y = badge.y + (32 - badgeText.height) / 2;
+
+    page.appendChild(badge);
+    page.appendChild(badgeText);
   }
 
   // Select and zoom to the frame
@@ -768,7 +854,7 @@ function createStylePropertyRow(
   sampleContainer.layoutMode = "HORIZONTAL";
   sampleContainer.primaryAxisSizingMode = "FIXED";
   sampleContainer.counterAxisSizingMode = "AUTO";
-  sampleContainer.resize(80, sampleContainer.height);
+  sampleContainer.resize(80, 14); // Fixed height for non-color rows
   sampleContainer.fills = [];
   sampleContainer.primaryAxisAlignItems = "CENTER";
   sampleContainer.counterAxisAlignItems = "CENTER";
