@@ -810,8 +810,13 @@ async function cloneSourceElements(
         .trim();
       highlightClone.name = `clicked_link_${flowStepNumber}: ${originalText}`;
 
-      highlightClone.x = screenshotClone.x + originalHighlight.x;
-      highlightClone.y = screenshotClone.y + originalHighlight.y;
+      // Get absolute coordinates of the highlight relative to the page
+      const overlayFrame = originalHighlight.parent as FrameNode;
+      const absoluteX = overlayFrame.x + originalHighlight.x;
+      const absoluteY = overlayFrame.y + originalHighlight.y;
+      
+      highlightClone.x = absoluteX;
+      highlightClone.y = absoluteY;
       flowPage.appendChild(highlightClone);
 
       console.log(
