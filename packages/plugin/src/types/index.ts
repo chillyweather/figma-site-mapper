@@ -313,6 +313,9 @@ export interface MainViewProps {
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
   crawlProgress: CrawlProgress;
+  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
+  authMethod: "none" | "manual" | "credentials" | "cookies";
+  onAuthorize: () => void;
   // Element styling props
   categorizedElements: CategorizedElements | null;
   elementFilters: ElementFilters;
@@ -357,6 +360,9 @@ export interface CrawlingTabProps {
   crawlProgress: CrawlProgress;
   projectSelected: boolean;
   isRenderingSnapshot: boolean;
+  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
+  authMethod: "none" | "manual" | "credentials" | "cookies";
+  onAuthorize: () => void;
 }
 
 export interface MarkupTabProps {

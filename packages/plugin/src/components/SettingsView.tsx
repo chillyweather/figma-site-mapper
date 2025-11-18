@@ -803,10 +803,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {authMethod === "manual" && (
         <div id="auth-manual-section" style={{ marginBottom: "8px" }}>
-          <div style={{ fontSize: "11px", color: "#666", marginBottom: "8px" }}>
-            Opens a browser where you can manually log in or solve CAPTCHA.
-            Cookies will be captured automatically when you close the browser.
+          <div
+            style={{ fontSize: "11px", color: "#666", marginBottom: "8px", lineHeight: 1.4 }}
+          >
+            <div>Opens a browser where you can manually log in or solve CAPTCHA.</div>
+            <div>
+              Close the browser window (Cmd+Q / Ctrl+Q) once authenticated so cookies
+              can be captured automatically.
+            </div>
+            <div>
+              You can also start this flow from the Crawling tab using the new
+              <span style={{ fontWeight: 600 }}> Authorize</span> button.
+            </div>
           </div>
+
           <button
             id="open-auth-browser-button"
             type="button"

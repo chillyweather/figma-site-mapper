@@ -1950,6 +1950,7 @@ export async function openAuthSession(url: string): Promise<{
       "--disable-web-security",
       "--disable-features=IsolateOrigins,site-per-process",
       "--disable-site-isolation-trials",
+      "--disable-site-isolation-trials",
     ],
   });
 
@@ -1970,45 +1971,100 @@ export async function openAuthSession(url: string): Promise<{
     });
   });
 
+  let lastSnapshotCount = 0;
+
+  const captureCookies = async () => {
+    try {
+      const allCookies = await context.cookies();
+      if (allCookies.length !== lastSnapshotCount) {
+        console.log(`🍪 Snapshot captured with ${allCookies.length} cookies`);
+        lastSnapshotCount = allCookies.length;
+      }
+      return allCookies.map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+      }));
+    } catch (error) {
+      console.warn(
+        `⚠️ Failed to capture cookies during auth session: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  };
+
+  let cookies: Array<{ name: string; value: string; domain: string }> = [];
+  let browserClosed = false;
+  let pollInterval: NodeJS.Timeout | null = null;
+
+  const stopPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  };
+
+  const finalizeSession = async (reason: string) => {
+    if (browserClosed) return;
+    console.log(`🛑 Finalizing auth session due to: ${reason}`);
+    browserClosed = true;
+    stopPolling();
+    const latestCookies = await captureCookies();
+    if (latestCookies.length > 0) {
+      cookies = latestCookies;
+      console.log(`📥 Final snapshot captured ${latestCookies.length} cookies`);
+    } else {
+      console.log(`⚠️ Final snapshot still empty`);
+    }
+    try {
+      await browser.close();
+    } catch (error) {
+      console.warn(
+        `⚠️ Error while closing auth browser: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  };
+
+  // Ensure we capture cookies if the user closes the tab or window
+  page.on("close", () => {
+    console.log("🪟 Page closed by user");
+    void finalizeSession("page-close");
+  });
+  context.on("close", () => {
+    console.log("🧩 Browser context closed");
+    void finalizeSession("context-close");
+  });
+
+  // Detect when the browser exits (e.g., Cmd+Q or Force Quit)
+  browser.on("disconnected", () => {
+    console.log("💥 Browser disconnected (quit/force quit)");
+    browserClosed = true;
+    stopPolling();
+  });
+
   try {
     // Navigate to the page
     await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
 
     console.log(`✅ Browser opened at ${url}`);
     console.log(
-      `👤 Please complete login/CAPTCHA and close the browser when done...`
+      `👤 Please complete login/CAPTCHA, then close the browser window to finish (Cmd+Q / Ctrl+Q).`
     );
 
-    // Keep polling for cookies and wait for browser to close
-    let cookies: Array<{ name: string; value: string; domain: string }> = [];
-    let browserClosed = false;
-
-    // Set up listener for browser disconnect
-    browser.on("disconnected", () => {
-      browserClosed = true;
-    });
-
-    // Poll for cookies every second and capture the latest
-    const pollInterval = setInterval(async () => {
-      try {
-        const allCookies = await context.cookies();
-        cookies = allCookies.map((cookie) => ({
-          name: cookie.name,
-          value: cookie.value,
-          domain: cookie.domain,
-        }));
-      } catch (error) {
-        // Browser/context might be closing, stop polling
-        clearInterval(pollInterval);
+    // Poll for cookies every second and capture the latest snapshot
+    pollInterval = setInterval(async () => {
+      const snapshot = await captureCookies();
+      if (snapshot.length > 0) {
+        cookies = snapshot;
       }
     }, 1000);
 
-    // Wait for browser to be closed
+    // Wait for browser to be closed (either by the user or programmatically)
     await new Promise<void>((resolve) => {
       const checkClosed = setInterval(() => {
         if (browserClosed) {
           clearInterval(checkClosed);
-          clearInterval(pollInterval);
+          stopPolling();
           resolve();
         }
       }, 100);
@@ -2023,5 +2079,7 @@ export async function openAuthSession(url: string): Promise<{
       `❌ Auth session error: ${error instanceof Error ? error.message : String(error)}`
     );
     throw error;
+  } finally {
+    await finalizeSession("finally-cleanup");
   }
 }

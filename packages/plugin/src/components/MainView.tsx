@@ -30,6 +30,9 @@ export const MainView: React.FC<MainViewProps> = ({
   handleShowFlow,
   flowProgress,
   crawlProgress,
+  authStatus,
+  authMethod,
+  onAuthorize,
   categorizedElements: _categorizedElements,
   elementFilters: _elementFilters,
   onElementFilterChange: _onElementFilterChange,
@@ -252,6 +255,9 @@ export const MainView: React.FC<MainViewProps> = ({
               crawlProgress={crawlProgress}
               projectSelected={projectSelected}
               isRenderingSnapshot={isRenderingSnapshot}
+              authStatus={authStatus}
+              authMethod={authMethod}
+              onAuthorize={onAuthorize}
             />
           )}
 

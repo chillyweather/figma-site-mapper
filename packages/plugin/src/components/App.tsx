@@ -30,6 +30,7 @@ export const App: React.FC = () => {
     authStatus,
     handleSubmit,
     handleRenderSnapshot,
+    handleOpenAuthSession,
     crawlProgress,
   } = useCrawl();
   const {
@@ -499,6 +500,9 @@ export const App: React.FC = () => {
       handleShowFlow={handleShowFlow}
       flowProgress={flowProgress}
       crawlProgress={crawlProgress}
+      authStatus={authStatus}
+      authMethod={settings.authMethod}
+      onAuthorize={handleOpenAuthSession}
       // Element styling props
       categorizedElements={categorizedElements}
       elementFilters={elementFilters}

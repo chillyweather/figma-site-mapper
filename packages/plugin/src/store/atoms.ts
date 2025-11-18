@@ -21,7 +21,11 @@ export const isRenderingSnapshotAtom = atom(false);
 export const statusAtom = atom("");
 export const jobIdAtom = atom<string | null>(null);
 export const authStatusAtom = atom<
-  "idle" | "authenticating" | "success" | "failed" | null
+  | "idle"
+  | "authenticating"
+  | "success"
+  | "failed"
+  | null
 >("idle");
 export const crawlProgressAtom = atom<CrawlProgress>({
   status: "idle",

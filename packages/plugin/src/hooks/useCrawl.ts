@@ -113,6 +113,33 @@ export function useCrawl() {
     [settings, setIsLoading, setStatus, activeProjectId]
   );
 
+  const handleOpenAuthSession = useCallback(() => {
+    const trimmedUrl = settings.url.trim();
+
+    if (!trimmedUrl) {
+      setStatus("Enter a URL before starting authorization.");
+      return;
+    }
+
+    if (!activeProjectId) {
+      setStatus("Select or create a project before authorizing.");
+      return;
+    }
+
+    setAuthStatus("authenticating");
+    setStatus("Opening authentication browser...");
+
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "open-auth-session",
+          url: trimmedUrl,
+        },
+      },
+      "*"
+    );
+  }, [settings.url, activeProjectId, setAuthStatus, setStatus]);
+
   const handleRenderSnapshot = useCallback(async () => {
     if (!activeProjectId) {
       setStatus("Select or create a project before rendering a snapshot.");
@@ -373,6 +400,7 @@ export function useCrawl() {
     authStatus,
     handleSubmit,
     handleRenderSnapshot,
+    handleOpenAuthSession,
     crawlProgress,
   };
 }
