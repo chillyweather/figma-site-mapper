@@ -163,7 +163,7 @@ export const MainView: React.FC<MainViewProps> = ({
   );
 
   return (
-    <div id="main-view" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div id="main-view">
       <div
         id="main-header"
         className="header"
@@ -186,23 +186,9 @@ export const MainView: React.FC<MainViewProps> = ({
       {/* Project-related UI moved to SettingsView */}
 
       {!projectSelected ? (
-        <div
-          className="container"
-          style={{
-            color: "#6b7280",
-            fontSize: "14px",
-            textAlign: "center",
-            padding: "40px 20px",
-            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-            borderRadius: "12px",
-            border: "1px solid #e2e8f0",
-            margin: "20px",
-          }}
-        >
-          <p style={{ margin: "0 0 8px 0", fontWeight: 500 }}>
-            No project selected
-          </p>
-          <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5 }}>
+        <div className="flows-empty">
+          <p>No project selected</p>
+          <p className="flows-empty-hint">
             Select or create a project to enable crawling, flows, styling, and markup features.
           </p>
         </div>

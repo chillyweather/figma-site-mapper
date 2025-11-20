@@ -41,16 +41,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   const renderAuthStatus = () => {
     if (authStatus === "authenticating") {
       return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#b45309",
-            marginTop: "6px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="auth-status auth-status-authenticating">
           <IconKey size={12} />
           Authentication browser is open — complete login/CAPTCHA, then close
           the window.
@@ -60,16 +51,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
 
     if (authStatus === "success") {
       return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#065f46",
-            marginTop: "6px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="auth-status auth-status-success">
           <IconCheck size={12} /> Authentication successful — cookies saved for
           this domain.
         </div>
@@ -78,16 +60,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
 
     if (authStatus === "failed") {
       return (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#991b1b",
-            marginTop: "6px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="auth-status auth-status-failed">
           <IconX size={12} /> Authentication failed — try again or update your
           credentials.
         </div>
@@ -99,14 +72,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
 
   const manualReminder =
     authMethod === "manual" && authStatus !== "success" ? (
-      <div
-        style={{
-          fontSize: "11px",
-          color: "#6b7280",
-          marginTop: "6px",
-          lineHeight: 1.5,
-        }}
-      >
+      <div className="form-hint-small">
         Manual auth is selected. Run <strong>Authorize</strong> before starting a
         crawl so the backend can reuse your session cookies.
       </div>
@@ -115,14 +81,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   return (
     <div id="crawling-tab" className="container">
       {!projectSelected && (
-        <div
-          className="status-display"
-          style={{
-            background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-            border: "1px solid #fbbf24",
-            color: "#92400e",
-          }}
-        >
+        <div className="status-display status-warning">
           Select or create a project to enable crawling.
         </div>
       )}
@@ -148,38 +107,17 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: "12px",
-            marginBottom: "20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "6px",
-          }}
-        >
+        <div className="form-group">
           <button
             id="authorize-button"
             type="button"
             onClick={onAuthorize}
             disabled={authorizeDisabled}
             className={`button-secondary ${authorizeDisabled ? "button-flow-disabled" : ""}`}
-            style={{
-              background: authorizeDisabled
-                ? undefined
-                : "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)",
-              color: authorizeDisabled ? undefined : "white",
-              border: "none",
-            }}
           >
             {authorizeLabel}
           </button>
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#6b7280",
-              lineHeight: 1.4,
-            }}
-          >
+          <div className="form-hint">
             Opens a dedicated browser so you can log in or solve CAPTCHA before
             crawling. When finished, close the browser window (Cmd+Q / Ctrl+Q)
             so cookies can be captured.
@@ -213,19 +151,13 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           onClick={handleRenderSnapshot}
           disabled={disableActions}
           className={`button-secondary ${disableActions ? "button-flow-disabled" : ""}`}
-          style={{
-            background: isRenderingSnapshot
-              ? undefined
-              : "linear-gradient(135deg, #374151 0%, #1f2937 100%)",
-            color: "white",
-            border: "none",
-          }}
         >
           {isRenderingSnapshot
             ? "Rendering Snapshot..."
             : "Render Project Snapshot"}
         </button>
       </div>
+
 
       {/* Crawl Progress */}
       <CrawlProgress progress={crawlProgress} />

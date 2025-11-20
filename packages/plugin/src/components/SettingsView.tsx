@@ -126,46 +126,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     [newProjectName, onCreateProject]
   );
   return (
-    <div
-      id="settings-view"
-      style={{ padding: "16px", fontFamily: "Inter, sans-serif" }}
-    >
-      <div
-        id="settings-header"
-        style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}
-      >
+    <div id="settings-view" className="container">
+      <div id="settings-header" className="settings-header">
         <button
           id="settings-back-button"
           onClick={switchToMain}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "4px 8px",
-            marginRight: "8px",
-            cursor: "pointer",
-            fontSize: "14px",
-          }}
+          className="back-button"
         >
           ← Back
         </button>
-        <h3
-          id="settings-title"
-          style={{ margin: "0", fontSize: "14px", fontWeight: 600 }}
-        >
+        <h3 id="settings-title" className="settings-title">
           Settings
         </h3>
       </div>
 
       {/* Project Selection Section */}
-      <div id="project-selection-section" style={{ marginBottom: "16px" }}>
-        <label
-          style={{
-            display: "block",
-            fontSize: "12px",
-            marginBottom: "4px",
-            fontWeight: "500",
-          }}
-        >
+      <div id="project-selection-section" className="settings-section">
+        <label className="form-label">
           Project
         </label>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -174,13 +151,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             value={activeProjectId ? activeProjectId : ""}
             onChange={handleProjectSelect}
             disabled={isProjectLoading}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              fontSize: "12px",
-            }}
+            className="form-select"
           >
             <option value="">Select a project…</option>
             {projects.map((project) => (
@@ -196,14 +167,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               void onRefreshProjects();
             }}
             disabled={isProjectLoading}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              backgroundColor: isProjectLoading ? "#f1f3f5" : "white",
-              fontSize: "11px",
-              cursor: isProjectLoading ? "not-allowed" : "pointer",
-            }}
+            className="button-secondary"
+            style={{ width: "auto", marginBottom: 0 }}
           >
             {isProjectLoading ? "Refreshing…" : "Refresh"}
           </button>
@@ -219,72 +184,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onChange={(event) => setNewProjectName(event.target.value)}
             placeholder="New project name"
             disabled={isCreatingProject}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: "4px",
-              border: "1px solid #ced4da",
-              fontSize: "12px",
-            }}
+            className="form-input"
+            style={{ marginBottom: 0 }}
           />
           <button
             type="submit"
             disabled={isCreatingProject}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "4px",
-              border: "none",
-              backgroundColor: isCreatingProject ? "#adb5bd" : "#0066cc",
-              color: "white",
-              fontSize: "12px",
-              cursor: isCreatingProject ? "not-allowed" : "pointer",
-              fontWeight: 500,
-            }}
+            className="button-primary"
+            style={{ width: "auto", marginBottom: 0, whiteSpace: "nowrap" }}
           >
             {isCreatingProject ? "Creating…" : "Create Project"}
           </button>
         </form>
 
         {(projectError || localError) && (
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#721c24",
-              backgroundColor: "#f8d7da",
-              border: "1px solid #f5c6cb",
-              borderRadius: "4px",
-              padding: "8px",
-              marginBottom: "8px",
-            }}
-          >
+          <div className="status-display status-error">
             {projectError || localError}
           </div>
         )}
 
         {!projects.length && !isProjectLoading && !activeProjectId && (
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#495057",
-              backgroundColor: "#e9ecef",
-              borderRadius: "4px",
-              padding: "8px",
-            }}
-          >
+          <div className="status-display status-neutral">
             Create your first project to start crawling.
           </div>
         )}
       </div>
 
-    <div id="screenshot-settings-section" style={{ marginBottom: "16px" }}>
-      <label
-        style={{
-          display: "block",
-          fontSize: "12px",
-          marginBottom: "4px",
-          fontWeight: "500",
-        }}
-      >
+    <div id="screenshot-settings-section" className="settings-section">
+      <label className="form-label">
         Screenshot Settings
       </label>
       <FocusedInput
@@ -295,16 +222,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleScreenshotWidthChange}
         placeholder="Screenshot width (1440)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="320"
         max="3840"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "8px" }}>
+      <div className="settings-description">
         Screenshot width in pixels (320-3840px)
       </div>
       <select
@@ -312,30 +234,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         value={deviceScaleFactor}
         onChange={handleDeviceScaleFactorChange}
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-select"
       >
         <option value="1">1x Resolution</option>
         <option value="2">2x Resolution (Higher Quality)</option>
       </select>
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "16px" }}>
+      <div className="settings-description">
         Higher resolution screenshots take longer to process
       </div>
     </div>
 
-    <div id="crawl-performance-section" style={{ marginBottom: "16px" }}>
-      <label
-        style={{
-          display: "block",
-          fontSize: "12px",
-          marginBottom: "4px",
-          fontWeight: "500",
-        }}
-      >
+    <div id="crawl-performance-section" className="settings-section">
+      <label className="form-label">
         Crawl Performance
       </label>
       <FocusedInput
@@ -346,16 +256,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleDelayChange}
         placeholder="Delay in seconds (0)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="0"
         max="60"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "8px" }}>
+      <div className="settings-description">
         Additional delay after page load (0-60 seconds)
       </div>
       <FocusedInput
@@ -366,29 +271,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleRequestDelayChange}
         placeholder="Delay between requests in ms (1000)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="0"
         max="10000"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "16px" }}>
+      <div className="settings-description">
         Delay between requests to avoid rate limiting (0-10000ms)
       </div>
     </div>
 
-    <div id="crawl-limits-section" style={{ marginBottom: "16px" }}>
-      <label
-        style={{
-          display: "block",
-          fontSize: "12px",
-          marginBottom: "4px",
-          fontWeight: "500",
-        }}
-      >
+    <div id="crawl-limits-section" className="settings-section">
+      <label className="form-label">
         Crawl Limits
       </label>
       <FocusedInput
@@ -399,15 +292,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleMaxRequestsChange}
         placeholder="Max requests (10)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="0"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "8px" }}>
+      <div className="settings-description">
         Leave empty, 0, or ≥999 for unlimited requests
       </div>
       <FocusedInput
@@ -417,16 +305,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleMaxDepthChange}
         placeholder="Max crawl depth (2)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="1"
         max="10"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "8px" }}>
+      <div className="settings-description">
         How many levels deep to crawl (0 or empty = no limit, 1-10)
       </div>
       <FocusedInput
@@ -436,155 +319,89 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onChange={handleSampleSizeChange}
         placeholder="Pages per section (3)"
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "4px",
-        }}
+        className="form-input"
         min="1"
         max="20"
       />
-      <div style={{ fontSize: "10px", color: "#666", marginBottom: "8px" }}>
+      <div className="settings-description">
         Max pages to crawl per section (0 or empty = no limit, 1-20)
       </div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          fontSize: "12px",
-          cursor: "pointer",
-        }}
-      >
+      <label className="settings-label">
         <input
           id="default-language-only-checkbox"
           type="checkbox"
           checked={defaultLanguageOnly}
           onChange={handleDefaultLanguageOnlyChange}
           disabled={isLoading || !!jobId}
-          style={{ marginRight: "8px" }}
         />
         Crawl only default language pages
       </label>
-      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+      <div className="settings-description">
         Detects language from URL patterns like /en/, /fr/, ?lang=de, etc.
       </div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          fontSize: "12px",
-          cursor: "pointer",
-          marginTop: "8px",
-        }}
-      >
+      <label className="settings-label">
         <input
           id="full-refresh-checkbox"
           type="checkbox"
           checked={fullRefresh}
           onChange={handleFullRefreshChange}
           disabled={isLoading || !!jobId}
-          style={{ marginRight: "8px" }}
         />
         Treat this crawl as a full refresh
       </label>
-      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+      <div className="settings-description">
         When enabled, pages not visited in this crawl are removed from the
         project.
       </div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          fontSize: "12px",
-          cursor: "pointer",
-          marginTop: "8px",
-        }}
-      >
+      <label className="settings-label">
         <input
           id="show-browser-checkbox"
           type="checkbox"
           checked={showBrowser}
           onChange={handleShowBrowserChange}
           disabled={isLoading || !!jobId}
-          style={{ marginRight: "8px" }}
         />
         Show browser window during crawl
       </label>
-      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+      <div className="settings-description">
         Keep browser visible for manual intervention (CAPTCHA, login, etc.)
       </div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          fontSize: "12px",
-          cursor: "pointer",
-          marginTop: "8px",
-        }}
-      >
+      <label className="settings-label">
         <input
           id="detect-interactive-elements-checkbox"
           type="checkbox"
           checked={detectInteractiveElements}
           onChange={handleDetectInteractiveElementsChange}
           disabled={isLoading || !!jobId}
-          style={{ marginRight: "8px" }}
         />
         Detect interactive elements
       </label>
-      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+      <div className="settings-description">
         Add numbered frames around links and buttons for user journey mapping
       </div>
 
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          fontSize: "12px",
-          cursor: "pointer",
-          marginTop: "12px",
-        }}
-      >
+      <label className="settings-label" style={{ marginTop: "12px" }}>
         <input
           id="highlight-all-elements-checkbox"
           type="checkbox"
           checked={highlightAllElements}
           onChange={handleHighlightAllElementsChange}
           disabled={isLoading || !!jobId || !extractStyles}
-          style={{ marginRight: "8px" }}
         />
         Highlight detected elements
       </label>
-      <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
+      <div className="settings-description">
         Create color-coded highlights for detected elements. Requires style
         extraction to be enabled.
       </div>
 
       {highlightAllElements && (
-        <div
-          style={{
-            marginTop: "8px",
-            marginLeft: "24px",
-            padding: "8px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "4px",
-            border: "1px solid #e9ecef",
-          }}
-        >
-          <div
-            style={{ fontSize: "11px", fontWeight: "600", marginBottom: "6px" }}
-          >
+        <div className="settings-group">
+          <div className="settings-group-title">
             Element Types to Highlight:
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.buttons}
@@ -592,18 +409,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("buttons", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#28A745", marginRight: "4px" }}>●</span>{" "}
               Buttons
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.links}
@@ -611,18 +421,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("links", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#0066CC", marginRight: "4px" }}>●</span>{" "}
               Links
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.inputs}
@@ -630,18 +433,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("inputs", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
               Form Inputs
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.textareas}
@@ -649,18 +445,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("textareas", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
               Textareas
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.selects}
@@ -668,18 +457,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("selects", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
               Selects
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.headings}
@@ -687,18 +469,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("headings", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#6F42C1", marginRight: "4px" }}>●</span>{" "}
               Headings
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.images}
@@ -706,18 +481,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("images", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#20C997", marginRight: "4px" }}>●</span>{" "}
               Images
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.paragraphs}
@@ -725,18 +493,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("paragraphs", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
               Paragraphs
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.divs}
@@ -744,18 +505,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("divs", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
               Divs
             </label>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                fontSize: "11px",
-              }}
-            >
+            <label className="settings-label">
               <input
                 type="checkbox"
                 checked={highlightElementFilters.other}
@@ -763,7 +517,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   handleHighlightFilterChange("other", e.target.checked)
                 }
                 disabled={isLoading || !!jobId}
-                style={{ marginRight: "6px" }}
               />
               <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
               Other
@@ -773,15 +526,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
     </div>
 
-    <div id="authentication-section" style={{ marginBottom: "16px" }}>
-      <label
-        style={{
-          display: "block",
-          fontSize: "12px",
-          marginBottom: "4px",
-          fontWeight: "500",
-        }}
-      >
+    <div id="authentication-section" className="settings-section">
+      <label className="form-label">
         Authentication
       </label>
       <select
@@ -789,13 +535,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         value={authMethod}
         onChange={handleAuthMethodChange}
         disabled={isLoading || !!jobId}
-        style={{
-          width: "100%",
-          padding: "8px",
-          boxSizing: "border-box",
-          marginBottom: "8px",
-          fontSize: "12px",
-        }}
+        className="form-select"
+        style={{ marginBottom: "8px" }}
       >
         <option value="none">No Authentication</option>
         <option value="manual">Manual (Browser Session)</option>
@@ -803,9 +544,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {authMethod === "manual" && (
         <div id="auth-manual-section" style={{ marginBottom: "8px" }}>
-          <div
-            style={{ fontSize: "11px", color: "#666", marginBottom: "8px", lineHeight: 1.4 }}
-          >
+          <div className="settings-description" style={{ lineHeight: 1.4 }}>
             <div>Opens a browser where you can manually log in or solve CAPTCHA.</div>
             <div>
               Close the browser window (Cmd+Q / Ctrl+Q) once authenticated so cookies
@@ -836,50 +575,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               );
             }}
             disabled={isLoading || !!jobId || !url.trim()}
-            style={{
-              width: "100%",
-              padding: "8px 16px",
-              backgroundColor:
-                isLoading || !!jobId || !url.trim() ? "#e9ecef" : "#0066cc",
-              color: isLoading || !!jobId || !url.trim() ? "#6c757d" : "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor:
-                isLoading || !!jobId || !url.trim() ? "not-allowed" : "pointer",
-              fontSize: "12px",
-              fontWeight: "500",
-            }}
+            className="button-primary"
+            style={{ width: "100%" }}
           >
             {authStatus === "authenticating"
               ? "Browser Open - Complete auth and close..."
               : "Open Authentication Browser"}
           </button>
           {authStatus === "success" && (
-            <div
-              style={{
-                fontSize: "11px",
-                color: "#155724",
-                marginTop: "4px",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
+            <div className="status-display status-success" style={{ marginTop: "4px" }}>
               <IconCheck size={12} />
               Authentication successful - cookies captured
             </div>
           )}
           {authStatus === "failed" && (
-            <div
-              style={{
-                fontSize: "11px",
-                color: "#721c24",
-                marginTop: "4px",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
+            <div className="status-display status-error" style={{ marginTop: "4px" }}>
               <IconX size={12} />
               Authentication failed
             </div>
@@ -888,46 +598,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {authStatus === "authenticating" && (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#856404",
-            marginTop: "4px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="status-display status-warning" style={{ marginTop: "4px" }}>
           <IconKey size={12} />
           Authenticating...
         </div>
       )}
       {authStatus === "success" && (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#155724",
-            marginTop: "4px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="status-display status-success" style={{ marginTop: "4px" }}>
           <IconCheck size={12} />
           Authentication successful
         </div>
       )}
       {authStatus === "failed" && (
-        <div
-          style={{
-            fontSize: "11px",
-            color: "#721c24",
-            marginTop: "4px",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-          }}
-        >
+        <div className="status-display status-error" style={{ marginTop: "4px" }}>
           <IconX size={12} />
           Authentication failed - will crawl public pages only
         </div>
@@ -935,44 +618,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
 
     {/* Style Extraction Section */}
-    <div
-      id="style-extraction-section"
-      style={{ marginBottom: "16px", marginTop: "24px" }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "12px",
-        }}
-      >
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-          }}
-        >
+    <div id="style-extraction-section" className="settings-section" style={{ marginTop: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+        <label className="settings-label">
           <input
             type="checkbox"
             checked={extractStyles}
             onChange={handleExtractStylesChange}
             disabled={isLoading || !!jobId}
-            style={{ cursor: isLoading || !!jobId ? "not-allowed" : "pointer" }}
           />
           Extract DOM & Style Data
         </label>
-        <div
-          style={{
-            position: "relative",
-            display: "inline-flex",
-            alignItems: "center",
-          }}
-        >
+        <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
           <IconInfoCircle
             size={14}
             style={{ color: "#666", cursor: "help" }}
@@ -982,48 +639,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {extractStyles && (
-        <div
-          style={{
-            marginLeft: "24px",
-            padding: "12px",
-            backgroundColor: "#f8f9fa",
-            borderRadius: "6px",
-            border: "1px solid #e9ecef",
-          }}
-        >
+        <div className="settings-group">
           {/* Preset Selector */}
           <div style={{ marginBottom: "12px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "11px",
-                marginBottom: "4px",
-                fontWeight: "500",
-                color: "#495057",
-              }}
-            >
+            <label className="form-label">
               Extraction Preset
             </label>
             <select
               value={styleExtractionPreset}
               onChange={handleStyleExtractionPresetChange}
               disabled={isLoading || !!jobId}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                boxSizing: "border-box",
-                fontSize: "11px",
-                borderRadius: "4px",
-                border: "1px solid #ced4da",
-                backgroundColor: "white",
-              }}
+              className="form-select"
             >
               <option value="smart">Smart (Recommended)</option>
               <option value="minimal">Minimal (Smallest)</option>
               <option value="complete">Complete (Largest)</option>
               <option value="custom">Custom...</option>
             </select>
-            <div style={{ fontSize: "10px", color: "#666", marginTop: "4px" }}>
+            <div className="settings-description">
               {styleExtractionPreset === "smart" &&
                 "Interactive + structural + styled elements"}
               {styleExtractionPreset === "minimal" &&
@@ -1038,31 +671,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div style={{ marginTop: "12px" }}>
               {/* Element Types */}
               <div style={{ marginBottom: "12px" }}>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    marginBottom: "6px",
-                    color: "#212529",
-                  }}
-                >
+                <div className="settings-group-title">
                   Element Types
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                <div className="settings-checkbox-list">
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractInteractive}
@@ -1071,14 +684,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Interactive elements (buttons, links, inputs)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractStructural}
@@ -1087,14 +693,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Structural components (header, nav, footer)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractContentBlocks}
@@ -1103,14 +702,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Content blocks (cards, articles, lists)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractFormElements}
@@ -1119,14 +711,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Form elements (forms, labels, fieldsets)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractCustomComponents}
@@ -1140,31 +725,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
               {/* Style Properties */}
               <div style={{ marginBottom: "12px" }}>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    marginBottom: "6px",
-                    color: "#212529",
-                  }}
-                >
+                <div className="settings-group-title">
                   Style Properties
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                <div className="settings-checkbox-list">
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractColors}
@@ -1173,14 +738,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Colors & backgrounds
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractTypography}
@@ -1189,14 +747,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Typography (font, size, weight)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractSpacing}
@@ -1205,14 +756,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Spacing (margin, padding)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractBorders}
@@ -1221,14 +765,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Borders & effects (shadows, radius)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractLayout}
@@ -1242,31 +779,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
               {/* Additional Options */}
               <div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    marginBottom: "6px",
-                    color: "#212529",
-                  }}
-                >
+                <div className="settings-group-title">
                   Additional Options
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
-                  }}
-                >
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                <div className="settings-checkbox-list">
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={extractCSSVariables}
@@ -1275,14 +792,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     />
                     Extract CSS variables (custom properties)
                   </label>
-                  <label
-                    style={{
-                      fontSize: "11px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
+                  <label className="settings-label">
                     <input
                       type="checkbox"
                       checked={detectPatterns}
@@ -1296,20 +806,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
+
           {/* Data Size Estimate */}
-          <div
-            style={{
-              marginTop: "12px",
-              padding: "8px",
-              backgroundColor: "#e7f3ff",
-              borderRadius: "4px",
-              fontSize: "10px",
-              color: "#004085",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
+          <div className="status-display status-info" style={{ marginTop: "12px", fontSize: "10px" }}>
             <IconInfoCircle size={12} />
             <span>
               Estimated data:{" "}
