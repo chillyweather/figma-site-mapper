@@ -44,14 +44,7 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
   return (
     <div className="container">
       <div
-        className="status-display"
-        style={{
-          background: isPageReady 
-            ? "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)"
-            : "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-          border: isPageReady ? "1px solid #60a5fa" : "1px solid #fbbf24",
-          color: isPageReady ? "#1e40af" : "#92400e",
-        }}
+        className={`status-display ${isPageReady ? "status-info" : "status-warning"}`}
       >
         <div style={{ fontWeight: 600, marginBottom: "4px" }}>
           Active Page
@@ -76,10 +69,10 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             gap: "12px 16px",
-            background: "#ffffff",
+            background: "var(--color-bg)",
             padding: "16px",
-            borderRadius: "8px",
-            border: "1px solid #e5e7eb",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--color-border)",
           }}
         >
           {supportedFilters.map((filterKey) => (
@@ -108,11 +101,6 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
         onClick={onRender}
         disabled={!isPageReady || isRendering || selectedFilterCount === 0}
         className={`button-primary ${(!isPageReady || selectedFilterCount === 0 || isRendering) ? 'button-flow-disabled' : ''}`}
-        style={{
-          background: (!isPageReady || selectedFilterCount === 0 || isRendering)
-            ? undefined
-            : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-        }}
       >
         {isRendering ? "Working…" : "Render Highlights"}
       </button>
@@ -126,7 +114,7 @@ export const MarkupTab: React.FC<MarkupTabProps> = ({
       </button>
 
       {status && (
-        <div className="status-display" style={{ textAlign: "center" }}>
+        <div className="status-display status-neutral" style={{ textAlign: "center" }}>
           {status}
         </div>
       )}

@@ -96,14 +96,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
     <div className="container">
       {/* Project Status */}
       {!hasProject && (
-        <div
-          className="status-display"
-          style={{
-            background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-            border: "1px solid #fbbf24",
-            color: "#92400e",
-          }}
-        >
+        <div className="status-display status-warning">
           Select a project to access styling features.
         </div>
       )}
@@ -115,14 +108,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
         </h4>
         
         <div
-          className="status-display"
-          style={{
-            background: globalStylesData 
-              ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
-              : "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-            border: globalStylesData ? "1px solid #34d399" : "1px solid #e2e8f0",
-            color: globalStylesData ? "#065f46" : "#64748b",
-          }}
+          className={`status-display ${globalStylesData ? "status-success" : "status-neutral"}`}
         >
           {globalStylesData ? (
             <div>
@@ -142,17 +128,12 @@ export const StylingTab: React.FC<StylingTabProps> = ({
           onClick={onRenderGlobalStyles}
           disabled={!canRenderGlobalStyles || isRenderingGlobalStyles}
           className={`button-primary ${!canRenderGlobalStyles || isRenderingGlobalStyles ? 'button-flow-disabled' : ''}`}
-          style={{
-            background: canRenderGlobalStyles && !isRenderingGlobalStyles 
-              ? "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)"
-              : undefined,
-          }}
         >
           {isRenderingGlobalStyles ? "Rendering..." : "Render Global Styles"}
         </button>
 
         {globalStylesStatus && (
-          <div className="status-display" style={{ textAlign: "center" }}>
+          <div className="status-display status-neutral" style={{ textAlign: "center", marginTop: "8px" }}>
             {globalStylesStatus}
           </div>
         )}
@@ -166,14 +147,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
 
         {/* Current Page Info */}
         <div
-          className="status-display"
-          style={{
-            background: isPageReady 
-              ? "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)"
-              : "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-            border: isPageReady ? "1px solid #60a5fa" : "1px solid #e2e8f0",
-            color: isPageReady ? "#1e40af" : "#64748b",
-          }}
+          className={`status-display ${isPageReady ? "status-info" : "status-neutral"}`}
         >
           <div style={{ fontWeight: 600, marginBottom: "4px" }}>
             Active Page
@@ -197,14 +171,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
             </div>
             
             {selectedElementInfo ? (
-              <div
-                className="status-display"
-                style={{
-                  background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
-                  border: "1px solid #60a5fa",
-                  color: "#1e40af",
-                }}
-              >
+              <div className="status-display status-info">
                 <div style={{ fontWeight: 600, marginBottom: "4px" }}>
                   {selectedElementInfo.type}
                   {selectedElementInfo.text ? ` (${selectedElementInfo.text.substring(0, 30)}${selectedElementInfo.text.length > 30 ? '...' : ''})` : ''}
@@ -214,12 +181,7 @@ export const StylingTab: React.FC<StylingTabProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="status-display" style={{ 
-                textAlign: "center",
-                background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-                border: "1px solid #fbbf24",
-                color: "#92400e",
-              }}>
+              <div className="status-display status-warning" style={{ textAlign: "center" }}>
                 Select a badge or highlight frame to enable element styling
               </div>
             )}
@@ -230,17 +192,12 @@ export const StylingTab: React.FC<StylingTabProps> = ({
           onClick={() => selectedElementId && onRenderElementStyles(selectedElementId)}
           disabled={!canRenderElementStyles || isRenderingElementStyles}
           className={`button-primary ${!canRenderElementStyles || isRenderingElementStyles ? 'button-flow-disabled' : ''}`}
-          style={{
-            background: canRenderElementStyles && !isRenderingElementStyles 
-              ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
-              : undefined,
-          }}
         >
           {isRenderingElementStyles ? "Rendering..." : "Render Element Styles"}
         </button>
 
         {elementStylesStatus && (
-          <div className="status-display" style={{ textAlign: "center" }}>
+          <div className="status-display status-neutral" style={{ textAlign: "center", marginTop: "8px" }}>
             {elementStylesStatus}
           </div>
         )}

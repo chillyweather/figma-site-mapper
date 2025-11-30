@@ -14,7 +14,8 @@ import { DEFAULT_SETTINGS } from "../../constants";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 import { buildManifestFromProject } from "../utils/buildManifestFromProject";
-import type { TreeNode } from "../../types";
+import type { TreeNode, ElementType } from "../../types";
+import { ELEMENT_HIGHLIGHT_COLORS } from "../../figmaRendering/utils/createScreenshotPages";
 
 async function getActiveProjectId(): Promise<string | null> {
   try {
@@ -24,6 +25,15 @@ async function getActiveProjectId(): Promise<string | null> {
     console.error("Failed to load active project id", error);
     return null;
   }
+}
+
+function getHighlightColorFromType(elementType?: string | null): RGB | null {
+  if (!elementType) {
+    return null;
+  }
+
+  const color = ELEMENT_HIGHLIGHT_COLORS[elementType as ElementType];
+  return color || null;
 }
 
 /**
@@ -377,16 +387,11 @@ export async function handleRenderElementStylesRequest(
     const elementData = responseData.element;
     console.log("Fetched element data:", elementData);
 
-    // Create new page for element styles
-    const elementStylesPage = figma.createPage();
-    elementStylesPage.name = `🎨 ${elementData.type || 'Element'} ${elementId.substring(0, 8)}`;
+    // Use current page instead of creating new page
+    const currentPage = figma.currentPage;
 
-    // Insert page at the end
-    figma.root.appendChild(elementStylesPage);
-    figma.currentPage = elementStylesPage;
-
-    // Create element styles table
-    await createElementStylesTable(elementStylesPage, elementData);
+    // Create element styles table on current page
+    await createElementStylesTable(currentPage, elementData, elementId);
 
     figma.notify("✨ Element styles table created!");
   } catch (error) {
@@ -559,7 +564,8 @@ function createVariableRow(
  */
 async function createElementStylesTable(
   page: PageNode,
-  elementData: any
+  elementData: any,
+  elementId: string
 ): Promise<void> {
   const styles = elementData.styles || {};
   const styleEntries = Object.entries(styles);
@@ -686,26 +692,152 @@ async function createElementStylesTable(
   // Position in viewport
   page.appendChild(mainFrame);
 
-  // Position to the right of existing content
-  const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
-  let rightmostX = 0;
-  let topmostY = 0;
+  // Find the screenshot frame on this page
+  const screenshotFrames = page.findAll(
+    (node: SceneNode) =>
+      node.type === "FRAME" && node.name.includes("Screenshots")
+  ) as FrameNode[];
 
-  if (allNodes.length > 0) {
-    allNodes.forEach((node) => {
-      const nodeRight = node.x + node.width;
-      if (nodeRight > rightmostX) {
-        rightmostX = nodeRight;
-      }
-      if (node.y < topmostY || topmostY === 0) {
-        topmostY = node.y;
-      }
-    });
-    mainFrame.x = rightmostX + 200;
-    mainFrame.y = topmostY;
+  let screenshotFrame: FrameNode | null = null;
+  if (screenshotFrames.length > 0) {
+    screenshotFrame = screenshotFrames[0];
+  }
+
+  // Position to the right of the screenshot frame if found
+  if (screenshotFrame) {
+    mainFrame.x = screenshotFrame.x + screenshotFrame.width + 100;
+    mainFrame.y = screenshotFrame.y;
   } else {
-    mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
-    mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+    // Fallback: position to the right of existing content
+    const allNodes = page.children.filter((n) => n.id !== mainFrame.id);
+    let rightmostX = 0;
+    let topmostY = 0;
+
+    if (allNodes.length > 0) {
+      allNodes.forEach((node) => {
+        const nodeRight = node.x + node.width;
+        if (nodeRight > rightmostX) {
+          rightmostX = nodeRight;
+        }
+        if (node.y < topmostY || topmostY === 0) {
+          topmostY = node.y;
+        }
+      });
+      mainFrame.x = rightmostX + 200;
+      mainFrame.y = topmostY;
+    } else {
+      mainFrame.x = figma.viewport.center.x - mainFrame.width / 2;
+      mainFrame.y = figma.viewport.center.y - mainFrame.height / 2;
+    }
+  }
+
+  // Find the element's highlight badge number and color
+  let badgeNumber: number | null = null;
+  let badgeColor: { r: number; g: number; b: number } = { r: 0.9, g: 0.45, b: 0.1 }; // Default orange
+
+  const overlayFrames = page.findAll(
+    (node: SceneNode) => node.type === "FRAME" && node.name === "Page Overlay"
+  ) as FrameNode[];
+
+  if (overlayFrames.length > 0) {
+    const overlay = overlayFrames[0];
+
+    // Find badge groups containing this element ID
+    const badgeGroups = overlay.findAll(
+      (node: SceneNode) =>
+        node.type === "GROUP" &&
+        (node.name.startsWith("link_") || node.name.startsWith("element_")) &&
+        node.name.endsWith("_badge")
+    ) as GroupNode[];
+
+    for (const badgeGroup of badgeGroups) {
+      const pluginData = badgeGroup.getPluginData("dbId");
+      const ordinalData = badgeGroup.getPluginData("ordinalNumber");
+      const elementTypeData = badgeGroup.getPluginData("elementType");
+
+      if (pluginData === elementId && ordinalData) {
+        badgeNumber = parseInt(ordinalData, 10);
+
+        const typeColor = getHighlightColorFromType(elementTypeData);
+        if (typeColor) {
+          badgeColor = typeColor;
+        } else {
+          // Extract color from the badge circle as a fallback
+          const badgeCircle = badgeGroup.findOne(
+            (node: SceneNode) =>
+              node.type === "ELLIPSE" &&
+              (node.name.includes("badge_circle") || node.name.includes("badge-circle"))
+          ) as EllipseNode | null;
+
+          if (
+            badgeCircle &&
+            badgeCircle.fills &&
+            Array.isArray(badgeCircle.fills) &&
+            badgeCircle.fills.length > 0
+          ) {
+            const fill = badgeCircle.fills[0];
+            if (fill.type === "SOLID" && fill.color) {
+              badgeColor = fill.color;
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    // If not found in badges, try highlights
+    if (badgeNumber === null) {
+      const highlights = overlay.findAll(
+        (node: SceneNode) =>
+          node.type === "RECTANGLE" && node.name.includes("_highlight")
+      ) as RectangleNode[];
+
+      for (const highlight of highlights) {
+        const pluginData = highlight.getPluginData("dbId");
+        const ordinalData = highlight.getPluginData("ordinalNumber");
+        const elementTypeData = highlight.getPluginData("elementType");
+
+        if (pluginData === elementId && ordinalData) {
+          badgeNumber = parseInt(ordinalData, 10);
+          const typeColor = getHighlightColorFromType(elementTypeData);
+          if (typeColor) {
+            badgeColor = typeColor;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Add badge to the table if we found a number
+  if (badgeNumber !== null) {
+    const badgeSize = 24;
+    const badge = figma.createEllipse();
+    badge.name = "styles-table-badge-circle";
+    badge.resize(badgeSize, badgeSize);
+    badge.fills = [{ type: "SOLID", color: badgeColor }];
+    badge.strokes = [];
+
+    const badgeText = figma.createText();
+    await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+    badgeText.fontName = { family: "Inter", style: "Bold" };
+    badgeText.fontSize = 11;
+    badgeText.characters = badgeNumber.toString();
+    badgeText.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+    badgeText.name = "styles-table-badge-text";
+
+    // Position badge in top-left corner of table (overlapping)
+    badge.x = mainFrame.x - 12;
+    badge.y = mainFrame.y - 12;
+    badgeText.x = badge.x + (badgeSize - badgeText.width) / 2;
+    badgeText.y = badge.y + (badgeSize - badgeText.height) / 2;
+
+    page.appendChild(badge);
+    page.appendChild(badgeText);
+    
+    console.log(`✅ Added badge #${badgeNumber} to styles table`);
+  } else {
+    console.log(`⚠️ Could not find badge for element ID: ${elementId}`);
   }
 
   // Select and zoom to the frame
@@ -768,7 +900,7 @@ function createStylePropertyRow(
   sampleContainer.layoutMode = "HORIZONTAL";
   sampleContainer.primaryAxisSizingMode = "FIXED";
   sampleContainer.counterAxisSizingMode = "AUTO";
-  sampleContainer.resize(80, sampleContainer.height);
+  sampleContainer.resize(80, 14); // Fixed height for non-color rows
   sampleContainer.fills = [];
   sampleContainer.primaryAxisAlignItems = "CENTER";
   sampleContainer.counterAxisAlignItems = "CENTER";

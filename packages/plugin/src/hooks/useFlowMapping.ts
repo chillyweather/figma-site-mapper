@@ -33,13 +33,16 @@ export function useFlowMapping() {
   const handleLinkCheck = useCallback(
     (linkId: string, checked: boolean) => {
       setCheckedLinks((prev: Set<string>) => {
-        const newSet = new Set(prev);
         if (checked) {
-          newSet.add(linkId);
+          // Select the new link
+          return new Set([linkId]);
+        } else if (prev.has(linkId)) {
+          // If clicking the same link, deselect it
+          return new Set();
         } else {
-          newSet.delete(linkId);
+          // Otherwise select the new link
+          return new Set([linkId]);
         }
-        return newSet;
       });
     },
     [setCheckedLinks]

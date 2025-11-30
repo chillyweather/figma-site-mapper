@@ -39,7 +39,12 @@ async function storeDomainCookies(
 ): Promise<void> {
   try {
     const key = `cookies_${domain}`;
+    console.log(`💾 [storeDomainCookies] Saving ${cookies.length} cookies to ${key}`);
     await figma.clientStorage.setAsync(key, cookies);
+    const verify = await figma.clientStorage.getAsync(key);
+    console.log(
+      `🔍 [storeDomainCookies] Read-back count for ${key}: ${Array.isArray(verify) ? verify.length : 0}`
+    );
   } catch (error) {
     console.error(`Failed to store cookies for ${domain}`, error);
   }
@@ -115,10 +120,49 @@ async function getActiveProjectId(): Promise<string | null> {
 }
 
 function extractDomain(url: string): string | null {
+  console.log("[extractDomain] START - input:", url, "type:", typeof url);
   try {
-    const urlObj = new URL(url);
-    return urlObj.hostname;
+    if (!url || typeof url !== "string") {
+      console.warn("[extractDomain] Invalid url provided", url);
+      return null;
+    }
+    console.log("[extractDomain] URL type check:", typeof URL);
+    if (typeof URL === "undefined") {
+      console.warn("[extractDomain] Global URL constructor missing", url);
+      // Fallback: parse manually
+      const match = url.match(/^https?:\/\/([^\/]+)/);
+      if (match && match[1]) {
+        console.log("[extractDomain] Manual parse success:", match[1]);
+        return match[1];
+      }
+      return null;
+    }
+    const trimmedUrl = url.trim();
+    console.log("[extractDomain] About to call new URL with:", trimmedUrl);
+    const urlObj = new URL(trimmedUrl);
+    console.log("[extractDomain] URL parsed, hostname:", urlObj.hostname);
+    const hostname = urlObj.hostname;
+    if (!hostname) {
+      console.warn("[extractDomain] Parsed URL without hostname", trimmedUrl);
+      return null;
+    }
+    console.log("[extractDomain] SUCCESS - returning:", hostname);
+    return hostname;
   } catch (error) {
+    console.error(
+      `[extractDomain] EXCEPTION for url=${url}:`,
+      error,
+      "message:",
+      error instanceof Error ? error.message : String(error),
+      "stack:",
+      error instanceof Error ? error.stack : "N/A"
+    );
+    // Fallback: parse manually
+    const match = url.match(/^https?:\/\/([^\/]+)/);
+    if (match && match[1]) {
+      console.log("[extractDomain] Fallback parse success:", match[1]);
+      return match[1];
+    }
     return null;
   }
 }
@@ -492,32 +536,45 @@ export async function handleStartCrawl(config: {
       fullRefresh,
     } = config;
 
+    // Resolve stored cookies for this domain (used for manual auth or auto-injection)
+    const domain = extractDomain(url);
+    const storedCookies = domain ? await loadDomainCookies(domain) : null;
+
     // If auth method is manual, load cookies from storage
     let authData = auth;
 
     if (auth && auth.method === "manual") {
-      const domain = extractDomain(url);
-      if (domain) {
-        const cookies = await loadDomainCookies(domain);
-        if (cookies && cookies.length > 0) {
-          console.log(
-            `🍪 Using ${cookies.length} stored cookies for manual auth`
-          );
-          authData = {
-            method: "cookies",
-            cookies,
-          };
-        } else {
-          console.log(
-            "⚠️ Manual auth selected but no cookies found. Run authentication session first."
-          );
-          figma.notify(
-            "No authentication cookies found. Please complete the authentication session first.",
-            { error: true }
-          );
-          return;
-        }
+      if (storedCookies && storedCookies.length > 0) {
+        console.log(
+          `🍪 Using ${storedCookies.length} stored cookies for manual auth`
+        );
+        authData = {
+          method: "cookies",
+          cookies: storedCookies,
+        };
+      } else {
+        console.log(
+          "⚠️ Manual auth selected but no cookies found. Run authentication session first."
+        );
+        figma.notify(
+          "No authentication cookies found. Please complete the authentication session first.",
+          { error: true }
+        );
+        return;
       }
+    } else if (
+      storedCookies &&
+      storedCookies.length > 0 &&
+      (!auth ||
+        (auth.method === "cookies" && (!auth.cookies || auth.cookies.length === 0)))
+    ) {
+      console.log(
+        `🍪 Injecting ${storedCookies.length} stored cookies for ${domain} automatically`
+      );
+      authData = {
+        method: "cookies",
+        cookies: storedCookies,
+      };
     }
 
     // Build style extraction settings if enabled
@@ -758,7 +815,8 @@ export function handleClose(): void {
  * Handle open-auth-session message from UI
  */
 export async function handleOpenAuthSession(msg: any): Promise<void> {
-  const { url } = msg;
+  const rawUrl = typeof msg.url === "string" ? msg.url : "";
+  const url = rawUrl.trim();
 
   console.log("🔐 Opening authentication session for URL:", url);
 
@@ -773,26 +831,47 @@ export async function handleOpenAuthSession(msg: any): Promise<void> {
 
     // Store cookies for this domain
     const domain = extractDomain(url);
-    if (domain && result.cookies && result.cookies.length > 0) {
-      await storeDomainCookies(domain, result.cookies);
+    const cookieArray = Array.isArray(result.cookies) ? result.cookies : [];
+    const cookieCount = cookieArray.length;
+    const cookiePreview = cookieArray.map(
+      (cookie) => `${cookie.name}=${cookie.value.slice(0, 4)}…`
+    );
+    const domainLabel = domain ? domain : "unknown";
+    console.log(
+      `🔍 Auth session result for ${url} (domain: ${domainLabel}) captured ${cookieCount} cookies`
+    );
+
+    if (domain && cookieCount > 0) {
+      await storeDomainCookies(domain, cookieArray);
       console.log(
-        `🍪 Stored ${result.cookies.length} cookies for domain ${domain}`
+        `🍪 Stored ${cookieCount} cookies for domain ${domain}:`,
+        cookiePreview
       );
 
       figma.ui.postMessage({
         type: "auth-session-status",
         status: "success",
-        cookieCount: result.cookies.length,
+        cookieCount,
+        domain,
       });
 
       figma.notify(
-        `Authentication successful! Captured ${result.cookies.length} cookies.`
+        `Authentication successful! Captured ${cookieCount} cookies for ${domain}.`
       );
     } else {
+      console.warn(
+        `⚠️ Auth session completed without cookies (domain: ${domainLabel}) preview:`,
+        cookiePreview
+      );
       figma.ui.postMessage({
         type: "auth-session-status",
         status: "failed",
         error: "No cookies captured",
+        domain: domain ? domain : null,
+        cookieCount,
+        cookiePreview,
+        rawUrl: url,
+        storeKey: domain ? `cookies_${domain}` : null,
       });
 
       figma.notify("Authentication completed but no cookies were captured.", {
@@ -912,6 +991,10 @@ export async function handleUIMessage(msg: any): Promise<void> {
       break;
     case "set-active-project":
       await handleSetActiveProject(msg.projectId || null);
+      break;
+
+    case "render-project-snapshot":
+      await handleRenderProjectSnapshot(msg);
       break;
 
     case "render-markup": {

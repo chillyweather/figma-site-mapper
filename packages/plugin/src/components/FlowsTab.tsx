@@ -48,37 +48,19 @@ export const FlowsTab: React.FC<FlowsTabProps> = ({
               Found {badgeLinks.length} element
               {badgeLinks.length !== 1 ? "s" : ""}
             </h4>
-            {badgeLinks.map((link: FlowLink) => (
+            {badgeLinks.map((link: FlowLink, index: number) => (
               <div
                 key={link.id}
-                className="flows-link-item"
+                className={`flows-link-item ${checkedLinks.has(link.id) ? 'flows-link-item-selected' : ''}`}
+                onClick={() => handleLinkCheck(link.id, !checkedLinks.has(link.id))}
               >
-                <input
-                  type="checkbox"
-                  checked={checkedLinks.has(link.id)}
-                  onChange={(e) => handleLinkCheck(link.id, e.target.checked)}
-                />
+                <div className="flows-link-badge">
+                  {link.badgeNumber ?? index + 1}
+                </div>
                 <div className="flows-link-content">
-                  <div className="flows-link-text">
-                    {link.text}
-                  </div>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flows-link-url"
-                    onClick={(e) => {
-                      if (
-                        link.url.startsWith("#") ||
-                        link.url.includes("example.com")
-                      ) {
-                        e.preventDefault();
-                        console.log("Placeholder URL clicked:", link.url);
-                      }
-                    }}
-                  >
+                  <div className="flows-link-url">
                     {link.url}
-                  </a>
+                  </div>
                 </div>
               </div>
             ))}
