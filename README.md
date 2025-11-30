@@ -64,6 +64,53 @@ pnpm dev:backend  # run only the backend server
 3. Choose `packages/plugin/manifest.json`
 4. Run the plugin from the Plugins menu
 
+## Architecture
+
+For a complete overview of the system architecture and all features, see the [Architecture Diagram](./ARCHITECTURE_DIAGRAM.md).
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "Figma Plugin (Frontend)"
+        UI[React UI]
+        Plugin[Plugin Backend]
+    end
+    
+    subgraph "Backend Server"
+        API[Fastify API Server]
+        Crawler[Playwright Crawler]
+        Queue[Bull Queue/Redis]
+        Worker[Queue Worker]
+    end
+    
+    subgraph "Data Storage"
+        MongoDB[(MongoDB Atlas)]
+        Files[Screenshots & Files]
+    end
+    
+    UI -->|HTTP Requests| API
+    Plugin -->|Message Bridge| UI
+    API -->|Queue Jobs| Queue
+    Queue -->|Process| Worker
+    Worker -->|Execute| Crawler
+    Crawler -->|Store Data| MongoDB
+    Crawler -->|Save Files| Files
+    API -->|Read/Write| MongoDB
+    Plugin -->|Read URLs| Files
+```
+
+### Core Features
+
+- **Project Management**: Create and manage multiple website projects
+- **Web Crawling**: Full-site and single-page crawling with authentication support
+- **Element Extraction**: Automatic detection of links, buttons, forms, and other interactive elements
+- **Style Analysis**: Extract CSS variables, design tokens, and computed styles
+- **Sitemap Generation**: Hierarchical tree visualization in Figma
+- **Markup System**: On-demand element highlighting with type filters
+- **Flow Building**: Create user flow diagrams by connecting pages
+- **Persistent Storage**: All data saved to MongoDB for reuse and collaboration
+
 ## Notes for contributors
 
 - The repo is split into `packages/backend` and `packages/plugin`. Keep plugin-facing changes inside `packages/plugin` and backend logic inside `packages/backend`.
@@ -73,7 +120,3 @@ pnpm dev:backend  # run only the backend server
 ## License
 
 ISC
-
----
-
-If you'd like, I can also add a short `TRY IT` section with example commands for a local dry-run and a minimal troubleshooting checklist tailored to v0.1.
