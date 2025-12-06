@@ -6,7 +6,7 @@ After months of pondering what AI would mean for my career as a developer, I dec
 
 This is the story of building a Figma plugin for automated sitemap generation and design system documentation—and doing it almost entirely with AI-assisted development.
 
-_(Note: This project is still in active development, and this post will be updated as the codebase evolves.)_
+*(Note: This project is still in active development, and this post will be updated as the codebase evolves.)*
 
 **Project Repository:** https://github.com/chillyweather/figma-site-mapper
 
@@ -26,11 +26,11 @@ I wanted to test the limits of AI-assisted development in a real, production-qua
 
 The plugin needs to deliver:
 
-- **Screenshot capture** of website pages with automated element detection
-- **Visual markup** of interactive elements (buttons, links, forms, etc.) on those screenshots
-- **Flow visualization** showing the chain of links between pages
-- **Style analysis** displaying design tokens and styling information for elements and the site overall
-- **Authentication handling** for password-protected sites
+- **Screenshot capture** - Automated element detection on website pages
+- **Visual markup** - Interactive elements (buttons, links, forms, etc.) highlighted on screenshots
+- **Flow visualization** - Shows the chain of links between pages
+- **Style analysis** - Design tokens and styling information for elements and the site overall
+- **Authentication handling** - Support for password-protected sites
 
 **[ADD GIF: Demo of the flow visualization feature]**
 
@@ -65,84 +65,31 @@ The system uses a **job queue pattern** with three main components:
 
 When you start a crawl from the plugin, here's what happens behind the scenes:
 
-**1. From UI Click to Screenshots on Canvas**
+**From UI Click to Screenshots on Canvas**
 
-Let's walk through the entire journey when you click "Start Crawl":
+You click "Start Crawl" and the plugin sends your settings to the backend API. The server immediately creates a job in the queue and returns an ID—no waiting around. A background worker picks up the job and launches a real Chromium browser (headless by default, visible if you're debugging).
 
-- **Plugin UI → Backend API**: Your crawl settings (URL, depth, filters) get sent to `/crawl` endpoint
-- **API Creates a Job**: The server creates a job in the BullMQ queue with a unique ID and returns it immediately
-- **Worker Picks Up Job**: A background worker process grabs the job and fires up Playwright
-- **Browser Does Its Thing**:
-  - Launches a real Chromium browser (headless or visible)
-  - Navigates to each page, waits for content to load
-  - Scrolls through the page to trigger lazy-loading
-  - Captures full-page screenshots (auto-sliced if taller than 4096px)
-  - Detects all interactive elements (links, buttons) with their exact coordinates
-  - Optionally extracts CSS styles, design tokens, and computed properties
-- **Data Gets Saved**: Each page's data goes into MongoDB:
-  - Screenshot file paths
-  - Page metadata (title, URL, crawl timestamp)
-  - Interactive elements with bounding boxes
-  - Style information and CSS variables
-- **Plugin Polls for Updates**: Meanwhile, your plugin checks `/status/{jobId}` every second
-- **Rendering Time**: When complete, plugin fetches the data and builds Figma frames with:
-  - Screenshot images loaded from backend server
-  - Interactive overlay with numbered badges on every link/button
-  - Proper positioning and scaling for Figma canvas
+The browser navigates to each page, waits for everything to load, scrolls through to trigger lazy-loading, and captures full-page screenshots. If a page is taller than 4096px, it gets automatically sliced into manageable chunks. While browsing, it detects every interactive element—links, buttons, forms—and records their exact coordinates on the page.
 
-**2. Highlighting Elements from the Markup Tab**
+All this data gets saved to MongoDB: screenshot paths, page metadata, element locations, and any CSS styles or design tokens the page uses. Meanwhile, your plugin polls the status endpoint every second, showing you a progress bar. When the job completes, the plugin fetches all the data and renders it on the Figma canvas—screenshot images, numbered badges on interactive elements, everything positioned and scaled properly.
 
-When you want to highlight specific element types (buttons, inputs, etc.):
+**Highlighting Elements from the Markup Tab**
 
-- **Select Element Types**: You check boxes in the Markup tab (e.g., "Buttons" + "Links")
-- **Plugin Queries Database**: Sends request to `/elements` endpoint with your filters
-- **Backend Filters Elements**: MongoDB query returns only elements matching your selected types
-- **Visual Highlights Appear**: Plugin draws colored rectangles on the "Page Overlay" frame:
-  - Each element type gets its own color (buttons = blue, links = green, etc.)
-  - Numbered badges appear in the top-right corner
-  - Element metadata stored in Figma's plugin data for later reference
+Here's where the database design pays off. All element data was captured during the initial crawl, so highlighting specific types is just a matter of filtering and visualization.
 
-The magic is that all element data was already captured during the initial crawl—this is just filtering and visualizing what's in the database.
+You check some boxes in the Markup tab—maybe "Buttons" and "Links." The plugin queries the `/elements` endpoint with your filters, and MongoDB returns only the matching elements. The plugin then draws colored rectangles on a "Page Overlay" frame: blue for buttons, green for links, each with a numbered badge. The metadata gets stored in Figma's plugin data, ready for when you want to build flows or analyze styles.
 
-**3. Building User Flows from Link Clicks**
+**Building User Flows from Link Clicks**
 
-This is where things get interesting. When you click a link badge to create a flow:
+This is where things get interesting. When you click a link badge to create a flow, the plugin reads the badge's stored data to get the target URL. It clones your current screenshot plus the clicked link highlight, then checks if we've crawled that target URL before.
 
-- **Identify the Link**: Plugin reads the badge's plugin data to get the target URL
-- **Clone Current View**: Copies your current screenshot + the clicked link highlight
-- **Check Cache First**: Queries `/page` endpoint—have we crawled this target URL before?
-- **Crawl If Needed**: If not cached, triggers a fresh crawl just for that one page:
-  - Sends a `/recrawl-page` request (same process as full crawl, but single page)
-  - Worker crawls the target URL with all the same screenshot + element detection
-  - Saves results to database
-- **Create Flow Page**: Plugin creates a new Figma page with hierarchical naming:
-  - Source screenshot on the left
-  - Big pink arrow pointing right (created as a vector with arrow cap)
-  - Target screenshot on the right
-  - All interactive elements detected and ready to click
-- **Chain Flows**: Click another link in the target screenshot? It creates another nested flow page, building a breadcrumb trail of your user journey
+If it's in the database, great—we just fetch the data. If not, we trigger a fresh crawl for that single page (same process, smaller scope). Then the plugin creates a new Figma page with a source screenshot on the left, a big pink arrow pointing right, and the target screenshot on the right. Click another link in the target screenshot? It creates another nested flow page, building a breadcrumb trail of your user journey.
 
-**4. Requesting Styles for Elements or Documents**
+**Requesting Styles for Elements or Documents**
 
-The styling features tap into CSS extraction that happened during crawl:
+The styling features tap into CSS extraction that happened during the crawl. For document-wide styles, a request to `/styles/global` returns all the CSS variables from `:root`—your `--color-primary`, `--spacing-md`, and other design tokens. For individual elements, clicking a numbered badge fetches the complete style object: all CSS properties, which variables are referenced, computed values from browser rendering, and the element's selector.
 
-**For Document Styles** (the whole page):
-
-- **Query Global Styles**: Request to `/styles/global` returns CSS variables from `:root`
-- **Display Design Tokens**: Shows all the `--color-primary`, `--spacing-md` type variables
-- **Cross-Page Analysis**: Can aggregate tokens across multiple pages to find design system patterns
-
-**For Individual Elements**:
-
-- **Select an Element**: Click a numbered badge from the markup overlay
-- **Fetch Element Data**: Request to `/styles/element` with element ID
-- **Show Computed Styles**: Displays the full style object:
-  - All CSS properties (color, font-size, padding, etc.)
-  - Which CSS variables are referenced
-  - Computed values from browser rendering
-  - Element's selector and tagname
-
-The styling extraction happens in the browser during crawl—we inject JavaScript that queries `getComputedStyle()` for thousands of elements, capturing the actual rendered CSS values, not just what's in stylesheets.
+The magic is that we inject JavaScript during the crawl that queries `getComputedStyle()` for thousands of elements, capturing the actual rendered CSS values—not just what's in stylesheets.
 
 ---
 
@@ -158,29 +105,56 @@ The process that worked best for me:
 4. **Execute one step at a time**—test after each stage, make clear commits when things work
 5. **Iterate** based on what breaks or what new requirements emerge
 
-**[MISSING SECTION: Add 2-3 specific examples of challenges and how AI helped solve them]**
+**When AI Became My Rubber Duck**
+
+Early in the project, I was wrestling with how to handle authentication for password-protected sites. The naive approach would be to just pass credentials through the plugin, but that's a security nightmare. I explained the problem to the AI agent, expecting code, and instead got a thoughtful breakdown of three different patterns: proxy authentication, session token handling, and environment-based credential storage. The AI didn't just write code—it helped me think through the architecture. Sometimes the best code is the code you don't write.
+
+**The TypeScript Type Crisis**
+
+Midway through refactoring from a file-based system to MongoDB, I hit a wall. The plugin's type definitions had become a tangled mess—`BadgeLink` vs `FlowLink`, `TreeNode` with inconsistent properties, optional chaining everywhere that broke in Figma's sandboxed environment. I spent an hour trying to untangle it manually, made things worse, then finally gave up and described the problem to the AI: "My types are lying to me and my code is a lie."
+
+The AI agent generated a complete type system overhaul: unified interfaces, proper generics, and even caught that Figma's plugin runtime doesn't support modern JavaScript features. It replaced all the optional chaining with explicit null checks and generated ES2018-compatible code. What would have taken me a full day of tedious refactoring took 20 minutes. The AI didn't just fix the types—it understood the runtime constraints I had forgotten about.
+
+**The Queue That Wouldn't Queue**
+
+BullMQ jobs were completing but the plugin wasn't getting updates. The status endpoint returned success, the data was in MongoDB, but the rendering step never triggered. After 30 minutes of console.log archaeology, I realized the AI had generated a race condition: the plugin was polling for status before the job had even been queued. The fix was embarrassingly simple—await the queue.add() promise—but finding it required understanding the entire async flow across three services. The AI agent had written correct code for each piece, but missed how they interacted. That's the kind of systems-level bug that still needs human oversight.
 
 ### What Works Well with AI
 
-- Boilerplate and repetitive code
-- API integrations and data transformations
-- Refactoring and code organization
-- Converting requirements into implementation plans
+- **Boilerplate and repetitive code** - The AI generates perfect CRUD endpoints, React components, and database schemas without breaking a sweat
+- **API integrations and data transformations** - It handles the tedious work of mapping between different data formats and API responses
+- **Refactoring and code organization** - Give it a messy function and get back clean, modular code with proper separation of concerns
+- **Converting requirements into implementation plans** - It excels at breaking down "build a crawler" into 47 specific, actionable steps
 
 ### Where Human Oversight Still Matters
 
-- Architectural decisions
-- Debugging complex cross-service issues
-- Performance optimization
-- Knowing when the AI is confidently wrong
-
-**[ADD CODE SNIPPET: Example of an interesting problem solved with AI assistance]**
+- **Architectural decisions** - The AI can implement any architecture you describe, but it won't question whether you're building a monolith or microservices for a Figma plugin
+- **Debugging complex cross-service issues** - When the queue, worker, API, and plugin all blame each other, you need a human to trace the actual data flow
+- **Performance optimization** - The AI writes correct code, but not always efficient code. That nested loop querying the database inside another loop? Still your problem to spot
+- **Knowing when the AI is confidently wrong** - It once suggested storing screenshots as base64 in MongoDB. Technically possible. Practically a terrible idea. The confidence was impressive, though.
 
 ---
 
 ## What's Next
 
-**[MISSING SECTION: Deployment plans, future features, and timeline]**
+**Deployment and Production Readiness**
+
+The current setup runs everything locally—great for development, useless for collaboration. Next up is deploying the backend to DigitalOcean App Platform, which means:
+
+- Production MongoDB Atlas cluster (goodbye free tier limits)
+- HTTPS endpoint for screenshot serving (Figma refuses to load images over HTTP)
+- Environment-based configuration (no more hardcoded localhost URLs)
+- Proper error handling and monitoring (because production logs are different from development console.log)
+
+**Future Features on the Horizon**
+
+- **Smart element grouping** - Automatically identify design system components across pages ("these 47 buttons all have the same styles, maybe they're the same component?")
+- **Collaborative projects** - Multiple designers working on the same crawl data, with conflict resolution
+- **Export formats** - Generate documentation in Markdown, JSON, or even Figma's own design system format
+- **Visual regression testing** - Re-crawl sites and highlight what changed since the last capture
+- **AI-powered analysis** - "Based on these 200 pages, your design system has 17 different button variants. Might want to consolidate?"
+
+**Timeline** - Realistically, v1.0 production-ready by end of Q1 2025. The core functionality is there; now it's about hardening, testing, and making it work for people who aren't me.
 
 ---
 
@@ -188,25 +162,37 @@ The process that worked best for me:
 
 The project is open source and available on GitHub: https://github.com/chillyweather/figma-site-mapper
 
-**[MISSING SECTION: Installation/usage instructions or link to docs]**
+**Quick Start**
+
+```bash
+# Clone and install
+git clone https://github.com/chillyweather/figma-site-mapper.git
+cd figma-site-mapper
+pnpm install
+
+# Set up environment
+cp packages/backend/.env.example packages/backend/.env
+# Edit .env with your MongoDB Atlas credentials
+
+# Run development servers
+pnpm dev
+```
+
+**Loading in Figma**
+
+1. Open Figma Desktop → Plugins → Development → Import plugin from manifest
+2. Select `packages/plugin/manifest.json`
+3. The plugin appears in your Plugins menu
+
+**Requirements**
+
+- Node.js 18+ and pnpm
+- Figma Desktop App
+- MongoDB Atlas account (free tier works for testing)
+- Redis (optional, for queue management)
+
+For detailed setup instructions and troubleshooting, see the [README](https://github.com/chillyweather/figma-site-mapper/blob/main/README.md).
 
 ---
 
 **Want to follow the journey?** Connect with me on [LinkedIn](https://www.linkedin.com/in/dmitridmitriev/) where I share updates on AI-assisted development and full-stack projects.
-
----
-
-## Missing Content Summary
-
-To complete this post, you'll need to add:
-
-1. **GIF/Video:** Flow visualization demo
-2. **Screenshot:** Plugin interface
-3. **Diagram:** System architecture
-4. **Expanded section:** Backend architecture details
-5. **Section:** 2-3 specific AI-assisted problem-solving examples
-6. **Code snippet:** Interesting technical challenge example
-7. **Section:** Deployment plans and future roadmap
-8. **Section:** Quick start / how to use it
-
-The structure is there—now it's ready for the technical meat and visual aids that will make it compelling!
