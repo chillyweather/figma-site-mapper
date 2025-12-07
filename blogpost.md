@@ -105,20 +105,6 @@ The process that worked best for me:
 4. **Execute one step at a time**—test after each stage, make clear commits when things work
 5. **Iterate** based on what breaks or what new requirements emerge
 
-**When AI Became My Rubber Duck**
-
-Early in the project, I was wrestling with how to handle authentication for password-protected sites. The naive approach would be to just pass credentials through the plugin, but that's a security nightmare. I explained the problem to the AI agent, expecting code, and instead got a thoughtful breakdown of three different patterns: proxy authentication, session token handling, and environment-based credential storage. The AI didn't just write code—it helped me think through the architecture. Sometimes the best code is the code you don't write.
-
-**The TypeScript Type Crisis**
-
-Midway through refactoring from a file-based system to MongoDB, I hit a wall. The plugin's type definitions had become a tangled mess—`BadgeLink` vs `FlowLink`, `TreeNode` with inconsistent properties, optional chaining everywhere that broke in Figma's sandboxed environment. I spent an hour trying to untangle it manually, made things worse, then finally gave up and described the problem to the AI: "My types are lying to me and my code is a lie."
-
-The AI agent generated a complete type system overhaul: unified interfaces, proper generics, and even caught that Figma's plugin runtime doesn't support modern JavaScript features. It replaced all the optional chaining with explicit null checks and generated ES2018-compatible code. What would have taken me a full day of tedious refactoring took 20 minutes. The AI didn't just fix the types—it understood the runtime constraints I had forgotten about.
-
-**The Queue That Wouldn't Queue**
-
-BullMQ jobs were completing but the plugin wasn't getting updates. The status endpoint returned success, the data was in MongoDB, but the rendering step never triggered. After 30 minutes of console.log archaeology, I realized the AI had generated a race condition: the plugin was polling for status before the job had even been queued. The fix was embarrassingly simple—await the queue.add() promise—but finding it required understanding the entire async flow across three services. The AI agent had written correct code for each piece, but missed how they interacted. That's the kind of systems-level bug that still needs human oversight.
-
 ### What Works Well with AI
 
 - **Boilerplate and repetitive code** - The AI generates perfect CRUD endpoints, React components, and database schemas without breaking a sweat
@@ -133,18 +119,27 @@ BullMQ jobs were completing but the plugin wasn't getting updates. The status en
 - **Performance optimization** - The AI writes correct code, but not always efficient code. That nested loop querying the database inside another loop? Still your problem to spot
 - **Knowing when the AI is confidently wrong** - It once suggested storing screenshots as base64 in MongoDB. Technically possible. Practically a terrible idea. The confidence was impressive, though.
 
+### What's Still Problematic
+
+**Authentication** - Handling password-protected sites remains a work in progress. The current implementation works for basic cases but needs refinement for more complex authentication flows and session management.
+
 ---
 
 ## What's Next
 
 **Deployment and Production Readiness**
 
-The current setup runs everything locally—great for development, useless for collaboration. Next up is deploying the backend to DigitalOcean App Platform, which means:
+The current setup runs everything locally—great for development, useless for collaboration. The deployment plan hit a practical wall: my target server has only 1GB of memory, and a full deployment of this project (Playwright browser instances + MongoDB + Redis + the Node.js services) immediately runs out of memory and crashes. The system needs at least 2GB to function, and realistically 4GB for comfortable operation with multiple concurrent crawls.
 
-- Production MongoDB Atlas cluster (goodbye free tier limits)
-- HTTPS endpoint for screenshot serving (Figma refuses to load images over HTTP)
-- Environment-based configuration (no more hardcoded localhost URLs)
-- Proper error handling and monitoring (because production logs are different from development console.log)
+This means either upgrading the server infrastructure or optimizing the memory footprint before production deployment. For now, development continues locally while I explore options for a more appropriately sized hosting environment.
+
+**Future Features on the Horizon**
+
+- **Smart element grouping** - Automatically identify design system components across pages ("these 47 buttons all have the same styles, maybe they're the same component?")
+- **Collaborative projects** - Multiple designers working on the same crawl data, with conflict resolution
+- **Export formats** - Generate documentation in Markdown, JSON, or even Figma's own design system format
+- **Visual regression testing** - Re-crawl sites and highlight what changed since the last capture
+- **AI-powered analysis** - "Based on these 200 pages, your design system has 17 different button variants. Might want to consolidate?"
 
 **Future Features on the Horizon**
 
