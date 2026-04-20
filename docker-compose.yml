@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: fsm-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    # Not exposed externally - only internal Docker network
+    networks:
+      - fsm-network
+
+  api:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: fsm-api
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - MONGO_URI=${MONGO_URI}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - PUBLIC_URL=${PUBLIC_URL}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+    volumes:
+      - ./screenshots:/app/screenshots
+    depends_on:
+      - redis
+    networks:
+      - fsm-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    command: node --experimental-specifier-resolution=node dist/index.js
+
+  worker:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: fsm-worker
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - MONGO_URI=${MONGO_URI}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - PUBLIC_URL=${PUBLIC_URL}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_REGION=${S3_REGION}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+    volumes:
+      - ./screenshots:/app/screenshots
+    depends_on:
+      - redis
+    networks:
+      - fsm-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    command: node --experimental-specifier-resolution=node dist/worker.js
+
+volumes:
+  redis-data:
+
+networks:
+  fsm-network:
+    driver: bridge
