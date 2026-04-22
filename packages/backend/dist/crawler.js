@@ -938,7 +938,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 try {
                     await page.waitForTimeout(500);
                     await enqueueLinks({
-                        strategy: "same-hostname",
+                        strategy: "same-domain",
                         transformRequestFunction: (request) => {
                             const url = new URL(request.url);
                             const blockedPatterns = [

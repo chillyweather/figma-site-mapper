@@ -1162,7 +1162,7 @@ export async function runCrawler(
           try {
             await page.waitForTimeout(500);
             await enqueueLinks({
-              strategy: "same-hostname",
+              strategy: "same-domain",
               transformRequestFunction: (request) => {
                 const url = new URL(request.url);
                 const blockedPatterns = [

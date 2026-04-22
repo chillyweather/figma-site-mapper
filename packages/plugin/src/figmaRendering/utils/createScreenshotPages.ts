@@ -65,12 +65,9 @@ async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
 
   if (url.startsWith("http://") && !insecureProtocolWarned) {
     insecureProtocolWarned = true;
-    if (typeof figma !== "undefined" && "notify" in figma) {
-      figma.notify(
-        "Screenshots are served over HTTP. Configure an HTTPS backend so Figma can fetch them.",
-        { error: true }
-      );
-    }
+    console.warn(
+      "Screenshots are served over HTTP. Configure an HTTPS backend so Figma can fetch them."
+    );
   }
 
   try {
