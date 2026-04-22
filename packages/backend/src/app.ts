@@ -56,7 +56,10 @@ function getUrlLookupCandidates(rawUrl: string): string[] {
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({ logger: fastifyLoggerConfig });
 
-  await server.register(cors, { origin: "*" });
+  await server.register(cors, {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  });
 
   await server.register(fastifyStatic, {
     root: path.join(__dirname, "..", "static"),
