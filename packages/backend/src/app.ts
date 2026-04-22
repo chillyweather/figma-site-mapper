@@ -8,6 +8,7 @@ import { db } from "./db.js";
 import { projects, pages, elements } from "./schema.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
+import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,7 +54,7 @@ function getUrlLookupCandidates(rawUrl: string): string[] {
 }
 
 export async function buildServer(): Promise<FastifyInstance> {
-  const server = Fastify({ logger: true });
+  const server = Fastify({ logger: fastifyLoggerConfig });
 
   await server.register(cors, { origin: "*" });
 

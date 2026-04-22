@@ -15,9 +15,9 @@ graph TB
     API --> Queue[BullMQ Queue]
     Queue --> Worker[Worker Process]
     Worker --> Crawler[Playwright/Crawlee Crawler]
-    Crawler --> Mongo[(MongoDB)]
+    Crawler --> DB[(SQLite DB)]
     Crawler --> Files[Screenshot Files]
-    API --> Mongo
+    API --> DB
     API --> Files
     Plugin --> Figma[Figma Canvas]
 ```
@@ -28,139 +28,95 @@ The backend lives in `packages/backend`.
 
 Main modules:
 
-- `src/index.ts`: starts the Fastify server after connecting to MongoDB.
-- `src/app.ts`: defines API routes.
-- `src/queue.ts`: creates the BullMQ queue.
-- `src/worker.ts`: consumes crawl jobs and calls the crawler.
-- `src/crawler.ts`: runs Playwright/Crawlee, captures screenshots, extracts data, and persists results.
-- `src/models/*`: Mongoose models for projects, pages, and elements.
-- `src/services/manifestBuilder.ts`: builds page/element payloads from persisted records.
+- `src/index.ts`: entry point — imports logger, then starts the Fastify server.
+- `src/worker.ts`: entry point — imports logger, then starts the BullMQ worker.
+- `src/logger.ts`: pino logger with daily rotating file output + console override. Import this first in any new entry point.
+- `src/db.ts`: opens the SQLite file, creates tables with `CREATE TABLE IF NOT EXISTS`, exports the Drizzle `db` instance.
+- `src/schema.ts`: Drizzle table definitions for `projects`, `pages`, and `elements`. Source of truth for DB types.
+- `src/app.ts`: all Fastify routes.
+- `src/queue.ts`: BullMQ queue and Redis connection (reads `REDIS_URL` env var).
+- `src/crawler.ts`: Playwright/Crawlee crawler — screenshots, element detection, style extraction, auth session.
+- `src/services/manifestBuilder.ts`: queries pages and elements by ID, serializes to API response shape.
 
-Important API endpoints:
+API endpoints:
 
-- `GET /projects`
-- `POST /projects`
-- `POST /crawl`
-- `POST /recrawl-page`
-- `GET /status/:jobId`
-- `GET /jobs/:jobId/pages`
-- `GET /pages/by-ids`
-- `GET /page`
+- `GET /projects`, `POST /projects`
+- `POST /crawl`, `POST /recrawl-page`
+- `GET /status/:jobId`, `GET /jobs/:jobId/pages`
+- `GET /pages/by-ids`, `GET /page`
 - `GET /elements`
-- `GET /styles/global`
-- `GET /styles/element`
-- `POST /auth-session`
+- `GET /styles/global`, `GET /styles/element`
+- `POST /auth-session`, `POST /progress/:jobId`
 
 ## Data Model
 
-The DB-backed model replaced the earlier manifest-file approach.
+Stored in SQLite at `packages/backend/data/sitemapper.db`. Schema defined in `src/schema.ts` via Drizzle ORM.
 
-`Project`
+`projects` — `id`, `name`, timestamps
 
-- `name`
-- timestamps
+`pages` — `id`, `projectId`, `url`, `title`, `screenshotPaths` (JSON), `interactiveElements` (JSON), `globalStyles` (JSON), `lastCrawledAt`, `lastCrawlJobId`, timestamps. Unique compound index on `(projectId, url)` — recrawling updates the same logical record.
 
-`Page`
+`elements` — `id`, `pageId`, `projectId`, `type`, `selector`, `tagName`, `classes` (JSON), `bbox` (JSON), `styles` (JSON), `styleTokens` (JSON), accessibility and media/input fields, timestamps. Indexed on `(pageId, type)` and `(projectId, type)`.
 
-- `projectId`
-- `url`
-- `title`
-- `screenshotPaths`
-- `interactiveElements`
-- `globalStyles`
-- `lastCrawledAt`
-- `lastCrawlJobId`
+Array and object fields (`screenshotPaths`, `interactiveElements`, `globalStyles`, `styles`, `classes`, `bbox`, `styleTokens`) are stored as TEXT and must be `JSON.parse`/`JSON.stringify`d at the DB boundary. Serialization helpers `serializePage` and `serializeElement` in `manifestBuilder.ts` handle this for API responses.
 
-`Element`
-
-- `projectId`
-- `pageId`
-- `type`
-- `selector`
-- `tagName`
-- `elementId`
-- `classes`
-- `bbox`
-- `href`
-- `text`
-- `styles`
-- `styleTokens`
-- accessibility and media/input metadata
-
-`Page` has a unique compound index on `projectId + url`, so a recrawl updates the same logical page.
+IDs are auto-increment integers. All API responses include `_id: String(id)` for plugin compatibility.
 
 ## Crawl Flow
 
-1. The plugin sends `POST /crawl` with URL, project ID, and crawl settings.
-2. The API validates the project and queues a BullMQ job.
-3. The worker pulls the job and calls `runCrawler`.
-4. The crawler opens Chromium, navigates pages, handles delays/auth/CAPTCHA checks, scrolls for lazy loading, and captures screenshots.
-5. Screenshots are sliced and written to the local screenshot directory.
-6. Page data is upserted into MongoDB.
-7. Existing elements for that page are deleted and replaced with fresh extracted elements.
-8. The worker writes visited page IDs and URLs back to the job.
-9. The plugin polls `/status/:jobId`, then fetches only the visited pages when possible.
-10. The plugin renders Figma pages and stores DB IDs in Figma plugin data.
+1. Plugin sends `POST /crawl` with URL, project ID, and crawl settings.
+2. API validates the project exists in SQLite and queues a BullMQ job.
+3. Worker pulls the job and calls `runCrawler`.
+4. Crawler opens Chromium, navigates pages, handles delays/auth/CAPTCHA, scrolls for lazy loading, captures screenshots.
+5. Screenshots are sliced to ≤4096 px height and written to `packages/backend/screenshots/`.
+6. Each page is upserted via `INSERT ... ON CONFLICT(project_id, url) DO UPDATE`.
+7. Existing elements for that page are deleted and replaced with freshly extracted elements in batches of 200.
+8. Worker writes visited page IDs (integer strings) and URLs back to the BullMQ job record.
+9. Plugin polls `GET /status/:jobId`, then fetches `GET /jobs/:jobId/pages` when complete.
+10. Plugin renders Figma pages and stores `PAGE_ID` (integer string) and `URL` in Figma plugin data.
 
 ## Plugin
 
-The plugin lives in `packages/plugin`.
+The plugin lives in `packages/plugin` and has two separate build targets:
+
+- `vite.config.ts` — builds the React UI (`src/ui.tsx`) into a single self-contained HTML file.
+- `vite.code.config.ts` — builds the Figma sandbox code (`src/main.ts`) as an ES module.
 
 Main areas:
 
 - `src/ui.tsx`: React entry point.
-- `src/main.ts`: Figma plugin entry point.
-- `src/components/*`: UI views and tabs.
-- `src/hooks/*`: UI-side state/workflows.
-- `src/store/atoms.ts`: Jotai state.
-- `src/plugin/handlers/*`: Figma-side message handlers.
-- `src/plugin/services/*`: backend API client, badge scanning, target page rendering.
-- `src/figmaRendering/*`: sitemap/screenshot rendering helpers.
+- `src/main.ts`: Figma plugin sandbox entry point.
+- `src/components/`: UI views and tabs (Crawling, Markup, Flows, Styling).
+- `src/hooks/`: UI-side state and workflow hooks.
+- `src/store/atoms.ts`: Jotai global state.
+- `src/plugin/handlers/`: Figma-side message handlers.
+- `src/plugin/services/apiClient.ts`: all fetch calls to the backend.
+- `src/plugin/constants.ts`: compile-time constants including `BACKEND_URL`.
+- `src/figmaRendering/`: sitemap/screenshot/overlay canvas rendering.
 
-The UI has four main tabs:
+## Plugin↔Canvas Bridge
 
-- Crawling
-- Markup
-- Flows
-- Styling
+The Figma-side code stores metadata on generated pages and frames using `figma.currentPage.setPluginData(key, value)`. Keys in use:
 
-The Figma-side code stores metadata on generated pages and nodes using plugin data keys such as `URL`, `PAGE_ID`, `SCREENSHOT_WIDTH`, and element IDs. That metadata is the bridge between Figma canvas objects and MongoDB records.
+- `URL` — the crawled page URL
+- `PAGE_ID` — the integer DB ID as a string
+- `SCREENSHOT_WIDTH` — original screenshot width
 
-## Rendering Flow
+This metadata is the only link between Figma canvas objects and DB records. These key names must not change without updating all handler code that reads them.
 
-Automatic rendering after crawl:
+## Rendering Flows
 
-1. Poll job status until complete.
-2. Read `visitedPageIds` from the completed job.
-3. Build a manifest-like tree from those pages.
-4. Render screenshot pages and an index page.
-5. Store project/page metadata in Figma plugin data.
+**After crawl:** poll job → read `visitedPageIds` → fetch pages/elements → render screenshot frames and index page → store plugin data.
 
-Snapshot rendering:
+**Snapshot:** fetch all project pages from DB → render full sitemap.
 
-1. Fetch all project pages and elements.
-2. Rebuild a full sitemap from persisted DB records.
-3. Render the full project into Figma.
+**Markup:** read `PAGE_ID` from active Figma page → fetch elements → filter by category → draw overlays in a `Page Overlay` frame.
 
-Markup rendering:
+**Flows:** scan badge links on current page → check if target URL exists in DB → render from DB or trigger single-page recrawl.
 
-1. Read `PAGE_ID` from the active generated Figma page.
-2. Fetch elements for that page.
-3. Filter by requested element categories.
-4. Draw highlight rectangles and badges in the `Page Overlay` frame.
+## Known Gaps
 
-Flow rendering:
-
-1. Scan badges/links from the current Figma page.
-2. User selects a link.
-3. Plugin checks whether the target page exists in MongoDB.
-4. If it exists, render from DB.
-5. If not, queue a single-page recrawl and render the result.
-
-## Known Architecture Gaps
-
-- `BACKEND_URL` is currently compiled into the plugin and defaults to `http://localhost:3006`.
-- Redis connection currently uses default local settings instead of `REDIS_URL`.
-- Screenshot storage is local in the current code. Some older notes mention S3/object storage, but that is not reflected in the current crawler.
-- There is no formal auth/rate-limit layer on the API.
-- The styling tab workflow exists but needs a fresh validation pass.
+- `BACKEND_URL` is compiled into the plugin via `src/plugin/constants.ts`. There is no runtime configuration.
+- Screenshots are served over HTTP from `localhost:3006`. Figma requires HTTPS for reliable image loading outside local dev.
+- No authentication or rate limiting on the API.
+- Styling tab workflow needs a validation pass.

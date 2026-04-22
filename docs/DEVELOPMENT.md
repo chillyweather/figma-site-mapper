@@ -2,10 +2,9 @@
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm
-- Redis running locally on `localhost:6379`
-- MongoDB Atlas or local MongoDB
+- Docker (for Redis)
 - Figma Desktop
 
 ## Install
@@ -16,118 +15,104 @@ pnpm install
 
 ## Environment
 
-For local pnpm workflows, create `packages/backend/.env`:
+Create `packages/backend/.env`:
 
 ```env
-MONGO_URI="mongodb+srv://username:password@cluster.mongodb.net/dev?retryWrites=true&w=majority"
+REDIS_URL="redis://localhost:6379"
+PUBLIC_URL="http://localhost:3006"
 NODE_ENV="development"
 ```
 
-For Docker Compose workflows, create a root `.env` from `.env.example`.
+## Startup
 
-Current caveat: `packages/backend/src/queue.ts` does not read `REDIS_URL` yet. Local development expects Redis at the default local Redis address unless that code is fixed.
+Start Redis (required for the job queue):
 
-## Run
+```bash
+docker compose up redis -d
+```
 
-Run backend and plugin watcher together:
+Run everything in parallel (backend API + worker + plugin watcher):
 
 ```bash
 pnpm dev
 ```
 
-Run one side only:
+Run individual pieces:
 
 ```bash
-pnpm dev:backend
-pnpm dev:plugin
+pnpm dev:backend   # Fastify API on :3006
+pnpm dev:worker    # BullMQ worker
+pnpm dev:plugin    # Vite plugin watcher
 ```
 
-Build plugin:
+Build plugin for production:
 
 ```bash
 pnpm build:plugin
-```
-
-Build backend:
-
-```bash
-pnpm --filter backend build
 ```
 
 ## Load the Figma Plugin
 
 1. Run `pnpm build:plugin` or `pnpm dev:plugin`.
 2. Open Figma Desktop.
-3. Go to `Plugins -> Development -> Import plugin from manifest`.
+3. Go to `Plugins → Development → Import plugin from manifest`.
 4. Select `packages/plugin/manifest.json`.
 5. Run the plugin from Figma's development plugins menu.
 
-The plugin currently points at `http://localhost:3006` through `packages/plugin/src/plugin/constants.ts`.
+The plugin calls `http://localhost:3006` — configured in `packages/plugin/src/plugin/constants.ts`.
 
-## Backend Local Checks
+## Sanity Checks
 
-Health check:
+Backend health:
 
 ```bash
 curl http://localhost:3006/
+# {"hello":"world"}
 ```
 
-Expected response:
-
-```json
-{"hello":"world"}
-```
-
-Redis check:
+Redis:
 
 ```bash
 redis-cli ping
+# PONG
 ```
 
-Expected response:
+## Logs
 
-```text
-PONG
-```
+Backend and worker logs stream to the console and are written to `packages/backend/logs/app.log` (daily rotation, last 2 days kept). Check that file when debugging background worker issues.
 
 ## Common Workflows
 
-Create/select a project in the plugin, then run a crawl from the Crawling tab. On completion the plugin should render generated screenshot pages and an index page in Figma.
+Create/select a project in the plugin, then run a crawl from the Crawling tab. On completion the plugin renders screenshot pages and an index page in Figma.
 
-Use the Markup tab on a generated screenshot page. The tab depends on the Figma page having a stored `PAGE_ID` and a `Page Overlay` frame.
+Use the Markup tab on a generated screenshot page. The tab requires the Figma page to have a stored `PAGE_ID` plugin data key and a `Page Overlay` frame.
 
-Use the Flows tab after link badges exist on the current page. The flow handler tries the database first and falls back to a single-page recrawl for missing target URLs.
+Use the Flows tab after link badges exist on the current page. The flow handler queries the database first and falls back to a single-page recrawl for missing target URLs.
 
-Use the Styling tab after a crawl with style extraction enabled. This area needs a validation pass before relying on it for serious work.
+Use the Styling tab after a crawl with style extraction enabled. This area needs a validation pass before relying on it.
 
 ## Debugging Notes
 
-Screenshots:
+**Screenshots**: saved under `packages/backend/screenshots/`. Figma may reject HTTP image URLs in non-local contexts — HTTPS or a tunnel is needed for reliable image loading inside Figma.
 
-- Current code saves screenshots locally under the backend screenshot directory.
-- Figma may reject or warn about HTTP screenshot URLs. HTTPS deployment or a tunnel is usually needed for reliable image fetches inside Figma.
+**Crawls**: Playwright/Chromium is memory-heavy. Style extraction can process thousands of DOM nodes. The worker is configured for one crawl at a time.
 
-Crawls:
-
-- Playwright/Chromium is memory-heavy.
-- Style extraction can process thousands of DOM nodes and increase memory use.
-- The worker is configured for one crawl at a time.
-
-Builds:
-
-- This repo uses pnpm workspaces.
-- `pnpm-lock.yaml` is currently ignored by `.gitignore`; Docker/CI expects should be reviewed before production work.
+**Database**: SQLite file lives at `packages/backend/data/sitemapper.db`. It is created automatically on first start. Both files are git-ignored.
 
 ## Source Map
 
 Backend:
 
 ```text
-packages/backend/src/app.ts
-packages/backend/src/crawler.ts
-packages/backend/src/worker.ts
-packages/backend/src/queue.ts
-packages/backend/src/models/
+packages/backend/src/index.ts       API entry point
+packages/backend/src/worker.ts      Worker entry point
+packages/backend/src/logger.ts      Pino logger + console override
+packages/backend/src/db.ts          SQLite connection + table creation
+packages/backend/src/schema.ts      Drizzle table definitions
+packages/backend/src/app.ts         Fastify routes
+packages/backend/src/queue.ts       BullMQ queue
+packages/backend/src/crawler.ts     Playwright/Crawlee crawler
+packages/backend/src/services/manifestBuilder.ts  DB query + serialization helpers
 ```
 
 Plugin UI:
