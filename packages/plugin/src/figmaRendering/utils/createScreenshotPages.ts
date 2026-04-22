@@ -129,11 +129,14 @@ function isImageTooLarge(imageBytes: Uint8Array): boolean {
   return imageBytes.length > MAX_SIZE;
 }
 
-function findExistingPageByUrl(url: string): PageNode | null {
+function findExistingPageByUrl(url: string, projectId?: string): PageNode | null {
   const matches: PageNode[] = [];
   const pages = figma.root.children;
   for (const pageNode of pages) {
     if (pageNode.type !== "PAGE") {
+      continue;
+    }
+    if (projectId && pageNode.getPluginData("PROJECT_ID") !== projectId) {
       continue;
     }
     if (pageNode.getPluginData("URL") === url) {
@@ -514,7 +517,8 @@ export async function createScreenshotPages(
   screenshotWidth: number = 1440,
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
-  highlightElementFilters?: any
+  highlightElementFilters?: any,
+  projectId?: string
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
   console.log(
@@ -589,11 +593,12 @@ export async function createScreenshotPages(
   }
 
   for (const page of pages) {
-    const existingPage = findExistingPageByUrl(page.url);
+    const existingPage = findExistingPageByUrl(page.url, projectId);
     const newPage = existingPage !== null ? existingPage : figma.createPage();
 
     newPage.name = page.title.substring(0, 50);
     newPage.setPluginData("URL", page.url);
+    newPage.setPluginData("PROJECT_ID", projectId || "");
     if (page.pageId) {
       newPage.setPluginData("PAGE_ID", page.pageId);
     } else {

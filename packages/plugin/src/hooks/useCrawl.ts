@@ -265,6 +265,24 @@ export function useCrawl() {
             });
           }, 3000);
         }
+
+        if (msg.status === "failed" || msg.status === "error") {
+          if (intervalRef.current) {
+            window.clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+
+          const errorMessage =
+            msg.detailedProgress?.stage || `Job ${msg.jobId}: ${msg.status}`;
+
+          setIsLoading(false);
+          setJobId(null);
+          setCrawlProgress({
+            status: "error",
+            message: errorMessage,
+            progress: 100,
+          });
+        }
       }
 
       if (msg.type === "auth-session-status") {
@@ -378,7 +396,14 @@ export function useCrawl() {
     if (jobId && !intervalRef.current) {
       intervalRef.current = window.setInterval(() => {
         parent.postMessage(
-          { pluginMessage: { type: "get-status", jobId } },
+          {
+            pluginMessage: {
+              type: "get-status",
+              jobId,
+              screenshotWidth: parseScreenshotWidth(settings.screenshotWidth),
+              detectInteractiveElements: settings.detectInteractiveElements,
+            },
+          },
           "*"
         );
       }, 3000);
@@ -390,7 +415,7 @@ export function useCrawl() {
         intervalRef.current = null;
       }
     };
-  }, [jobId]);
+  }, [jobId, settings.screenshotWidth, settings.detectInteractiveElements]);
 
   return {
     isLoading,

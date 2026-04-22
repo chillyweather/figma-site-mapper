@@ -21,6 +21,7 @@ pid.[0-9]*.log.unsupported
 /packages/plugin/dist
 /packages/backend/screenshots/
 /packages/backend/storage/
+/packages/backend/data/
 /coverage
 
 # Environment Variables

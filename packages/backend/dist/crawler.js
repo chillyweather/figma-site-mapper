@@ -977,6 +977,20 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             });
                         }
                     });
+                    // Sort elements by visual position (top-to-bottom, left-to-right)
+                    elements.sort((a, b) => {
+                        if (Math.abs(a.y - b.y) < 5) {
+                            // If elements are on the same line, sort by x position
+                            return a.x - b.x;
+                        }
+                        // Otherwise sort by y position
+                        return a.y - b.y;
+                    });
+                    // Debug: Log element order
+                    console.log("🔍 Element order after sorting:");
+                    elements.forEach((el, index) => {
+                        console.log(`  ${index + 1}. ${el.type}: "${el.text}" -> ${el.href}`);
+                    });
                     return elements;
                 });
                 log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
@@ -1061,7 +1075,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     const pageId = pageDoc._id;
                     visitedPageIds.add(pageId.toString());
                     await Element.deleteMany({ pageId });
-                    const elementsToInsert = styleData?.elements?.reduce((acc, element) => {
+                    const styleElementsToInsert = styleData?.elements?.reduce((acc, element) => {
                         const { boundingBox } = element;
                         if (!boundingBox) {
                             return acc;
@@ -1100,6 +1114,30 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         });
                         return acc;
                     }, []) ?? [];
+                    const interactiveElementsToInsert = styleElementsToInsert.length === 0
+                        ? interactiveElements.map((element) => ({
+                            pageId,
+                            projectId: projectObjectId,
+                            type: element.type,
+                            selector: "",
+                            tagName: element.type === "link" ? "a" : "button",
+                            classes: [],
+                            bbox: {
+                                x: element.x,
+                                y: element.y,
+                                width: element.width,
+                                height: element.height,
+                            },
+                            href: element.href,
+                            text: element.text,
+                            styles: {},
+                            styleTokens: [],
+                        }))
+                        : [];
+                    const elementsToInsert = [
+                        ...styleElementsToInsert,
+                        ...interactiveElementsToInsert,
+                    ];
                     if (elementsToInsert && elementsToInsert.length > 0) {
                         await Element.insertMany(elementsToInsert, { ordered: false });
                         log.info(`Persisted ${elementsToInsert.length} elements for ${request.url}`);
@@ -1381,6 +1419,7 @@ export async function openAuthSession(url) {
             "--disable-web-security",
             "--disable-features=IsolateOrigins,site-per-process",
             "--disable-site-isolation-trials",
+            "--disable-site-isolation-trials",
         ],
     });
     const context = await browser.newContext({
@@ -1396,43 +1435,102 @@ export async function openAuthSession(url) {
             get: () => false,
         });
     });
+    let lastSnapshotCount = 0;
+    const captureCookies = async () => {
+        try {
+            const allCookies = await context.cookies();
+            if (allCookies.length !== lastSnapshotCount) {
+                console.log(`🍪 Snapshot captured with ${allCookies.length} cookies`);
+                lastSnapshotCount = allCookies.length;
+            }
+            return allCookies.map((cookie) => ({
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain,
+            }));
+        }
+        catch (error) {
+            console.warn(`⚠️ Failed to capture cookies during auth session: ${error instanceof Error ? error.message : String(error)}`);
+            return [];
+        }
+    };
+    let cookies = [];
+    let browserClosed = false;
+    let pollInterval = null;
+    let finalizingSession = null;
+    const stopPolling = () => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    };
+    const finalizeSession = async (reason) => {
+        if (finalizingSession) {
+            return finalizingSession;
+        }
+        finalizingSession = (async () => {
+            if (browserClosed)
+                return;
+            console.log(`🛑 Finalizing auth session due to: ${reason}`);
+            browserClosed = true;
+            stopPolling();
+            const latestCookies = await captureCookies();
+            if (latestCookies.length > 0) {
+                cookies = latestCookies;
+                console.log(`📥 Final snapshot captured ${latestCookies.length} cookies`);
+            }
+            else {
+                console.log(`⚠️ Final snapshot still empty`);
+            }
+            try {
+                await browser.close();
+            }
+            catch (error) {
+                console.warn(`⚠️ Error while closing auth browser: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        })();
+        return finalizingSession;
+    };
+    // Ensure we capture cookies if the user closes the tab or window
+    page.on("close", () => {
+        console.log("🪟 Page closed by user");
+        void finalizeSession("page-close");
+    });
+    context.on("close", () => {
+        console.log("🧩 Browser context closed");
+        void finalizeSession("context-close");
+    });
+    // Detect when the browser exits (e.g., Cmd+Q or Force Quit)
+    browser.on("disconnected", () => {
+        console.log("💥 Browser disconnected (quit/force quit)");
+        browserClosed = true;
+        stopPolling();
+    });
     try {
         // Navigate to the page
         await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
         console.log(`✅ Browser opened at ${url}`);
-        console.log(`👤 Please complete login/CAPTCHA and close the browser when done...`);
-        // Keep polling for cookies and wait for browser to close
-        let cookies = [];
-        let browserClosed = false;
-        // Set up listener for browser disconnect
-        browser.on("disconnected", () => {
-            browserClosed = true;
-        });
-        // Poll for cookies every second and capture the latest
-        const pollInterval = setInterval(async () => {
-            try {
-                const allCookies = await context.cookies();
-                cookies = allCookies.map((cookie) => ({
-                    name: cookie.name,
-                    value: cookie.value,
-                    domain: cookie.domain,
-                }));
-            }
-            catch (error) {
-                // Browser/context might be closing, stop polling
-                clearInterval(pollInterval);
+        console.log(`👤 Please complete login/CAPTCHA, then close the browser window to finish (Cmd+Q / Ctrl+Q).`);
+        // Poll for cookies every second and capture the latest snapshot
+        pollInterval = setInterval(async () => {
+            const snapshot = await captureCookies();
+            if (snapshot.length > 0) {
+                cookies = snapshot;
             }
         }, 1000);
-        // Wait for browser to be closed
+        // Wait for browser to be closed (either by the user or programmatically)
         await new Promise((resolve) => {
             const checkClosed = setInterval(() => {
                 if (browserClosed) {
                     clearInterval(checkClosed);
-                    clearInterval(pollInterval);
+                    stopPolling();
                     resolve();
                 }
             }, 100);
         });
+        if (finalizingSession) {
+            await finalizingSession;
+        }
         console.log(`🔒 Browser closed by user`);
         console.log(`🍪 Captured ${cookies.length} cookies`);
         return { cookies };
@@ -1440,5 +1538,8 @@ export async function openAuthSession(url) {
     catch (error) {
         console.error(`❌ Auth session error: ${error instanceof Error ? error.message : String(error)}`);
         throw error;
+    }
+    finally {
+        await finalizeSession("finally-cleanup");
     }
 }

@@ -93,7 +93,25 @@ export async function startCrawl(
     }),
   });
 
-  return response.json();
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") {
+        message = data.error;
+      }
+    } catch {
+      // Keep HTTP status fallback.
+    }
+    throw new Error(`Failed to queue crawl: ${message}`);
+  }
+
+  const data = await response.json();
+  if (!data || typeof data.jobId !== "string") {
+    throw new Error("Backend did not return a crawl job ID");
+  }
+
+  return { jobId: data.jobId };
 }
 
 /**
@@ -131,6 +149,11 @@ export async function recrawlPage(
  */
 export async function getJobStatus(jobId: string): Promise<any> {
   const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch job status: ${response.status} ${response.statusText}`
+    );
+  }
   return response.json();
 }
 

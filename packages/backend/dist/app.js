@@ -12,6 +12,34 @@ import { Element } from "./models/Element.js";
 import { buildManifestForPageIds } from "./services/manifestBuilder.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+function getUrlLookupCandidates(rawUrl) {
+    const candidates = new Set();
+    const add = (value) => {
+        if (value && value.trim()) {
+            candidates.add(value.trim());
+        }
+    };
+    add(rawUrl);
+    try {
+        const parsed = new URL(rawUrl);
+        parsed.hash = "";
+        add(parsed.toString());
+        if (parsed.pathname !== "/") {
+            const originalPath = parsed.pathname;
+            if (originalPath.endsWith("/")) {
+                parsed.pathname = originalPath.replace(/\/+$/, "") || "/";
+            }
+            else {
+                parsed.pathname = `${originalPath}/`;
+            }
+            add(parsed.toString());
+        }
+    }
+    catch {
+        // Keep the raw candidate only for non-URL values.
+    }
+    return Array.from(candidates);
+}
 export async function buildServer() {
     const server = Fastify({
         logger: true,
@@ -306,7 +334,9 @@ export async function buildServer() {
         if (url || pageId) {
             const query = { projectId: projectObjectId };
             if (url) {
-                query.url = url;
+                const urlCandidates = getUrlLookupCandidates(url);
+                query.url =
+                    urlCandidates.length > 1 ? { $in: urlCandidates } : urlCandidates[0];
             }
             if (pageId) {
                 if (!Types.ObjectId.isValid(pageId)) {

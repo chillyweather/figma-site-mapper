@@ -179,7 +179,7 @@ async function createIndexPage(
 }
 
 export async function renderSitemap(
-  manifestData: { tree: TreeNode | null },
+  manifestData: { tree: TreeNode | null; projectId?: string },
   screenshotWidth: number = 1440,
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
@@ -210,7 +210,8 @@ export async function renderSitemap(
     screenshotWidth,
     detectInteractiveElements,
     highlightAllElements,
-    highlightElementFilters
+    highlightElementFilters,
+    manifestData.projectId
   );
 
   // Notify progress: Creating index page (80-90%)

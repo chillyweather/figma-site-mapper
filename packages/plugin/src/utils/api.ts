@@ -54,10 +54,28 @@ export async function startCrawl(params: Omit<CrawlStartMessage, "type">) {
     }),
   });
 
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") {
+        message = data.error;
+      }
+    } catch {
+      // Keep HTTP status fallback.
+    }
+    throw new Error(`Failed to queue crawl: ${message}`);
+  }
+
   return response.json();
 }
 
 export async function getJobStatus(jobId: string) {
   const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch job status: ${response.status} ${response.statusText}`
+    );
+  }
   return response.json();
 }

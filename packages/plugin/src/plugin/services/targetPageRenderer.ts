@@ -111,6 +111,17 @@ export async function renderTargetPage(
     );
   }
 
+  if (manifestData.projectId) {
+    try {
+      flowPage.setPluginData("PROJECT_ID", manifestData.projectId);
+      console.log(
+        `🧭 Stored PROJECT_ID=${manifestData.projectId} on flow page ${flowPage.name}`
+      );
+    } catch (error) {
+      console.warn("Unable to persist PROJECT_ID on flow page", error);
+    }
+  }
+
   if (pageData.url || manifestData.startUrl) {
     try {
       const urlToPersist = pageData.url || manifestData.startUrl;

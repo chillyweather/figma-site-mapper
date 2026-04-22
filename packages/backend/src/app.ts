@@ -3,25 +3,59 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import { fileURLToPath } from "url";
+import { eq, and, or, inArray, desc } from "drizzle-orm";
+import { db } from "./db.js";
+import { projects, pages, elements } from "./schema.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
-import { Types } from "mongoose";
-import { Project } from "./models/Project.js";
-import { Page } from "./models/Page.js";
-import { Element } from "./models/Element.js";
-import { buildManifestForPageIds } from "./services/manifestBuilder.js";
+import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export async function buildServer(): Promise<FastifyInstance> {
-  const server = Fastify({
-    logger: true,
-  });
+function isValidId(id: string | undefined | null): id is string {
+  if (!id) return false;
+  const n = parseInt(id, 10);
+  return !isNaN(n) && n > 0 && String(n) === id;
+}
 
-  await server.register(cors, {
-    origin: "*",
-  });
+function toId(id: string): number {
+  return parseInt(id, 10);
+}
+
+function getUrlLookupCandidates(rawUrl: string): string[] {
+  const candidates = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    if (value && value.trim()) candidates.add(value.trim());
+  };
+
+  add(rawUrl);
+
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.hash = "";
+    add(parsed.toString());
+
+    if (parsed.pathname !== "/") {
+      const originalPath = parsed.pathname;
+      if (originalPath.endsWith("/")) {
+        parsed.pathname = originalPath.replace(/\/+$/, "") || "/";
+      } else {
+        parsed.pathname = `${originalPath}/`;
+      }
+      add(parsed.toString());
+    }
+  } catch {
+    // Keep the raw candidate only for non-URL values.
+  }
+
+  return Array.from(candidates);
+}
+
+export async function buildServer(): Promise<FastifyInstance> {
+  const server = Fastify({ logger: true });
+
+  await server.register(cors, { origin: "*" });
 
   await server.register(fastifyStatic, {
     root: path.join(__dirname, "..", "static"),
@@ -35,14 +69,21 @@ export async function buildServer(): Promise<FastifyInstance> {
     });
   });
 
-  server.get("/", async () => {
-    return { hello: "world" };
-  });
+  server.get("/", async () => ({ hello: "world" }));
 
-  // Project endpoints
+  // ── Projects ──────────────────────────────────────────────────────────────
+
   server.get("/projects", async () => {
-    const projects = await Project.find().sort({ createdAt: -1 });
-    return { projects };
+    const rows = db.select().from(projects).orderBy(desc(projects.createdAt)).all();
+    return {
+      projects: rows.map((r) => ({
+        _id: String(r.id),
+        id: r.id,
+        name: r.name,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      })),
+    };
   });
 
   server.post("/projects", async (request, reply) => {
@@ -52,10 +93,25 @@ export async function buildServer(): Promise<FastifyInstance> {
       return reply.status(400).send({ error: "Project name is required" });
     }
 
-    const project = new Project({ name: name.trim() });
-    await project.save();
-    return { project };
+    const now = new Date();
+    const [row] = db
+      .insert(projects)
+      .values({ name: name.trim(), createdAt: now, updatedAt: now })
+      .returning()
+      .all();
+
+    return {
+      project: {
+        _id: String(row!.id),
+        id: row!.id,
+        name: row!.name,
+        createdAt: row!.createdAt.toISOString(),
+        updatedAt: row!.updatedAt.toISOString(),
+      },
+    };
   });
+
+  // ── Job progress & status ─────────────────────────────────────────────────
 
   server.post("/progress/:jobId", async (request, reply) => {
     const { jobId } = request.params as { jobId: string };
@@ -69,9 +125,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       };
 
     const job = await crawlQueue.getJob(jobId);
-    if (!job) {
-      return reply.status(404).send({ error: "Job not found" });
-    }
+    if (!job) return reply.status(404).send({ error: "Job not found" });
 
     await job.updateData({
       ...job.data,
@@ -92,59 +146,38 @@ export async function buildServer(): Promise<FastifyInstance> {
     const { jobId } = request.params as { jobId: string };
 
     const job = await crawlQueue.getJob(jobId);
-
-    if (!job) {
-      return reply.status(404).send({ error: "Job not found" });
-    }
+    if (!job) return reply.status(404).send({ error: "Job not found" });
 
     const state = await job.getState();
-    const progress = job.progress as number;
+    const jobData = job.data as any;
+    const detailedProgress = jobData.progress ?? null;
 
     let status: string;
-    let detailedProgress: any = null;
-
-    const jobData = job.data as any;
-    if (jobData.progress) {
-      detailedProgress = jobData.progress;
-    }
-
     switch (state) {
-      case "completed":
-        status = "completed";
-        break;
-      case "failed":
-        status = "failed";
-        break;
-      case "active":
-        status = "processing";
-        break;
-      default:
-        status = "pending";
+      case "completed": status = "completed"; break;
+      case "failed":    status = "failed";    break;
+      case "active":    status = "processing"; break;
+      default:          status = "pending";
     }
 
     return {
       jobId,
       status,
-      progress:
-        detailedProgress || (typeof progress === "number" ? progress : 0),
+      progress: detailedProgress ?? (typeof job.progress === "number" ? job.progress : 0),
       detailedProgress,
       result: {
         projectId: jobData.projectId ?? null,
         detectInteractiveElements: jobData.detectInteractiveElements !== false,
         startUrl: jobData.url ?? null,
         fullRefresh: jobData.fullRefresh === true,
-        visitedUrls: Array.isArray(jobData.visitedUrls)
-          ? jobData.visitedUrls
-          : [],
-        visitedPageIds: Array.isArray(jobData.visitedPageIds)
-          ? jobData.visitedPageIds
-          : [],
+        visitedUrls: Array.isArray(jobData.visitedUrls) ? jobData.visitedUrls : [],
+        visitedPageIds: Array.isArray(jobData.visitedPageIds) ? jobData.visitedPageIds : [],
         pageCount:
           typeof jobData.pageCount === "number"
             ? jobData.pageCount
             : Array.isArray(jobData.visitedUrls)
-              ? jobData.visitedUrls.length
-              : 0,
+            ? jobData.visitedUrls.length
+            : 0,
         lastCompletedAt: jobData.lastCompletedAt ?? null,
       },
     };
@@ -154,141 +187,67 @@ export async function buildServer(): Promise<FastifyInstance> {
     const { jobId } = request.params as { jobId: string };
 
     const job = await crawlQueue.getJob(jobId);
-    if (!job) {
-      return reply.status(404).send({ error: "Job not found" });
-    }
+    if (!job) return reply.status(404).send({ error: "Job not found" });
 
     const jobState = await job.getState();
     if (jobState !== "completed") {
-      return reply.status(409).send({
-        error: "Job has not completed",
-        state: jobState,
-      });
+      return reply.status(409).send({ error: "Job has not completed", state: jobState });
     }
 
     const jobData = job.data as any;
     const projectId = jobData.projectId;
-    if (!projectId || !Types.ObjectId.isValid(projectId)) {
-      return reply.status(400).send({
-        error: "Job is missing a valid projectId",
-      });
+    if (!isValidId(projectId)) {
+      return reply.status(400).send({ error: "Job is missing a valid projectId" });
     }
 
     const visitedPageIds: string[] = Array.isArray(jobData.visitedPageIds)
-      ? jobData.visitedPageIds.filter(
-          (value: unknown): value is string => typeof value === "string"
-        )
+      ? jobData.visitedPageIds.filter((v: unknown): v is string => typeof v === "string")
       : [];
 
     if (visitedPageIds.length === 0) {
-      return {
-        jobId,
-        projectId,
-        pages: [],
-        elements: [],
-      };
+      return { jobId, projectId, pages: [], elements: [] };
     }
 
     try {
       const manifest = await buildManifestForPageIds(projectId, visitedPageIds);
-      return {
-        jobId,
-        projectId,
-        pages: manifest.pages,
-        elements: manifest.elements,
-      };
+      return { jobId, projectId, pages: manifest.pages, elements: manifest.elements };
     } catch (error) {
-      request.log.error(
-        `Failed to build manifest for job ${jobId}: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return reply.status(500).send({
-        error: "Failed to load job pages",
-      });
+      request.log.error(`Failed to build manifest for job ${jobId}: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to load job pages" });
     }
   });
 
+  // ── Crawl ─────────────────────────────────────────────────────────────────
+
   server.post("/crawl", async (request, reply) => {
     const {
-      url,
-      publicUrl,
-      maxRequestsPerCrawl,
-      deviceScaleFactor,
-      delay,
-      requestDelay,
-      maxDepth,
-      defaultLanguageOnly,
-      sampleSize,
-      showBrowser,
-      detectInteractiveElements,
-      highlightAllElements,
-      projectId,
-      auth,
-      styleExtraction,
-      fullRefresh,
-    } = request.body as {
-      url: string;
-      publicUrl: string;
-      maxRequestsPerCrawl?: number;
-      deviceScaleFactor?: number;
-      delay?: number;
-      requestDelay?: number;
-      maxDepth?: number;
-      defaultLanguageOnly?: boolean;
-      sampleSize?: number;
-      fullRefresh?: boolean;
-      showBrowser?: boolean;
-      detectInteractiveElements?: boolean;
-      highlightAllElements?: boolean;
-      projectId?: string;
-      auth?: {
-        method: "credentials" | "cookies";
-        loginUrl?: string;
-        username?: string;
-        password?: string;
-        cookies?: Array<{ name: string; value: string }>;
-      };
-      styleExtraction?: {
-        enabled: boolean;
-        preset: string;
-        extractInteractiveElements: boolean;
-        extractStructuralElements: boolean;
-        extractTextElements: boolean;
-        extractFormElements: boolean;
-        extractMediaElements: boolean;
-        extractColors: boolean;
-        extractTypography: boolean;
-        extractSpacing: boolean;
-        extractLayout: boolean;
-        extractBorders: boolean;
-        includeSelectors: boolean;
-        includeComputedStyles: boolean;
-      };
-    };
+      url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay,
+      maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements,
+      highlightAllElements, projectId, auth, styleExtraction, fullRefresh,
+    } = request.body as any;
 
     if (!url || !publicUrl) {
-      reply.status(400).send({ error: "URL and publicUrl are required" });
-      return;
+      return reply.status(400).send({ error: "URL and publicUrl are required" });
     }
-
     if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
+      return reply.status(400).send({ error: "projectId is required" });
+    }
+    if (!isValidId(projectId)) {
+      return reply.status(400).send({ error: "Invalid projectId" });
     }
 
-    if (!Types.ObjectId.isValid(projectId)) {
-      reply.status(400).send({ error: "Invalid projectId" });
-      return;
-    }
+    const projectRow = db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, toId(projectId)))
+      .get();
 
-    const projectExists = await Project.exists({ _id: projectId });
-    if (!projectExists) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
+    if (!projectRow) {
+      return reply.status(404).send({ error: "Project not found" });
     }
 
     const job = await crawlQueue.add("crawl", {
-      url,
-      publicUrl,
+      url, publicUrl,
       maxRequestsPerCrawl,
       deviceScaleFactor: deviceScaleFactor || 1,
       delay: delay || 0,
@@ -310,70 +269,31 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   server.post("/recrawl-page", async (request, reply) => {
     const {
-      url,
-      publicUrl,
-      projectId,
-      deviceScaleFactor,
-      delay,
-      requestDelay,
-      auth,
-      styleExtraction,
-    } = request.body as {
-      url: string;
-      publicUrl: string;
-      projectId?: string;
-      deviceScaleFactor?: number;
-      delay?: number;
-      requestDelay?: number;
-      auth?: {
-        method: "credentials" | "cookies";
-        loginUrl?: string;
-        username?: string;
-        password?: string;
-        cookies?: Array<{ name: string; value: string }>;
-      };
-      styleExtraction?: {
-        enabled: boolean;
-        preset: string;
-        extractInteractiveElements: boolean;
-        extractStructuralElements: boolean;
-        extractTextElements: boolean;
-        extractFormElements: boolean;
-        extractMediaElements: boolean;
-        extractColors: boolean;
-        extractTypography: boolean;
-        extractSpacing: boolean;
-        extractLayout: boolean;
-        extractBorders: boolean;
-        includeSelectors: boolean;
-        includeComputedStyles: boolean;
-      };
-    };
+      url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction,
+    } = request.body as any;
 
     if (!url || !publicUrl) {
-      reply.status(400).send({ error: "URL and publicUrl are required" });
-      return;
+      return reply.status(400).send({ error: "URL and publicUrl are required" });
     }
-
     if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
+      return reply.status(400).send({ error: "projectId is required" });
+    }
+    if (!isValidId(projectId)) {
+      return reply.status(400).send({ error: "Invalid projectId" });
     }
 
-    if (!Types.ObjectId.isValid(projectId)) {
-      reply.status(400).send({ error: "Invalid projectId" });
-      return;
-    }
+    const projectRow = db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, toId(projectId)))
+      .get();
 
-    const projectExists = await Project.exists({ _id: projectId });
-    if (!projectExists) {
-      reply.status(404).send({ error: "Project not found" });
-      return;
+    if (!projectRow) {
+      return reply.status(404).send({ error: "Project not found" });
     }
 
     const job = await crawlQueue.add("recrawl-page", {
-      url,
-      publicUrl,
+      url, publicUrl,
       maxRequestsPerCrawl: 1,
       deviceScaleFactor: deviceScaleFactor || 1,
       delay: delay || 0,
@@ -394,15 +314,10 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   server.post("/auth-session", async (request, reply) => {
     const { url } = request.body as { url: string };
-
-    if (!url) {
-      reply.status(400).send({ error: "URL is required" });
-      return;
-    }
+    if (!url) return reply.status(400).send({ error: "URL is required" });
 
     try {
-      const result = await openAuthSession(url);
-      return result;
+      return await openAuthSession(url);
     } catch (error) {
       server.log.error(`Error in auth session: ${error}`);
       return reply.status(500).send({
@@ -412,46 +327,28 @@ export async function buildServer(): Promise<FastifyInstance> {
     }
   });
 
+  // ── Pages ─────────────────────────────────────────────────────────────────
+
   server.get("/pages/by-ids", async (request, reply) => {
-    const { projectId, ids } = request.query as {
-      projectId?: string;
-      ids?: string | string[];
-    };
+    const { projectId, ids } = request.query as { projectId?: string; ids?: string | string[] };
 
-    if (!projectId) {
-      return reply.status(400).send({ error: "projectId is required" });
-    }
-
-    if (!Types.ObjectId.isValid(projectId)) {
-      return reply.status(400).send({ error: "Invalid projectId" });
-    }
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
 
     let idList: string[] = [];
     if (Array.isArray(ids)) {
-      idList = ids.filter(
-        (value): value is string => typeof value === "string"
-      );
+      idList = ids.filter((v): v is string => typeof v === "string");
     } else if (typeof ids === "string") {
-      idList = ids
-        .split(",")
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0);
+      idList = ids.split(",").map((v) => v.trim()).filter((v) => v.length > 0);
     }
 
-    if (idList.length === 0) {
-      return { pages: [], elements: [] };
-    }
+    if (idList.length === 0) return { pages: [], elements: [] };
 
     try {
-      const manifest = await buildManifestForPageIds(projectId, idList);
-      return manifest;
+      return await buildManifestForPageIds(projectId, idList);
     } catch (error) {
-      request.log.error(
-        `Failed to fetch pages by ids: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return reply.status(500).send({
-        error: "Failed to fetch pages",
-      });
+      request.log.error(`Failed to fetch pages by ids: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to fetch pages" });
     }
   });
 
@@ -462,44 +359,53 @@ export async function buildServer(): Promise<FastifyInstance> {
       pageId?: string;
     };
 
-    if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
-    }
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
 
-    if (!Types.ObjectId.isValid(projectId)) {
-      reply.status(400).send({ error: "Invalid projectId" });
-      return;
-    }
-
-    const projectObjectId = new Types.ObjectId(projectId);
+    const projectNumId = toId(projectId);
 
     if (url || pageId) {
-      const query: Record<string, unknown> = { projectId: projectObjectId };
-      if (url) {
-        query.url = url;
+      if (pageId && !isValidId(pageId)) {
+        return reply.status(400).send({ error: "Invalid pageId" });
       }
+
+      let conditions = [eq(pages.projectId, projectNumId)];
+
       if (pageId) {
-        if (!Types.ObjectId.isValid(pageId)) {
-          reply.status(400).send({ error: "Invalid pageId" });
-          return;
+        conditions.push(eq(pages.id, toId(pageId)));
+      }
+
+      if (url) {
+        const candidates = getUrlLookupCandidates(url);
+        if (candidates.length === 1) {
+          conditions.push(eq(pages.url, candidates[0]!));
+        } else {
+          conditions.push(or(...candidates.map((c) => eq(pages.url, c)))!);
         }
-        query._id = new Types.ObjectId(pageId);
       }
 
-      const pageDoc = await Page.findOne(query);
-      if (!pageDoc) {
-        return reply.status(404).send({ error: "Page not found" });
-      }
+      const pageRow = db
+        .select()
+        .from(pages)
+        .where(and(...conditions))
+        .get();
 
-      return { page: pageDoc };
+      if (!pageRow) return reply.status(404).send({ error: "Page not found" });
+
+      return { page: serializePage(pageRow) };
     }
 
-    const pages = await Page.find({ projectId: projectObjectId }).sort({
-      createdAt: -1,
-    });
-    return { pages };
+    const pageRows = db
+      .select()
+      .from(pages)
+      .where(eq(pages.projectId, projectNumId))
+      .orderBy(desc(pages.createdAt))
+      .all();
+
+    return { pages: pageRows.map(serializePage) };
   });
+
+  // ── Elements ──────────────────────────────────────────────────────────────
 
   server.get("/elements", async (request, reply) => {
     const { projectId, pageId, url } = request.query as {
@@ -508,77 +414,58 @@ export async function buildServer(): Promise<FastifyInstance> {
       url?: string;
     };
 
-    if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
-    }
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
 
-    if (!Types.ObjectId.isValid(projectId)) {
-      reply.status(400).send({ error: "Invalid projectId" });
-      return;
-    }
-
-    const projectObjectId = new Types.ObjectId(projectId);
-
-    let resolvedPageId: Types.ObjectId | null = null;
+    const projectNumId = toId(projectId);
+    let resolvedPageId: number | null = null;
 
     if (pageId) {
-      if (!Types.ObjectId.isValid(pageId)) {
-        reply.status(400).send({ error: "Invalid pageId" });
-        return;
-      }
-      resolvedPageId = new Types.ObjectId(pageId);
+      if (!isValidId(pageId)) return reply.status(400).send({ error: "Invalid pageId" });
+      resolvedPageId = toId(pageId);
     } else if (url) {
-      const pageDoc = await Page.findOne({
-        projectId: projectObjectId,
-        url,
-      }).select({ _id: 1 });
+      const pageRow = db
+        .select({ id: pages.id })
+        .from(pages)
+        .where(and(eq(pages.projectId, projectNumId), eq(pages.url, url)))
+        .get();
 
-      if (!pageDoc) {
-        return reply.status(404).send({ error: "Page not found" });
-      }
-
-      resolvedPageId = pageDoc._id as Types.ObjectId;
+      if (!pageRow) return reply.status(404).send({ error: "Page not found" });
+      resolvedPageId = pageRow.id;
     }
 
-    const query: Record<string, unknown> = {
-      projectId: projectObjectId,
-    };
+    const conditions = resolvedPageId !== null
+      ? and(eq(elements.projectId, projectNumId), eq(elements.pageId, resolvedPageId))
+      : eq(elements.projectId, projectNumId);
 
-    if (resolvedPageId) {
-      query.pageId = resolvedPageId;
-    }
-
-    const elements = await Element.find(query).sort({ createdAt: 1 });
-    return { elements };
+    const elementRows = db.select().from(elements).where(conditions).all();
+    return { elements: elementRows.map(serializeElement) };
   });
+
+  // ── Styles ────────────────────────────────────────────────────────────────
 
   server.get("/styles/global", async (request, reply) => {
     const { projectId } = request.query as { projectId?: string };
 
-    if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
-    }
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
 
-    if (!Types.ObjectId.isValid(projectId)) {
-      reply.status(400).send({ error: "Invalid projectId" });
-      return;
-    }
-
-    const projectObjectId = new Types.ObjectId(projectId);
-
-    const pages = await Page.find({ projectId: projectObjectId }).select({
-      url: 1,
-      title: 1,
-      globalStyles: 1,
-    });
+    const pageRows = db
+      .select({
+        id: pages.id,
+        url: pages.url,
+        title: pages.title,
+        globalStyles: pages.globalStyles,
+      })
+      .from(pages)
+      .where(eq(pages.projectId, toId(projectId)))
+      .all();
 
     const cssVariables: Record<string, string> = {};
     const tokens = new Set<string>();
 
-    const pageSummaries = pages.map((page) => {
-      const pageStyles = (page.globalStyles ?? {}) as {
+    const pageSummaries = pageRows.map((page) => {
+      const pageStyles = (page.globalStyles ? JSON.parse(page.globalStyles) : {}) as {
         cssVariables?: Record<string, string>;
         tokens?: string[];
       };
@@ -588,29 +475,20 @@ export async function buildServer(): Promise<FastifyInstance> {
           cssVariables[key] = value;
         }
       }
-
       if (pageStyles.tokens) {
-        for (const token of pageStyles.tokens) {
-          tokens.add(token);
-        }
+        for (const token of pageStyles.tokens) tokens.add(token);
       }
 
       return {
-        pageId: page._id,
+        pageId: String(page.id),
         url: page.url,
         title: page.title,
-        cssVariableCount: pageStyles.cssVariables
-          ? Object.keys(pageStyles.cssVariables).length
-          : 0,
+        cssVariableCount: pageStyles.cssVariables ? Object.keys(pageStyles.cssVariables).length : 0,
         tokenCount: pageStyles.tokens ? pageStyles.tokens.length : 0,
       };
     });
 
-    return {
-      cssVariables,
-      tokens: Array.from(tokens).sort(),
-      pages: pageSummaries,
-    };
+    return { cssVariables, tokens: Array.from(tokens).sort(), pages: pageSummaries };
   });
 
   server.get("/styles/element", async (request, reply) => {
@@ -619,37 +497,21 @@ export async function buildServer(): Promise<FastifyInstance> {
       elementId?: string;
     };
 
-    if (!projectId) {
-      reply.status(400).send({ error: "projectId is required" });
-      return;
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!elementId) return reply.status(400).send({ error: "elementId is required" });
+    if (!isValidId(projectId) || !isValidId(elementId)) {
+      return reply.status(400).send({ error: "Invalid projectId or elementId" });
     }
 
-    if (!elementId) {
-      reply.status(400).send({ error: "elementId is required" });
-      return;
-    }
+    const elementRow = db
+      .select()
+      .from(elements)
+      .where(and(eq(elements.id, toId(elementId)), eq(elements.projectId, toId(projectId))))
+      .get();
 
-    if (
-      !Types.ObjectId.isValid(projectId) ||
-      !Types.ObjectId.isValid(elementId)
-    ) {
-      reply.status(400).send({ error: "Invalid projectId or elementId" });
-      return;
-    }
+    if (!elementRow) return reply.status(404).send({ error: "Element not found" });
 
-    const projectObjectId = new Types.ObjectId(projectId);
-    const elementObjectId = new Types.ObjectId(elementId);
-
-    const element = await Element.findOne({
-      _id: elementObjectId,
-      projectId: projectObjectId,
-    });
-
-    if (!element) {
-      return reply.status(404).send({ error: "Element not found" });
-    }
-
-    return { element };
+    return { element: serializeElement(elementRow) };
   });
 
   return server;

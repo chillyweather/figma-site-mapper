@@ -1248,6 +1248,29 @@ async function pollForCompletion(
     try {
       const statusResult = await getJobStatus(jobId);
 
+      if (statusResult.status === "failed" || statusResult.status === "error") {
+        clearInterval(pollInterval);
+        const message =
+          statusResult.detailedProgress?.stage ||
+          "Target page crawl failed";
+        sendProgressUpdate({
+          status: "error",
+          message,
+          progress: 0,
+          currentStep: 2,
+          totalSteps: 5,
+          steps: [
+            { name: "Create flow page", status: "complete" },
+            { name: "Clone source elements", status: "complete" },
+            { name: "Crawl target page", status: "error" },
+            { name: "Render target page", status: "pending" },
+            { name: "Create arrows", status: "pending" },
+          ],
+        });
+        figma.notify(message, { error: true });
+        return;
+      }
+
       if (statusResult.status !== "completed") {
         return;
       }
