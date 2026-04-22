@@ -29,6 +29,7 @@ export const MainView: React.FC<MainViewProps> = ({
   handleLinkCheck,
   handleShowFlow,
   flowProgress,
+  focusedBadgeNumber,
   crawlProgress,
   authStatus,
   authMethod,
@@ -268,6 +269,7 @@ export const MainView: React.FC<MainViewProps> = ({
               handleLinkCheck={handleLinkCheck}
               handleShowFlow={handleShowFlow}
               flowProgress={flowProgress}
+              focusedBadgeNumber={focusedBadgeNumber}
             />
           )}
 

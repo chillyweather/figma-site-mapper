@@ -107,6 +107,34 @@ export function handlePageChange(): void {
 }
 
 /**
+ * Notify UI when a link_N_badge or button_N_badge group is selected on canvas.
+ */
+const BADGE_NAME_PATTERN = /(?:link|button)_(\d+)_badge$/;
+
+function notifyBadgeSelection(): void {
+  const selection = figma.currentPage.selection;
+  if (selection.length !== 1) return;
+
+  const node = selection[0];
+  // Direct selection of the badge group
+  if (node.type === "GROUP" && node.name.endsWith("_badge")) {
+    const match = node.name.match(BADGE_NAME_PATTERN);
+    if (match) {
+      figma.ui.postMessage({ type: "badge-selected", badgeNumber: parseInt(match[1], 10) });
+      return;
+    }
+  }
+  // Selection of a child inside the badge group (badge circle or text)
+  const parent = (node as SceneNode & { parent?: BaseNode }).parent;
+  if (parent && parent.type === "GROUP" && (parent as GroupNode).name.endsWith("_badge")) {
+    const match = (parent as GroupNode).name.match(BADGE_NAME_PATTERN);
+    if (match) {
+      figma.ui.postMessage({ type: "badge-selected", badgeNumber: parseInt(match[1], 10) });
+    }
+  }
+}
+
+/**
  * Handle selection change event
  */
 export function handleSelectionChange(): void {
@@ -114,6 +142,7 @@ export function handleSelectionChange(): void {
   updateMappingTab();
   notifyActiveScreenshotPage();
   notifyElementSelection();
+  notifyBadgeSelection();
 }
 
 /**

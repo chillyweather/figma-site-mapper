@@ -85,6 +85,7 @@ export interface FlowLink {
   text: string;
   url: string;
   badgeNumber?: number;
+  elementType?: "link" | "button";
 }
 
 // Mode for the Mapping/Flows view
@@ -284,9 +285,11 @@ export interface SettingsViewProps {
   activeProjectId: string | null;
   onProjectChange: (projectId: string | null) => void;
   onCreateProject: (name: string) => Promise<void>;
+  onDeleteProject: (projectId: string) => Promise<void>;
   onRefreshProjects: () => Promise<void>;
   isProjectLoading: boolean;
   isCreatingProject: boolean;
+  isDeletingProject: boolean;
   projectError: string | null;
 }
 
@@ -312,6 +315,7 @@ export interface MainViewProps {
   handleLinkCheck: (linkId: string, checked: boolean) => void;
   handleShowFlow: () => void;
   flowProgress: FlowProgress;
+  focusedBadgeNumber?: number | null;
   crawlProgress: CrawlProgress;
   authStatus: "idle" | "authenticating" | "success" | "failed" | null;
   authMethod: "none" | "manual" | "credentials" | "cookies";

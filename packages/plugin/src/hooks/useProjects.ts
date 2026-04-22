@@ -5,6 +5,7 @@ import { Project } from "../types";
 import {
   fetchProjects as fetchProjectsApi,
   createProject as createProjectApi,
+  deleteProject as deleteProjectApi,
 } from "../utils/api";
 
 interface UseProjectsResult {
@@ -13,9 +14,11 @@ interface UseProjectsResult {
   setActiveProjectId: (projectId: string | null) => void;
   isLoading: boolean;
   isCreating: boolean;
+  isDeleting: boolean;
   error: string | null;
   refresh: () => Promise<void>;
   createProject: (name: string) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
 }
 
 export function useProjects(): UseProjectsResult {
@@ -23,6 +26,7 @@ export function useProjects(): UseProjectsResult {
   const [activeProjectId, setProjectId] = useAtom(activeProjectIdAtom);
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
   const [hasLoadedStoredProject, setHasLoadedStoredProject] = useState(false);
@@ -166,6 +170,10 @@ export function useProjects(): UseProjectsResult {
         setProjects((prev) => [result.project, ...prev]);
         setProjectId(result.project._id);
         setHasLoadedStoredProject(true);
+        parent.postMessage(
+          { pluginMessage: { type: "save-project", projectId: result.project._id } },
+          "*"
+        );
         setError(null);
       } catch (err) {
         console.error("Failed to create project", err);
@@ -209,14 +217,49 @@ export function useProjects(): UseProjectsResult {
     [setProjectId, setHasLoadedStoredProject]
   );
 
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      setIsDeleting(true);
+      try {
+        await deleteProjectApi(projectId);
+        if (!isMountedRef.current) return;
+        setProjects((prev) => prev.filter((p) => p._id !== projectId));
+        if (activeProjectId === projectId) {
+          setProjectId(null);
+          parent.postMessage(
+            { pluginMessage: { type: "save-project", projectId: null } },
+            "*"
+          );
+        }
+        setError(null);
+      } catch (err) {
+        console.error("Failed to delete project", err);
+        if (!isMountedRef.current) return;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to delete project right now."
+        );
+        throw err;
+      } finally {
+        if (isMountedRef.current) {
+          setIsDeleting(false);
+        }
+      }
+    },
+    [activeProjectId, setProjectId, setProjects]
+  );
+
   return {
     projects,
     activeProjectId,
     setActiveProjectId,
     isLoading,
     isCreating,
+    isDeleting,
     error,
     refresh,
     createProject,
+    deleteProject,
   };
 }

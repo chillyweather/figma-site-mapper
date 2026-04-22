@@ -8,6 +8,7 @@ export interface BadgeLink {
   text: string;
   url: string;
   badgeNumber?: number;
+  elementType?: "link" | "button";
 }
 
 export interface FlowLink {
@@ -15,6 +16,7 @@ export interface FlowLink {
   text: string;
   url: string;
   badgeNumber?: number;
+  elementType?: "link" | "button";
 }
 
 export interface ManifestData {

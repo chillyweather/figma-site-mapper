@@ -491,8 +491,9 @@ export async function handleStartCrawl(config: {
   includeSelectors: boolean;
   includeComputedStyles: boolean;
   fullRefresh: boolean;
+  projectId?: string | null;
 }): Promise<void> {
-  const resolvedProjectId = await getActiveProjectId();
+  const resolvedProjectId = config.projectId || await getActiveProjectId();
 
   if (!resolvedProjectId) {
     figma.notify("Select or create a project before starting a crawl.", {
@@ -500,6 +501,9 @@ export async function handleStartCrawl(config: {
     });
     return;
   }
+
+  // Keep sandbox ref in sync with what the UI considers active.
+  activeProjectIdRef = resolvedProjectId;
 
   // Reset render guard so the next completed crawl can draw a new sitemap
   hasRenderedSitemap = false;

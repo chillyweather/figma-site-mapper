@@ -79,6 +79,14 @@ export async function handleShowFlow(selectedLinks: FlowLink[]): Promise<void> {
   }
 
   const selectedLink = selectedLinks[0];
+
+  if (!selectedLink.url) {
+    figma.notify(
+      "Selected element has no navigation target (buttons can't build flows yet)."
+    );
+    return;
+  }
+
   console.log("📊 Creating flow for:", selectedLink);
 
   sendProgressUpdate({

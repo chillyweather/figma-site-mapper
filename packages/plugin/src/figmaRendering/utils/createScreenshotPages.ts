@@ -264,7 +264,9 @@ function buildLinkMetadataMap(
   let linkNumber = 1;
 
   for (const element of interactiveElements) {
-    if (element.href && element.href !== "#") {
+    // Only `<a>`-style links count toward link numbering; buttons with
+    // navigation targets are surfaced through the button_N_badge path.
+    if (element.type === "link" && element.href && element.href !== "#") {
       // Create a key from bounding box coordinates
       const key = `${element.x},${element.y},${element.width},${element.height}`;
       map.set(key, {
@@ -1045,8 +1047,11 @@ export async function createScreenshotPages(
           const badge = figma.createEllipse();
 
           // Use link_X_badge naming for links to support flow building
+          // Use button_X_badge naming for buttons so they also show in the Flows tab
           if (isLink && currentLinkNumber) {
             badge.name = `link_${currentLinkNumber}_badge_circle`;
+          } else if (elementType === "button") {
+            badge.name = `button_${elementCounter}_badge_circle`;
           } else {
             badge.name = `element_${elementCounter}_badge_circle`;
           }
@@ -1079,6 +1084,8 @@ export async function createScreenshotPages(
 
           if (isLink && currentLinkNumber) {
             badgeText.name = `link_${currentLinkNumber}_badge_text`;
+          } else if (elementType === "button") {
+            badgeText.name = `button_${elementCounter}_badge_text`;
           } else {
             badgeText.name = `element_${elementCounter}_badge_text`;
           }
@@ -1138,6 +1145,15 @@ export async function createScreenshotPages(
 
           if (isLink && currentLinkNumber) {
             badgeGroup.name = `link_${currentLinkNumber}_badge`;
+          } else if (elementType === "button") {
+            badgeGroup.name = `button_${elementCounter}_badge`;
+            // Store navigation target (if any) so the Flows tab can build
+            // flows from buttons. We use plugin data rather than a text
+            // hyperlink so clicking the badge doesn't open the browser.
+            if (el.href) {
+              badgeGroup.setPluginData("URL", el.href);
+              badgeGroup.setPluginData("TEXT", (el.text || "").substring(0, 100));
+            }
           } else {
             badgeGroup.name = `element_${elementCounter}_badge`;
           }

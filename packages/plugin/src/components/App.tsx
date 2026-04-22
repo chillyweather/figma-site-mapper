@@ -39,9 +39,11 @@ export const App: React.FC = () => {
     setActiveProjectId,
     isLoading: isProjectLoading,
     isCreating: isCreatingProject,
+    isDeleting: isDeletingProject,
     error: projectError,
     refresh,
     createProject,
+    deleteProject,
   } = useProjects();
   const {
     badgeLinks,
@@ -49,6 +51,7 @@ export const App: React.FC = () => {
     handleLinkCheck,
     handleShowFlow,
     flowProgress,
+    focusedBadgeNumber,
   } = useFlowMapping();
 
   // Element mode, filters, and page selection
@@ -104,6 +107,13 @@ export const App: React.FC = () => {
       await createProject(name);
     },
     [createProject]
+  );
+
+  const handleDeleteProject = useCallback(
+    async (projectId: string) => {
+      await deleteProject(projectId);
+    },
+    [deleteProject]
   );
 
   // Styling mode handler
@@ -471,9 +481,11 @@ export const App: React.FC = () => {
       activeProjectId={activeProjectId}
       onProjectChange={handleProjectChange}
       onCreateProject={handleCreateProject}
+      onDeleteProject={handleDeleteProject}
       onRefreshProjects={refresh}
       isProjectLoading={isProjectLoading}
       isCreatingProject={isCreatingProject}
+      isDeletingProject={isDeletingProject}
       projectError={projectError}
     />
   ) : (
@@ -499,6 +511,7 @@ export const App: React.FC = () => {
       handleLinkCheck={handleLinkCheck}
       handleShowFlow={handleShowFlow}
       flowProgress={flowProgress}
+      focusedBadgeNumber={focusedBadgeNumber}
       crawlProgress={crawlProgress}
       authStatus={authStatus}
       authMethod={settings.authMethod}

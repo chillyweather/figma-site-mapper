@@ -1,82 +1,88 @@
-import { Types } from "mongoose";
-import { Page } from "../models/Page.js";
-import { Element } from "../models/Element.js";
-function normalizeObjectIds(ids) {
-    const seen = new Set();
-    const result = [];
-    for (const id of ids) {
-        const asString = id instanceof Types.ObjectId ? id.toString() : String(id);
-        if (!Types.ObjectId.isValid(asString)) {
-            continue;
-        }
-        if (seen.has(asString)) {
-            continue;
-        }
-        seen.add(asString);
-        result.push(new Types.ObjectId(asString));
-    }
-    return result;
+import { db } from "../db.js";
+import { pages, elements } from "../schema.js";
+import { eq, and, inArray } from "drizzle-orm";
+function isValidId(id) {
+    if (!id || typeof id !== "string")
+        return false;
+    const n = parseInt(id, 10);
+    return !isNaN(n) && n > 0 && String(n) === id;
 }
-function getIdString(doc) {
-    if (!doc || typeof doc !== "object") {
-        return null;
-    }
-    const rawId = doc._id;
-    if (!rawId) {
-        return null;
-    }
-    if (typeof rawId === "string") {
-        return rawId;
-    }
-    if (rawId instanceof Types.ObjectId) {
-        return rawId.toString();
-    }
-    if (typeof rawId.toString === "function") {
-        return rawId.toString();
-    }
-    return null;
-}
-export async function buildManifestForPageIds(projectId, pageIds) {
-    if (!projectId || !Types.ObjectId.isValid(projectId)) {
-        throw new Error("Invalid projectId supplied to buildManifestForPageIds");
-    }
-    const normalizedPageIds = normalizeObjectIds(pageIds);
-    if (normalizedPageIds.length === 0) {
-        return { pages: [], elements: [] };
-    }
-    const projectObjectId = new Types.ObjectId(projectId);
-    const pages = await Page.find({
-        projectId: projectObjectId,
-        _id: { $in: normalizedPageIds },
-    })
-        .lean()
-        .exec();
-    if (pages.length === 0) {
-        return { pages: [], elements: [] };
-    }
-    const pageIdOrder = new Map();
-    normalizedPageIds.forEach((id, index) => {
-        pageIdOrder.set(id.toString(), index);
-    });
-    const sortedPages = pages.slice().sort((a, b) => {
-        const aIdString = getIdString(a);
-        const bIdString = getIdString(b);
-        const aPos = aIdString
-            ? (pageIdOrder.get(aIdString) ?? Number.MAX_SAFE_INTEGER)
-            : Number.MAX_SAFE_INTEGER;
-        const bPos = bIdString
-            ? (pageIdOrder.get(bIdString) ?? Number.MAX_SAFE_INTEGER)
-            : Number.MAX_SAFE_INTEGER;
-        return aPos - bPos;
-    });
-    const elements = await Element.find({
-        projectId: projectObjectId,
-        pageId: { $in: normalizedPageIds },
-    })
-        .lean()
-        .exec();
+function serializePage(row) {
     return {
-        pages: sortedPages,
-        elements,
+        _id: String(row.id),
+        id: row.id,
+        projectId: String(row.projectId),
+        url: row.url,
+        title: row.title,
+        screenshotPaths: JSON.parse(row.screenshotPaths),
+        interactiveElements: JSON.parse(row.interactiveElements),
+        globalStyles: row.globalStyles ? JSON.parse(row.globalStyles) : null,
+        lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
+        lastCrawlJobId: row.lastCrawlJobId ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
     };
 }
+function serializeElement(row) {
+    return {
+        _id: String(row.id),
+        id: row.id,
+        pageId: String(row.pageId),
+        projectId: String(row.projectId),
+        type: row.type,
+        selector: row.selector ?? undefined,
+        tagName: row.tagName ?? undefined,
+        elementId: row.elementId ?? undefined,
+        classes: JSON.parse(row.classes),
+        bbox: row.bbox ? JSON.parse(row.bbox) : undefined,
+        href: row.href ?? undefined,
+        text: row.text ?? undefined,
+        styles: JSON.parse(row.styles),
+        styleTokens: JSON.parse(row.styleTokens),
+        ariaLabel: row.ariaLabel ?? undefined,
+        role: row.role ?? undefined,
+        value: row.value ?? undefined,
+        placeholder: row.placeholder ?? undefined,
+        checked: row.checked ?? undefined,
+        src: row.src ?? undefined,
+        alt: row.alt ?? undefined,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+    };
+}
+export async function buildManifestForPageIds(projectId, pageIds) {
+    if (!isValidId(projectId)) {
+        throw new Error("Invalid projectId supplied to buildManifestForPageIds");
+    }
+    const validIds = pageIds.filter(isValidId).map((id) => parseInt(id, 10));
+    const uniqueIds = [...new Set(validIds)];
+    if (uniqueIds.length === 0) {
+        return { pages: [], elements: [] };
+    }
+    const projectNumId = parseInt(projectId, 10);
+    const pageRows = db
+        .select()
+        .from(pages)
+        .where(and(eq(pages.projectId, projectNumId), inArray(pages.id, uniqueIds)))
+        .all();
+    if (pageRows.length === 0) {
+        return { pages: [], elements: [] };
+    }
+    // Preserve the order of the requested IDs
+    const pageIdOrder = new Map(uniqueIds.map((id, i) => [id, i]));
+    const sortedPages = pageRows
+        .slice()
+        .sort((a, b) => (pageIdOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+        (pageIdOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+    const foundPageIds = sortedPages.map((p) => p.id);
+    const elementRows = db
+        .select()
+        .from(elements)
+        .where(and(eq(elements.projectId, projectNumId), inArray(elements.pageId, foundPageIds)))
+        .all();
+    return {
+        pages: sortedPages.map(serializePage),
+        elements: elementRows.map(serializeElement),
+    };
+}
+export { serializePage, serializeElement };

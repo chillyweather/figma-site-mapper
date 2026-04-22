@@ -112,6 +112,26 @@ export async function buildServer(): Promise<FastifyInstance> {
     };
   });
 
+  server.delete("/projects/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!isValidId(id)) {
+      return reply.status(400).send({ error: "Invalid project id" });
+    }
+    const pid = toId(id);
+    const existing = db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, pid))
+      .get();
+    if (!existing) {
+      return reply.status(404).send({ error: "Project not found" });
+    }
+    db.delete(elements).where(eq(elements.projectId, pid)).run();
+    db.delete(pages).where(eq(pages.projectId, pid)).run();
+    db.delete(projects).where(eq(projects.id, pid)).run();
+    return { ok: true, deletedId: id };
+  });
+
   // ── Job progress & status ─────────────────────────────────────────────────
 
   server.post("/progress/:jobId", async (request, reply) => {

@@ -10,20 +10,28 @@ export async function scanForBadgeLinks(): Promise<BadgeLink[]> {
     const badgeGroups = figma.currentPage.findAll(
       (node: SceneNode) =>
         node.type === "GROUP" &&
-        node.name.startsWith("link_") &&
+        (node.name.startsWith("link_") || node.name.startsWith("button_")) &&
         node.name.endsWith("_badge")
     );
 
     for (const group of badgeGroups) {
       if (group.type !== "GROUP") continue;
 
-      const links = extractLinksFromBadge(group);
-      badgeLinks.push(...links);
+      const kind: "link" | "button" = group.name.startsWith("button_")
+        ? "button"
+        : "link";
+
+      if (kind === "button") {
+        const entry = extractButtonFromBadge(group);
+        if (entry) badgeLinks.push(entry);
+      } else {
+        badgeLinks.push(...extractLinksFromBadge(group));
+      }
     }
 
     badgeLinks.sort(compareBadgeLinks);
 
-    console.log(`Found ${badgeLinks.length} internal badge links`);
+    console.log(`Found ${badgeLinks.length} internal badge entries`);
     return badgeLinks;
   } catch (error) {
     console.error("Error scanning for badge links:", error);
@@ -64,6 +72,7 @@ function extractLinksFromBadge(group: GroupNode): BadgeLink[] {
             text,
             url,
             badgeNumber: badgeNumber ?? undefined,
+            elementType: "link",
           });
         }
       } catch (e) {
@@ -75,12 +84,37 @@ function extractLinksFromBadge(group: GroupNode): BadgeLink[] {
   return links;
 }
 
+/**
+ * Extract a button entry from a button_N_badge group.
+ * Buttons have no URL target — we still surface them so users can locate
+ * them from the Flows tab via the canvas-selection sync.
+ */
+function extractButtonFromBadge(group: GroupNode): BadgeLink | null {
+  const badgeNumber = parseBadgeNumber(group.name);
+  const textNode = group.findOne((node: SceneNode) => node.type === "TEXT") as
+    | TextNode
+    | null;
+
+  const storedUrl = group.getPluginData("URL") || "";
+  const storedText = group.getPluginData("TEXT") || "";
+  const text = storedText || textNode?.characters || "Button";
+  const id = textNode?.id || group.id;
+
+  return {
+    id,
+    text,
+    url: storedUrl,
+    badgeNumber: badgeNumber ?? undefined,
+    elementType: "button",
+  };
+}
+
 function parseBadgeNumber(name?: string): number | null {
   if (!name) {
     return null;
   }
 
-  const match = name.match(/link_(\d+)/i);
+  const match = name.match(/(?:link|button)_(\d+)/i);
   if (!match) {
     return null;
   }

@@ -289,6 +289,42 @@ async function extractStyleData(
 
         if (el.tagName === "A") element.href = (el as HTMLAnchorElement).href;
 
+        const isButtonLike =
+          el.tagName === "BUTTON" ||
+          (el.tagName === "INPUT" &&
+            ["button", "submit"].includes((el as HTMLInputElement).type));
+        if (isButtonLike) {
+          let btnHref =
+            el.getAttribute("formaction") ||
+            el.getAttribute("data-href") ||
+            "";
+          if (!btnHref) {
+            const onclick = el.getAttribute("onclick") || "";
+            const m = onclick.match(
+              /(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]/
+            );
+            if (m && m[1]) btnHref = m[1];
+          }
+          if (!btnHref) {
+            const anchor = el.closest("a[href]") as HTMLAnchorElement | null;
+            if (anchor) btnHref = anchor.href;
+          }
+          if (!btnHref) {
+            const form = el.closest("form") as HTMLFormElement | null;
+            if (form) {
+              const action = form.getAttribute("action") || "";
+              if (action) btnHref = action;
+            }
+          }
+          if (btnHref) {
+            try {
+              element.href = new URL(btnHref, document.baseURI).href;
+            } catch {
+              element.href = btnHref;
+            }
+          }
+        }
+
         if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
           const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
           element.value = inputEl.value || undefined;
@@ -907,12 +943,43 @@ export async function runCrawler(
             document.querySelectorAll('button, input[type="button"], input[type="submit"], input[type="reset"]').forEach((button) => {
               const rect = button.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
+                let btnHref =
+                  button.getAttribute("formaction") ||
+                  button.getAttribute("data-href") ||
+                  "";
+                if (!btnHref) {
+                  const onclick = button.getAttribute("onclick") || "";
+                  const m = onclick.match(
+                    /(?:window\.)?location(?:\.href)?\s*=\s*['"]([^'"]+)['"]/
+                  );
+                  if (m && m[1]) btnHref = m[1];
+                }
+                if (!btnHref) {
+                  const anchor = button.closest("a[href]") as HTMLAnchorElement | null;
+                  if (anchor) btnHref = anchor.href;
+                }
+                if (!btnHref) {
+                  const form = button.closest("form") as HTMLFormElement | null;
+                  if (form) {
+                    const action = form.getAttribute("action") || "";
+                    if (action) btnHref = action;
+                  }
+                }
+                let resolved: string | undefined;
+                if (btnHref) {
+                  try {
+                    resolved = new URL(btnHref, document.baseURI).href;
+                  } catch {
+                    resolved = btnHref;
+                  }
+                }
                 els.push({
                   type: "button",
                   x: rect.left + window.scrollX,
                   y: rect.top + window.scrollY,
                   width: rect.width,
                   height: rect.height,
+                  href: resolved,
                   text:
                     button.textContent?.trim().substring(0, 100) ||
                     (button as HTMLInputElement).value?.substring(0, 100) ||

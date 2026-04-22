@@ -488,6 +488,46 @@ button {
   scroll-behavior: smooth;
 }
 
+.flows-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 var(--space-3);
+}
+
+.flows-search-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg);
+  color: var(--color-text-main);
+  outline: none;
+}
+
+.flows-search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.flows-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.flows-no-match {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: var(--space-5) 0;
+}
+
+.flows-link-item-focused {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .flows-list-header {
   margin: var(--space-4) 0 var(--space-3);
   font-size: var(--font-size-sm);
@@ -541,6 +581,14 @@ button {
 
 .flows-link-item-selected .flows-link-badge {
   background: var(--color-primary-hover);
+}
+
+.flows-link-badge-button {
+  background: #28a745;
+}
+
+.flows-link-item-selected .flows-link-badge-button {
+  background: #1f8a38;
 }
 
 .flows-link-url {

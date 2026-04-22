@@ -31,6 +31,17 @@ export async function createProject(
   return response.json();
 }
 
+export async function deleteProject(projectId: string): Promise<void> {
+  const response = await fetch(`${BACKEND_URL}/projects/${projectId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to delete project");
+  }
+}
+
 export async function startCrawl(params: Omit<CrawlStartMessage, "type">) {
   const response = await fetch(`${BACKEND_URL}/crawl`, {
     method: "POST",

@@ -1,5 +1,5 @@
 import { useAtom } from "jotai";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   badgeLinksAtom,
   checkedLinksAtom,
@@ -10,8 +10,9 @@ export function useFlowMapping() {
   const [badgeLinks, setBadgeLinks] = useAtom(badgeLinksAtom);
   const [checkedLinks, setCheckedLinks] = useAtom(checkedLinksAtom);
   const [flowProgress, setFlowProgress] = useAtom(flowProgressAtom);
+  const [focusedBadgeNumber, setFocusedBadgeNumber] = useState<number | null>(null);
 
-  // Listen for badge links and flow progress updates
+  // Listen for badge links, flow progress, and canvas badge selection
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
@@ -23,6 +24,10 @@ export function useFlowMapping() {
 
       if (msg.type === "flow-progress-update") {
         setFlowProgress(msg.flowProgress);
+      }
+
+      if (msg.type === "badge-selected") {
+        setFocusedBadgeNumber(msg.badgeNumber);
       }
     };
 
@@ -75,5 +80,6 @@ export function useFlowMapping() {
     handleLinkCheck,
     handleShowFlow,
     flowProgress,
+    focusedBadgeNumber,
   };
 }

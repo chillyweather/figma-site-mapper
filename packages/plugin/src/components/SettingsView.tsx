@@ -83,9 +83,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   activeProjectId,
   onProjectChange,
   onCreateProject,
+  onDeleteProject,
   onRefreshProjects,
   isProjectLoading,
   isCreatingProject,
+  isDeletingProject,
   projectError,
 }) => {
   const [newProjectName, setNewProjectName] = useState("");
@@ -125,6 +127,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     },
     [newProjectName, onCreateProject]
   );
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!activeProjectId) return;
+    const project = projects.find((p) => p._id === activeProjectId);
+    const name = project?.name || "this project";
+    const confirmed = window.confirm(
+      `Delete "${name}"? All pages and elements for this project will be permanently removed.`
+    );
+    if (!confirmed) return;
+    try {
+      setLocalError(null);
+      await onDeleteProject(activeProjectId);
+    } catch (error) {
+      setLocalError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete project right now."
+      );
+    }
+  }, [activeProjectId, projects, onDeleteProject]);
+
   return (
     <div id="settings-view" className="container">
       <div id="settings-header" className="settings-header">
@@ -171,6 +194,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             style={{ width: "auto", marginBottom: 0 }}
           >
             {isProjectLoading ? "Refreshing…" : "Refresh"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteProject}
+            disabled={!activeProjectId || isDeletingProject}
+            className="button-secondary"
+            style={{ width: "auto", marginBottom: 0 }}
+            title={activeProjectId ? "Delete selected project" : "Select a project to delete"}
+          >
+            {isDeletingProject ? "Deleting…" : "Delete"}
           </button>
         </div>
 

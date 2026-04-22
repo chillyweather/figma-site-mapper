@@ -1,4 +1,5 @@
 import "dotenv/config";
+import "./logger.js"; // must be first — redirects console.* to pino
 import { Worker } from "bullmq";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
