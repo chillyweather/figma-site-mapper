@@ -5,6 +5,7 @@ import { CrawlingTab } from "./CrawlingTab";
 import { FlowsTab } from "./FlowsTab";
 import { MarkupTab } from "./MarkupTab";
 import { StylingTab } from "./StylingTab";
+import { InventoryTab } from "./InventoryTab";
 
 
 export const MainView: React.FC<MainViewProps> = ({
@@ -62,7 +63,7 @@ export const MainView: React.FC<MainViewProps> = ({
   const [elementStylesStatus, setElementStylesStatus] = useState("");
 
   const [activeTab, setActiveTab] = useState<
-    "crawling" | "flows" | "styling" | "markup"
+    "crawling" | "flows" | "styling" | "markup" | "inventory"
   >("crawling");
   const [newProjectName, setNewProjectName] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -227,6 +228,13 @@ export const MainView: React.FC<MainViewProps> = ({
             >
               Styling
             </button>
+            <button
+              id="inventory-tab-button"
+              onClick={() => setActiveTab("inventory")}
+              className={`tab-button ${activeTab === "inventory" ? "tab-button-active" : "tab-button-inactive"}`}
+            >
+              Inventory
+            </button>
           </div>
 
           {activeTab === "crawling" && (
@@ -284,6 +292,10 @@ export const MainView: React.FC<MainViewProps> = ({
               selectedElementId={selectedElementId}
               selectedElementInfo={selectedElementInfo}
             />
+          )}
+
+          {activeTab === "inventory" && (
+            <InventoryTab activeProjectId={activeProjectId} />
           )}
 
 

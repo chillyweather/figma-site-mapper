@@ -1,5 +1,11 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
+import {
+  InventoryCluster,
+  InventoryInconsistency,
+  InventoryOverview,
+  InventoryTokenCandidate,
+} from "../../types";
 
 interface PageResponseItem {
   _id: string;
@@ -256,6 +262,21 @@ interface JobPagesResponse extends PagesByIdsResponse {
   projectId: string;
 }
 
+interface InventoryTokensResponse {
+  projectId: string;
+  tokens: InventoryTokenCandidate[];
+}
+
+interface InventoryClustersResponse {
+  projectId: string;
+  clusters: InventoryCluster[];
+}
+
+interface InventoryInconsistenciesResponse {
+  projectId: string;
+  inconsistencies: InventoryInconsistency[];
+}
+
 /**
  * Fetch a subset of pages by their identifiers.
  */
@@ -343,6 +364,70 @@ export async function openAuthSession(url: string): Promise<{
   if (!response.ok) {
     throw new Error(
       `Failed to open auth session: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchInventoryOverview(
+  projectId: string
+): Promise<InventoryOverview> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/overview?projectId=${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory overview: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchInventoryTokens(
+  projectId: string
+): Promise<InventoryTokensResponse> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/tokens?projectId=${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory tokens: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchInventoryClusters(
+  projectId: string
+): Promise<InventoryClustersResponse> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/clusters?projectId=${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory clusters: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchInventoryInconsistencies(
+  projectId: string
+): Promise<InventoryInconsistenciesResponse> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/inconsistencies?projectId=${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory inconsistencies: ${response.status} ${response.statusText}`
     );
   }
 

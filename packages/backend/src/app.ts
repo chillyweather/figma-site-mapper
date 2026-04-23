@@ -10,6 +10,12 @@ import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
+import {
+  getInventoryOverview,
+  getInventoryTokens,
+  getInventoryClusters,
+  getInventoryInconsistencies,
+} from "./services/inventory/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -536,6 +542,64 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!elementRow) return reply.status(404).send({ error: "Element not found" });
 
     return { element: serializeElement(elementRow) };
+  });
+
+  // ── Inventory ─────────────────────────────────────────────────────────────
+
+  server.get("/inventory/overview", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    try {
+      return await getInventoryOverview(projectId);
+    } catch (error) {
+      request.log.error(`Failed to build inventory overview: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to build inventory overview" });
+    }
+  });
+
+  server.get("/inventory/tokens", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    try {
+      return await getInventoryTokens(projectId);
+    } catch (error) {
+      request.log.error(`Failed to build inventory tokens: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to build inventory tokens" });
+    }
+  });
+
+  server.get("/inventory/clusters", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    try {
+      return await getInventoryClusters(projectId);
+    } catch (error) {
+      request.log.error(`Failed to build inventory clusters: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to build inventory clusters" });
+    }
+  });
+
+  server.get("/inventory/inconsistencies", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    try {
+      return await getInventoryInconsistencies(projectId);
+    } catch (error) {
+      request.log.error(`Failed to build inventory inconsistencies: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to build inventory inconsistencies" });
+    }
   });
 
   return server;
