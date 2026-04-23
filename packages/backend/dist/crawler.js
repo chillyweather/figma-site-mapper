@@ -456,6 +456,16 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             return "root";
         }
     }
+    function normalizeUrl(url) {
+        try {
+            const u = new URL(url);
+            u.hash = "";
+            return u.toString();
+        }
+        catch {
+            return url;
+        }
+    }
     let progressUpdateWarned = false;
     const updateProgress = async (stage, currentPage, totalPages, currentUrl) => {
         if (!jobId)
@@ -534,27 +544,32 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     log.error(`❌ Failed to set cookies: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
-            const currentDepth = calculateUrlDepth(request.url);
-            if (!shouldCrawlUrl(request.url, { startUrl: canonicalStartUrl, defaultLanguageOnly, maxDepth, currentDepth })) {
-                log.info(`Skipping ${request.url} due to language/depth filters`);
+            // Use the actual landing URL after any redirects as the canonical key
+            const finalUrl = normalizeUrl(page.url());
+            if (finalUrl !== request.url) {
+                log.info(`Redirect: ${request.url} -> ${finalUrl}`);
+            }
+            const currentDepth = calculateUrlDepth(finalUrl);
+            if (!shouldCrawlUrl(finalUrl, { startUrl: canonicalStartUrl, defaultLanguageOnly, maxDepth, currentDepth })) {
+                log.info(`Skipping ${finalUrl} due to language/depth filters`);
                 return;
             }
-            const sectionKey = getSectionKey(request.url);
+            const sectionKey = getSectionKey(finalUrl);
             const existingSectionUrls = sectionUrlMap.get(sectionKey) || [];
             if (sampleSize > 0 && existingSectionUrls.length >= sampleSize) {
-                log.info(`Skipping ${request.url} - section ${sectionKey} already has ${existingSectionUrls.length} pages`);
+                log.info(`Skipping ${finalUrl} - section ${sectionKey} already has ${existingSectionUrls.length} pages`);
                 return;
             }
-            if (crawledUrls.has(request.url)) {
-                log.info(`Skipping ${request.url} - already crawled`);
+            if (crawledUrls.has(finalUrl)) {
+                log.info(`Skipping ${finalUrl} - already crawled`);
                 return;
             }
-            const isLikelyLoginPage = request.url.includes("/login") ||
-                request.url.includes("/signin") ||
-                request.url.includes("/auth");
+            const isLikelyLoginPage = finalUrl.includes("/login") ||
+                finalUrl.includes("/signin") ||
+                finalUrl.includes("/auth");
             log.info(`Current page: ${currentPage}, Max requests: ${maxRequestsPerCrawl}`);
             if (shouldTerminate() && !isLikelyLoginPage) {
-                log.info(`Skipping ${request.url} - reached max requests limit`);
+                log.info(`Skipping ${finalUrl} - reached max requests limit`);
                 if (!isTerminating) {
                     isTerminating = true;
                     log.info(`🛑 Reached max requests limit, initiating early shutdown`);
@@ -568,10 +583,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 return;
             }
             currentPage++;
-            crawledUrls.add(request.url);
-            existingSectionUrls.push(request.url);
+            crawledUrls.add(finalUrl);
+            existingSectionUrls.push(finalUrl);
             sectionUrlMap.set(sectionKey, existingSectionUrls);
-            await updateProgress("crawling", currentPage, totalPages, request.url);
+            await updateProgress("crawling", currentPage, totalPages, finalUrl);
             await page.setExtraHTTPHeaders({
                 "Accept-Language": "en-US,en;q=0.9",
                 "Accept-Encoding": "gzip, deflate, br",
@@ -624,7 +639,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 };
             });
             if (captchaDetection.hasCaptcha) {
-                log.info(`🚨 CAPTCHA detected on ${request.url}`);
+                log.info(`🚨 CAPTCHA detected on ${finalUrl}`);
                 log.info(`👤 Please solve CAPTCHA manually. Waiting up to 2 minutes...`);
                 try {
                     await Promise.race([
@@ -643,7 +658,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     await page.waitForTimeout(2000);
                 }
                 catch {
-                    log.info(`⏰ CAPTCHA timeout on ${request.url}, skipping page`);
+                    log.info(`⏰ CAPTCHA timeout on ${finalUrl}, skipping page`);
                     return;
                 }
             }
@@ -664,7 +679,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 });
             }
             catch {
-                log.info(`Could not handle sticky elements for ${request.url}`);
+                log.info(`Could not handle sticky elements for ${finalUrl}`);
             }
             // Scroll to trigger lazy loading
             try {
@@ -682,14 +697,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     document.body.scrollTop = 0;
                 });
                 await page.waitForTimeout(delay > 0 ? Math.min(2000, delay / 2) : 1000);
-                log.info(`Completed scrolling through ${request.url}`);
+                log.info(`Completed scrolling through ${finalUrl}`);
             }
             catch {
-                log.info(`Scrolling failed or not needed for ${request.url}`);
+                log.info(`Scrolling failed or not needed for ${finalUrl}`);
             }
             const title = await page.title();
-            log.info(`Crawled ${request.url} - Title: ${title}`);
-            await updateProgress("screenshot", currentPage, totalPages, request.url);
+            log.info(`Crawled ${finalUrl} - Title: ${title}`);
+            await updateProgress("screenshot", currentPage, totalPages, finalUrl);
             // Ensure page is at the top before screenshot
             try {
                 await page.evaluate(() => {
@@ -702,12 +717,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 await page.waitForTimeout(300);
             }
             catch {
-                log.info(`⚠️ Could not ensure top position for ${request.url}`);
+                log.info(`⚠️ Could not ensure top position for ${finalUrl}`);
             }
             // Interactive elements
             let interactiveElements = [];
             if (detectInteractiveElements) {
-                log.info(`Finding interactive elements on ${request.url}`);
+                log.info(`Finding interactive elements on ${finalUrl}`);
                 interactiveElements = await page.evaluate(() => {
                     const els = [];
                     document.querySelectorAll("a[href]").forEach((link) => {
@@ -780,12 +795,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     els.sort((a, b) => (Math.abs(a.y - b.y) < 5 ? a.x - b.x : a.y - b.y));
                     return els;
                 });
-                log.info(`Found ${interactiveElements.length} interactive elements on ${request.url}`);
+                log.info(`Found ${interactiveElements.length} interactive elements on ${finalUrl}`);
             }
             // Style extraction
             let styleData;
             if (styleExtraction?.enabled) {
-                log.info(`Extracting style data on ${request.url} (preset: ${styleExtraction.preset})`);
+                log.info(`Extracting style data on ${finalUrl} (preset: ${styleExtraction.preset})`);
                 styleData = await extractStyleData(page, {
                     extractInteractiveElements: styleExtraction.extractInteractiveElements,
                     extractStructuralElements: styleExtraction.extractStructuralElements,
@@ -803,9 +818,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 log.info(`Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables).length} CSS variables`);
             }
             const fullPageBuffer = await page.screenshot({ fullPage: true });
-            await updateProgress("processing", currentPage, totalPages, request.url);
-            const screenshotSlices = await sliceScreenshot(fullPageBuffer, request.url, publicUrl);
-            log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${request.url}`);
+            await updateProgress("processing", currentPage, totalPages, finalUrl);
+            const screenshotSlices = await sliceScreenshot(fullPageBuffer, finalUrl, publicUrl);
+            log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${finalUrl}`);
             // ── Persist to SQLite ───────────────────────────────────────────────
             if (projectNumId !== null) {
                 try {
@@ -814,7 +829,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         .insert(pages)
                         .values({
                         projectId: projectNumId,
-                        url: request.url,
+                        url: finalUrl,
                         title,
                         screenshotPaths: JSON.stringify(screenshotSlices),
                         interactiveElements: JSON.stringify(interactiveElements),
@@ -843,7 +858,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         .returning({ id: pages.id })
                         .get();
                     if (!pageResult)
-                        throw new Error(`Page upsert returned null for ${request.url}`);
+                        throw new Error(`Page upsert returned null for ${finalUrl}`);
                     const pageId = pageResult.id;
                     visitedPageIds.add(String(pageId));
                     // Delete old elements for this page
@@ -899,14 +914,14 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         for (let i = 0; i < allElements.length; i += ELEMENT_INSERT_CHUNK) {
                             db.insert(elements).values(allElements.slice(i, i + ELEMENT_INSERT_CHUNK)).run();
                         }
-                        log.info(`Persisted ${allElements.length} elements for ${request.url}`);
+                        log.info(`Persisted ${allElements.length} elements for ${finalUrl}`);
                     }
                     else {
-                        log.info(`No elements to persist for ${request.url}`);
+                        log.info(`No elements to persist for ${finalUrl}`);
                     }
                 }
                 catch (error) {
-                    log.error(`❌ Failed to persist page data for ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+                    log.error(`❌ Failed to persist page data for ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`);
                     throw error;
                 }
             }
@@ -915,7 +930,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 missingProjectIdWarned = true;
             }
             crawledPages.push({
-                url: request.url,
+                url: finalUrl,
                 title,
                 screenshot: screenshotSlices,
                 interactiveElements,
@@ -927,10 +942,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 const links = await page.evaluate(() => Array.from(document.querySelectorAll("a[href]"))
                     .map((a) => ({ href: a.getAttribute("href"), text: a.textContent?.trim().substring(0, 50) }))
                     .slice(0, 10));
-                log.info(`Found ${links.length} links on ${request.url}: ${links.map((l) => l.href).join(", ")}`);
+                log.info(`Found ${links.length} links on ${finalUrl}: ${links.map((l) => l.href).join(", ")}`);
             }
             catch {
-                log.info(`Could not extract links from ${request.url}`);
+                log.info(`Could not extract links from ${finalUrl}`);
             }
             // Enqueue links
             const nearLimit = maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl;
@@ -951,10 +966,10 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             return request;
                         },
                     });
-                    log.info(`Successfully enqueued links from ${request.url}`);
+                    log.info(`Successfully enqueued links from ${finalUrl}`);
                 }
                 catch (error) {
-                    log.error(`Failed to enqueue links from ${request.url}: ${error instanceof Error ? error.message : String(error)}`);
+                    log.error(`Failed to enqueue links from ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`);
                 }
             }
             else {
