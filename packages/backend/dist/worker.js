@@ -6,7 +6,7 @@ import { runCrawler } from "./crawler.js";
 import { connectDB } from "./db.js";
 await connectDB();
 const processor = async (job) => {
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, } = job.data;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, projectId, auth, styleExtraction, } = job.data;
     console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
     console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`);
     console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
@@ -17,7 +17,7 @@ const processor = async (job) => {
         console.log(`🎨 Style Extraction: enabled (preset: ${styleExtraction.preset})`);
     }
     try {
-        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction);
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction);
         await job.updateData({
             ...job.data,
             visitedUrls: result.visitedUrls,

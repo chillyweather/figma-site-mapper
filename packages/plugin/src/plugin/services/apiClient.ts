@@ -4,6 +4,8 @@ import {
   InventoryCluster,
   InventoryInconsistency,
   InventoryOverview,
+  InventoryRegionInsight,
+  InventoryTemplateInsight,
   InventoryTokenCandidate,
 } from "../../types";
 
@@ -277,6 +279,12 @@ interface InventoryInconsistenciesResponse {
   inconsistencies: InventoryInconsistency[];
 }
 
+interface InventoryRegionsResponse {
+  projectId: string;
+  regions: InventoryRegionInsight[];
+  templates: InventoryTemplateInsight[];
+}
+
 /**
  * Fetch a subset of pages by their identifiers.
  */
@@ -428,6 +436,22 @@ export async function fetchInventoryInconsistencies(
   if (!response.ok) {
     throw new Error(
       `Failed to fetch inventory inconsistencies: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchInventoryRegions(
+  projectId: string
+): Promise<InventoryRegionsResponse> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/regions?projectId=${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory regions: ${response.status} ${response.statusText}`
     );
   }
 

@@ -3,6 +3,7 @@ import { db } from "../../db.js";
 import { elements, pages } from "../../schema.js";
 import { analyzeComponentClusters } from "./componentClustering.js";
 import { analyzeInconsistencies } from "./inconsistencyAnalysis.js";
+import { analyzeRegionsAndTemplates } from "./regionDetection.js";
 import { analyzeTokenCandidates } from "./tokenMining.js";
 function isValidId(id) {
     const parsed = parseInt(id, 10);
@@ -61,6 +62,15 @@ async function loadProjectData(projectId) {
             styleTokens: parseJson(row.styleTokens, []),
             ariaLabel: row.ariaLabel ?? undefined,
             role: row.role ?? undefined,
+            parentTag: row.parentTag ?? undefined,
+            parentSelector: row.parentSelector ?? undefined,
+            ancestryPath: row.ancestryPath ?? undefined,
+            nearestInteractiveSelector: row.nearestInteractiveSelector ?? undefined,
+            isVisible: row.isVisible ?? undefined,
+            regionLabel: row.regionLabel ?? undefined,
+            styleSignature: row.styleSignature ?? undefined,
+            componentFingerprint: row.componentFingerprint ?? undefined,
+            cropPath: row.cropPath ?? undefined,
             value: row.value ?? undefined,
             placeholder: row.placeholder ?? undefined,
             checked: row.checked ?? undefined,
@@ -74,15 +84,18 @@ async function analyzeProject(projectId) {
     const tokens = analyzeTokenCandidates(data.pages, data.elements);
     const clusters = analyzeComponentClusters(data.elements);
     const inconsistencies = analyzeInconsistencies(tokens, clusters);
+    const { regions, templates } = analyzeRegionsAndTemplates(data.pages, data.elements);
     return {
         ...data,
         tokens,
         clusters,
         inconsistencies,
+        regions,
+        templates,
     };
 }
 export async function getInventoryOverview(projectId) {
-    const { pages: projectPages, elements: projectElements, tokens, clusters, inconsistencies } = await analyzeProject(projectId);
+    const { pages: projectPages, elements: projectElements, tokens, clusters, inconsistencies, regions, templates, } = await analyzeProject(projectId);
     return {
         projectId,
         summary: {
@@ -95,6 +108,8 @@ export async function getInventoryOverview(projectId) {
         topClusters: clusters.slice(0, 10),
         topTokenCandidates: tokens.slice(0, 12),
         topInconsistencies: inconsistencies.slice(0, 10),
+        topRegions: regions.slice(0, 8),
+        templates: templates.slice(0, 8),
     };
 }
 export async function getInventoryTokens(projectId) {
@@ -108,4 +123,8 @@ export async function getInventoryClusters(projectId) {
 export async function getInventoryInconsistencies(projectId) {
     const { inconsistencies } = await analyzeProject(projectId);
     return { projectId, inconsistencies };
+}
+export async function getInventoryRegions(projectId) {
+    const { regions, templates } = await analyzeProject(projectId);
+    return { projectId, regions, templates };
 }

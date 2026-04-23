@@ -56,6 +56,15 @@ sqlite.exec(`
     style_tokens TEXT NOT NULL DEFAULT '[]',
     aria_label TEXT,
     role TEXT,
+    parent_tag TEXT,
+    parent_selector TEXT,
+    ancestry_path TEXT,
+    nearest_interactive_selector TEXT,
+    is_visible INTEGER,
+    region_label TEXT,
+    style_signature TEXT,
+    component_fingerprint TEXT,
+    crop_path TEXT,
     value TEXT,
     placeholder TEXT,
     checked INTEGER,
@@ -68,6 +77,32 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS elements_page_id_type_idx ON elements(page_id, type);
   CREATE INDEX IF NOT EXISTS elements_project_id_type_idx ON elements(project_id, type);
 `);
+
+function ensureColumn(tableName: string, columnName: string, columnDefinition: string): void {
+  const columns = sqlite
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all() as Array<{ name: string }>;
+
+  if (columns.some((column) => column.name === columnName)) {
+    return;
+  }
+
+  sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`);
+}
+
+ensureColumn("elements", "parent_tag", "parent_tag TEXT");
+ensureColumn("elements", "parent_selector", "parent_selector TEXT");
+ensureColumn("elements", "ancestry_path", "ancestry_path TEXT");
+ensureColumn(
+  "elements",
+  "nearest_interactive_selector",
+  "nearest_interactive_selector TEXT"
+);
+ensureColumn("elements", "is_visible", "is_visible INTEGER");
+ensureColumn("elements", "region_label", "region_label TEXT");
+ensureColumn("elements", "style_signature", "style_signature TEXT");
+ensureColumn("elements", "component_fingerprint", "component_fingerprint TEXT");
+ensureColumn("elements", "crop_path", "crop_path TEXT");
 
 export const db = drizzle(sqlite, { schema });
 

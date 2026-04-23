@@ -9,6 +9,10 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatPrevalence(value: number): string {
+  return `${Math.round(value * 100)}% of pages`;
+}
+
 export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) => {
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,12 +120,39 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
           overview.topClusters.map((cluster) => (
             <div key={cluster.clusterId} className="status-display status-info" style={{ marginBottom: "10px" }}>
               <div style={{ fontWeight: 600, marginBottom: "4px" }}>{cluster.label}</div>
+              {(cluster.canonicalCropPath || cluster.exampleCropPaths.length > 0) && (
+                <div style={{ display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap" }}>
+                  {[cluster.canonicalCropPath, ...cluster.exampleCropPaths]
+                    .filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index)
+                    .slice(0, 3)
+                    .map((cropPath, index) => (
+                    <img
+                      key={`${cropPath}-${index}`}
+                      src={cropPath}
+                      alt={cluster.label}
+                      style={{
+                        width: "72px",
+                        height: "54px",
+                        objectFit: "cover",
+                        borderRadius: "4px",
+                        border: "1px solid #d9d9d9",
+                        background: "#fff",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div>Family: {cluster.familyId}</div>
               <div>Category: {cluster.category}</div>
               <div>Confidence: {formatPercent(cluster.confidence)}</div>
               <div>Instances: {cluster.instanceCount}</div>
               <div>Pages: {cluster.pageCount}</div>
-              {cluster.variantHints.length > 0 && (
-                <div>Variant hints: {cluster.variantHints.join(", ")}</div>
+              {cluster.variantAxes.length > 0 && (
+                <div>
+                  Variant axes: {cluster.variantAxes
+                    .map((axis) => `${axis.name}=${axis.values.join("/")}${axis.currentValue ? ` (current: ${axis.currentValue})` : ""}`)
+                    .join(", ")}
+                </div>
               )}
             </div>
           ))
@@ -146,6 +177,39 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
           ))
         ) : (
           <div className="status-display status-neutral">No token candidates yet.</div>
+        )}
+      </div>
+
+      <div style={{ marginTop: "24px" }}>
+        <h4 className="section-header">Regions And Templates</h4>
+        {overview?.topRegions?.length ? (
+          <>
+            {overview.topRegions.map((region) => (
+              <div key={region.regionLabel} className="status-display status-info" style={{ marginBottom: "10px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "4px" }}>{region.regionLabel}</div>
+                <div>Coverage: {formatPrevalence(region.prevalence)}</div>
+                <div>Pages: {region.pageCount}</div>
+                <div>Elements: {region.elementCount}</div>
+                {region.topCategories.length > 0 && (
+                  <div>Top categories: {region.topCategories.join(", ")}</div>
+                )}
+              </div>
+            ))}
+
+            {overview.templates?.map((template) => (
+              <div key={template.templateId} className="status-display status-success" style={{ marginBottom: "10px" }}>
+                <div style={{ fontWeight: 600, marginBottom: "4px" }}>{template.label}</div>
+                <div>Pages: {template.pageCount}</div>
+                {template.sampleUrls.length > 0 && (
+                  <div style={{ fontSize: "11px", wordBreak: "break-word" }}>
+                    Samples: {template.sampleUrls.join(", ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        ) : (
+          <div className="status-display status-neutral">No region or template insights yet.</div>
         )}
       </div>
 

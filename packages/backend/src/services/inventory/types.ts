@@ -46,6 +46,15 @@ export interface ParsedInventoryElement {
   styleTokens: string[];
   ariaLabel?: string;
   role?: string;
+  parentTag?: string;
+  parentSelector?: string;
+  ancestryPath?: string;
+  nearestInteractiveSelector?: string;
+  isVisible?: boolean;
+  regionLabel?: string;
+  styleSignature?: string;
+  componentFingerprint?: string;
+  cropPath?: string;
   value?: string;
   placeholder?: string;
   checked?: boolean;
@@ -77,6 +86,7 @@ export interface InventoryTokenCandidate {
 
 export interface InventoryCluster {
   clusterId: string;
+  familyId: string;
   category: InventoryCategory;
   label: string;
   confidence: number;
@@ -84,9 +94,33 @@ export interface InventoryCluster {
   pageCount: number;
   signature: Record<string, string>;
   variantHints: string[];
+  variantAxes: Array<{
+    name: string;
+    values: string[];
+    currentValue?: string;
+  }>;
+  canonicalElementId?: string;
+  canonicalCropPath?: string;
   exampleElementIds: string[];
+  exampleCropPaths: string[];
   memberElementIds: string[];
   pageIds: string[];
+}
+
+export interface InventoryRegionInsight {
+  regionLabel: string;
+  pageCount: number;
+  elementCount: number;
+  prevalence: number;
+  topCategories: InventoryCategory[];
+}
+
+export interface InventoryTemplateInsight {
+  templateId: string;
+  label: string;
+  pageCount: number;
+  pageIds: string[];
+  sampleUrls: string[];
 }
 
 export interface InventoryInconsistency {
@@ -109,4 +143,6 @@ export interface InventoryOverview {
   topClusters: InventoryCluster[];
   topTokenCandidates: InventoryTokenCandidate[];
   topInconsistencies: InventoryInconsistency[];
+  topRegions: InventoryRegionInsight[];
+  templates: InventoryTemplateInsight[];
 }

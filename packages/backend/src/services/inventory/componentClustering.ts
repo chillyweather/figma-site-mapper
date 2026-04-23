@@ -1,5 +1,10 @@
 import { categorizeElement } from "./elementCategory.js";
-import { buildClusterSignature, isLikelyRenderableElement } from "./signatureBuilders.js";
+import {
+  buildClusterSignature,
+  bucketDimension,
+  isLikelyRenderableElement,
+} from "./signatureBuilders.js";
+import { getNormalizedStyle } from "./normalizeStyles.js";
 import type {
   InventoryCategory,
   InventoryCluster,
@@ -9,9 +14,11 @@ import type {
 type ClusterAccumulator = {
   category: InventoryCategory;
   signature: Record<string, string>;
-  memberElementIds: string[];
+  members: ParsedInventoryElement[];
   pageIds: Set<string>;
 };
+
+type VariantAxis = InventoryCluster["variantAxes"][number];
 
 const PHASE_ONE_CATEGORIES = new Set<InventoryCategory>([
   "button",
@@ -44,23 +51,122 @@ function formatCategoryLabel(category: InventoryCategory): string {
 }
 
 function computeConfidence(instanceCount: number, pageCount: number): number {
-  const raw = 0.45 + Math.min(instanceCount, 20) * 0.015 + Math.min(pageCount, 10) * 0.025;
+  const raw =
+    0.45 + Math.min(instanceCount, 20) * 0.015 + Math.min(pageCount, 10) * 0.025;
   return Math.min(0.98, Number(raw.toFixed(2)));
 }
 
-function getVariantHints(category: InventoryCategory, signature: Record<string, string>): string[] {
-  const hints = new Set<string>();
-  if (category === "button" || category === "link") {
-    if (signature.backgroundColor || signature.borderColor) hints.add("kind");
-    if (signature.width !== "unknown" || signature.height !== "unknown") hints.add("size");
+function classifyKind(cluster: ClusterAccumulator): string {
+  const background = cluster.signature.backgroundColor;
+  const border = cluster.signature.borderColor;
+  const transparentBackground =
+    !background || background === "transparent" || background === "none";
+
+  if (!transparentBackground) return "filled";
+  if (border && border !== "transparent" && border !== "none") return "outline";
+  return "text";
+}
+
+function classifySize(cluster: ClusterAccumulator): string {
+  const heightValue = Number.parseInt(cluster.signature.height || "", 10);
+  const fontSizeValue = Number.parseInt(cluster.signature.fontSize || "", 10);
+  const score = Math.max(heightValue || 0, (fontSizeValue || 0) * 2);
+
+  if (score <= 28) return "sm";
+  if (score <= 44) return "md";
+  if (score <= 60) return "lg";
+  return "xl";
+}
+
+function classifyHeadingLevel(cluster: ClusterAccumulator): string {
+  const fontSizeValue = Number.parseInt(cluster.signature.fontSize || "", 10);
+  if (!fontSizeValue || Number.isNaN(fontSizeValue)) return "unknown";
+  if (fontSizeValue >= 40) return "display";
+  if (fontSizeValue >= 32) return "h1";
+  if (fontSizeValue >= 24) return "h2";
+  if (fontSizeValue >= 20) return "h3";
+  return "h4+";
+}
+
+function pickCanonicalMember(members: ParsedInventoryElement[]): ParsedInventoryElement | undefined {
+  if (members.length === 0) return undefined;
+
+  const scored = members.slice().sort((a, b) => {
+    const aCrop = a.cropPath ? 1 : 0;
+    const bCrop = b.cropPath ? 1 : 0;
+    if (bCrop !== aCrop) return bCrop - aCrop;
+
+    const aText = a.text?.trim().length || 0;
+    const bText = b.text?.trim().length || 0;
+    const aTextScore = aText > 0 && aText <= 48 ? 1 : 0;
+    const bTextScore = bText > 0 && bText <= 48 ? 1 : 0;
+    if (bTextScore !== aTextScore) return bTextScore - aTextScore;
+
+    const aArea = (a.bbox?.width || 0) * (a.bbox?.height || 0);
+    const bArea = (b.bbox?.width || 0) * (b.bbox?.height || 0);
+    return bArea - aArea;
+  });
+
+  return scored[0];
+}
+
+function buildFamilyKey(cluster: ClusterAccumulator): string {
+  return [
+    cluster.category,
+    cluster.signature.parentTag || "none",
+    cluster.signature.region || "content",
+    cluster.signature.fontFamily || "default-font",
+    cluster.signature.fontWeight || "default-weight",
+    cluster.signature.borderRadius || "default-radius",
+    cluster.signature.textTransform || "default-transform",
+  ].join("|");
+}
+
+function inferVariantAxes(
+  category: InventoryCategory,
+  cluster: ClusterAccumulator,
+  familyClusters: ClusterAccumulator[]
+): VariantAxis[] {
+  const axes: VariantAxis[] = [];
+
+  if (category === "button" || category === "link" || category === "input") {
+    const kinds = Array.from(new Set(familyClusters.map(classifyKind))).sort();
+    if (kinds.length > 1) {
+      axes.push({
+        name: "kind",
+        values: kinds,
+        currentValue: classifyKind(cluster),
+      });
+    }
+
+    const sizes = Array.from(new Set(familyClusters.map(classifySize))).sort();
+    if (sizes.length > 1) {
+      axes.push({
+        name: "size",
+        values: sizes,
+        currentValue: classifySize(cluster),
+      });
+    }
   }
-  if (category === "input") {
-    if (signature.width !== "unknown" || signature.height !== "unknown") hints.add("size");
+
+  if (category === "heading") {
+    const levels = Array.from(new Set(familyClusters.map(classifyHeadingLevel))).filter(
+      (value) => value !== "unknown"
+    );
+    if (levels.length > 1) {
+      axes.push({
+        name: "level",
+        values: levels,
+        currentValue: classifyHeadingLevel(cluster),
+      });
+    }
   }
-  if (category === "heading" && signature.fontSize) {
-    hints.add("level");
-  }
-  return Array.from(hints);
+
+  return axes;
+}
+
+function buildVariantHints(variantAxes: VariantAxis[]): string[] {
+  return variantAxes.map((axis) => axis.name);
 }
 
 export function analyzeComponentClusters(
@@ -81,23 +187,35 @@ export function analyzeComponentClusters(
       accumulators.set(clusterKey, {
         category,
         signature: summary,
-        memberElementIds: [],
+        members: [],
         pageIds: new Set<string>(),
       });
     }
 
     const acc = accumulators.get(clusterKey)!;
-    acc.memberElementIds.push(element.id);
+    acc.members.push(element);
     acc.pageIds.add(element.pageId);
+  }
+
+  const rawClusters = Array.from(accumulators.values()).filter(
+    (cluster) => cluster.members.length >= 2
+  );
+
+  const familyMap = new Map<string, ClusterAccumulator[]>();
+  for (const cluster of rawClusters) {
+    const familyKey = buildFamilyKey(cluster);
+    if (!familyMap.has(familyKey)) {
+      familyMap.set(familyKey, []);
+    }
+    familyMap.get(familyKey)!.push(cluster);
   }
 
   const counters = new Map<InventoryCategory, number>();
 
-  return Array.from(accumulators.values())
-    .filter((cluster) => cluster.memberElementIds.length >= 2)
+  return rawClusters
     .sort((a, b) => {
-      if (b.memberElementIds.length !== a.memberElementIds.length) {
-        return b.memberElementIds.length - a.memberElementIds.length;
+      if (b.members.length !== a.members.length) {
+        return b.members.length - a.members.length;
       }
       return a.category.localeCompare(b.category);
     })
@@ -106,20 +224,36 @@ export function analyzeComponentClusters(
       counters.set(cluster.category, nextIndex);
 
       const pageIds = Array.from(cluster.pageIds).sort();
-      const instanceCount = cluster.memberElementIds.length;
+      const instanceCount = cluster.members.length;
       const pageCount = pageIds.length;
+      const familyId = buildFamilyKey(cluster)
+        .toLowerCase()
+        .replace(/[^a-z0-9|]+/g, "-")
+        .replace(/\|/g, "_");
+      const familyClusters = familyMap.get(buildFamilyKey(cluster)) || [cluster];
+      const variantAxes = inferVariantAxes(cluster.category, cluster, familyClusters);
+      const canonicalMember = pickCanonicalMember(cluster.members);
+      const exampleMembers = cluster.members.slice(0, 5);
+      const exampleCropPaths = exampleMembers
+        .map((member) => member.cropPath)
+        .filter((value): value is string => Boolean(value));
 
       return {
         clusterId: `${cluster.category}-${String(nextIndex).padStart(2, "0")}`,
+        familyId,
         category: cluster.category,
         label: `${formatCategoryLabel(cluster.category)} / Candidate ${String(nextIndex).padStart(2, "0")}`,
         confidence: computeConfidence(instanceCount, pageCount),
         instanceCount,
         pageCount,
         signature: cluster.signature,
-        variantHints: getVariantHints(cluster.category, cluster.signature),
-        exampleElementIds: cluster.memberElementIds.slice(0, 5),
-        memberElementIds: cluster.memberElementIds,
+        variantHints: buildVariantHints(variantAxes),
+        variantAxes,
+        canonicalElementId: canonicalMember?.id,
+        canonicalCropPath: canonicalMember?.cropPath,
+        exampleElementIds: exampleMembers.map((member) => member.id),
+        exampleCropPaths,
+        memberElementIds: cluster.members.map((member) => member.id),
         pageIds,
       } satisfies InventoryCluster;
     });

@@ -19,6 +19,7 @@ export function isLikelyRenderableElement(
 ): boolean {
   const bbox = element.bbox;
   if (!bbox) return false;
+  if (element.isVisible === false) return false;
   if (bbox.width <= 0 || bbox.height <= 0) return false;
   if (bbox.width < 8 || bbox.height < 8) return false;
   if (bbox.width > 1600 || bbox.height > 1200) return false;
@@ -35,6 +36,14 @@ export function buildClusterSignature(
     width: bucketDimension(bbox?.width),
     height: bucketDimension(bbox?.height),
   };
+
+  if (element.regionLabel) {
+    summary.region = element.regionLabel;
+  }
+
+  if (element.parentTag) {
+    summary.parentTag = element.parentTag;
+  }
 
   const addStyle = (property: string, outputKey = property) => {
     const value = getNormalizedStyle(element.styles, property);
@@ -82,10 +91,14 @@ export function buildClusterSignature(
       break;
   }
 
-  const key = Object.entries(summary)
+  const baseKey = Object.entries(summary)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}:${v}`)
     .join("|");
+
+  const key = element.componentFingerprint
+    ? `${element.componentFingerprint}|${baseKey}`
+    : baseKey;
 
   return { key, summary };
 }

@@ -5,6 +5,9 @@ import path from "path";
 import { db } from "./db.js";
 import { pages, elements } from "./schema.js";
 import { eq, and, notInArray } from "drizzle-orm";
+import { categorizeElement } from "./services/inventory/elementCategory.js";
+import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
+import { bucketDimension } from "./services/inventory/signatureBuilders.js";
 // CSS properties that we want to capture on every element.
 const ELEMENT_STYLE_PROPERTIES = [
     "color",
@@ -104,6 +107,95 @@ function shouldCrawlUrl(url, options) {
     }
     return true;
 }
+function buildElementStyleSignature(styles) {
+    if (!styles)
+        return undefined;
+    const properties = [
+        "color",
+        "background-color",
+        "font-size",
+        "font-family",
+        "font-weight",
+        "line-height",
+        "border-color",
+        "border-width",
+        "border-radius",
+        "box-shadow",
+        "padding",
+        "display",
+        "position",
+    ];
+    const parts = properties
+        .map((property) => {
+        const normalized = normalizeStyleValue(property, styles[property]);
+        return normalized ? `${property}:${normalized}` : null;
+    })
+        .filter((value) => Boolean(value));
+    return parts.length > 0 ? parts.join("|") : undefined;
+}
+function buildElementFingerprint(element) {
+    const category = categorizeElement({
+        id: "",
+        pageId: "",
+        projectId: "",
+        type: element.type,
+        selector: element.selector,
+        tagName: element.tagName,
+        elementId: element.id,
+        classes: element.classes,
+        bbox: element.boundingBox,
+        href: element.href,
+        text: element.text,
+        styles: element.styles ?? {},
+        styleTokens: element.styleTokens ?? [],
+        ariaLabel: element.ariaLabel,
+        role: element.role,
+        value: element.value,
+        placeholder: element.placeholder,
+        checked: element.checked,
+        src: element.src,
+        alt: element.alt,
+        parentTag: element.parentTag,
+        parentSelector: element.parentSelector,
+        ancestryPath: element.ancestryPath,
+        nearestInteractiveSelector: element.nearestInteractiveSelector,
+        isVisible: element.isVisible,
+        regionLabel: element.regionLabel,
+        styleSignature: element.styleSignature,
+        componentFingerprint: element.componentFingerprint,
+        cropPath: element.cropPath,
+    });
+    return [
+        category,
+        element.regionLabel || "content",
+        element.parentTag || "none",
+        bucketDimension(element.boundingBox?.width),
+        bucketDimension(element.boundingBox?.height),
+        element.styleSignature || "unstyled",
+    ].join("|");
+}
+function shouldGenerateElementCrop(element) {
+    const bbox = element.boundingBox;
+    if (!bbox)
+        return false;
+    if (bbox.width < 16 || bbox.height < 16)
+        return false;
+    if (bbox.width > 900 || bbox.height > 600)
+        return false;
+    const tagName = (element.tagName || "").toLowerCase();
+    const role = (element.role || "").toLowerCase();
+    const hasText = Boolean(element.text && element.text.trim().length > 0);
+    const hasVisualStyles = Boolean(element.styles?.["background-color"] ||
+        element.styles?.["border-color"] ||
+        element.styles?.["box-shadow"]);
+    if (/^h[1-6]$/.test(tagName) ||
+        ["a", "button", "input", "select", "textarea", "img"].includes(tagName) ||
+        role === "button" ||
+        role === "link") {
+        return true;
+    }
+    return hasText && hasVisualStyles;
+}
 async function extractStyleData(page, config) {
     return await page.evaluate((params) => {
         const evaluateConfig = params.config;
@@ -113,6 +205,62 @@ async function extractStyleData(page, config) {
         const MAX_STYLE_ELEMENTS = 5000;
         const allElements = Array.from(document.querySelectorAll("*"));
         const maxElements = Math.min(allElements.length, MAX_STYLE_ELEMENTS);
+        const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight);
+        const buildSelector = (node) => {
+            if (!node)
+                return undefined;
+            if (node.id)
+                return `#${node.id}`;
+            const tag = node.tagName.toLowerCase();
+            const className = node.className;
+            if (typeof className === "string" && className.trim()) {
+                const classes = className.trim().split(/\s+/).filter(Boolean).slice(0, 3);
+                if (classes.length > 0) {
+                    return `${tag}.${classes.join(".")}`;
+                }
+            }
+            return tag;
+        };
+        const getAncestryPath = (node) => {
+            const segments = [];
+            let current = node.parentElement;
+            let depth = 0;
+            while (current && depth < 5) {
+                const selector = buildSelector(current);
+                if (selector)
+                    segments.unshift(selector);
+                current = current.parentElement;
+                depth += 1;
+            }
+            return segments.length > 0 ? segments.join(" > ") : undefined;
+        };
+        const getNearestInteractiveSelector = (node) => {
+            const interactive = node.closest('a[href],button,input[type="button"],input[type="submit"],input[type="reset"],[role="button"],[role="link"]');
+            if (!interactive || interactive === node)
+                return undefined;
+            return buildSelector(interactive);
+        };
+        const detectRegionLabel = (node, rect, role) => {
+            const tag = node.tagName.toLowerCase();
+            const idAndClass = `${node.id || ""} ${typeof node.className === "string" ? node.className : ""}`.toLowerCase();
+            const absoluteTop = rect.top + window.scrollY;
+            const absoluteBottom = absoluteTop + rect.height;
+            if (tag === "header" || role === "banner")
+                return "header";
+            if (tag === "footer" || role === "contentinfo")
+                return "footer";
+            if (tag === "nav" || role === "navigation")
+                return "navigation";
+            if (tag === "aside" || idAndClass.includes("sidebar"))
+                return "sidebar";
+            if (tag === "form" || !!node.closest("form"))
+                return "form";
+            if (absoluteTop < Math.max(160, documentHeight * 0.15))
+                return "top";
+            if (absoluteBottom > documentHeight * 0.85)
+                return "bottom";
+            return "content";
+        };
         for (let i = 0; i < maxElements; i++) {
             const el = allElements[i];
             if (!el)
@@ -133,6 +281,16 @@ async function extractStyleData(page, config) {
                 }
             }
             const computed = getComputedStyle(el);
+            const isVisible = computed.display !== "none" &&
+                computed.visibility !== "hidden" &&
+                computed.visibility !== "collapse" &&
+                computed.opacity !== "0" &&
+                !el.hasAttribute("hidden") &&
+                el.getAttribute("aria-hidden") !== "true" &&
+                rect.width > 0 &&
+                rect.height > 0;
+            if (evaluateConfig.captureOnlyVisibleElements && !isVisible)
+                continue;
             const styles = {};
             const elementTokens = new Set();
             for (let p = 0; p < styleProperties.length; p++) {
@@ -170,6 +328,12 @@ async function extractStyleData(page, config) {
                     width: Math.round(rect.width),
                     height: Math.round(rect.height),
                 },
+                parentTag: el.parentElement?.tagName.toLowerCase() || undefined,
+                parentSelector: buildSelector(el.parentElement),
+                ancestryPath: getAncestryPath(el),
+                nearestInteractiveSelector: getNearestInteractiveSelector(el),
+                isVisible,
+                regionLabel: detectRegionLabel(el, rect, el.getAttribute("role")),
             };
             if (Object.keys(styles).length > 0)
                 element.styles = styles;
@@ -305,6 +469,9 @@ function buildTree(pagesList, startUrl) {
 const screenshotDir = path.join(process.cwd(), "screenshots");
 if (!fs.existsSync(screenshotDir))
     fs.mkdirSync(screenshotDir, { recursive: true });
+const elementCropDir = path.join(screenshotDir, "elements");
+if (!fs.existsSync(elementCropDir))
+    fs.mkdirSync(elementCropDir, { recursive: true });
 function getSafeFilename(url) {
     return url.replace(/[^a-zA-Z0-9]/g, "_");
 }
@@ -374,11 +541,56 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
     }
 }
 const ELEMENT_INSERT_CHUNK = 200;
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction) {
+async function generateElementCrops(imageBuffer, url, elements, publicUrl, viewportWidth) {
+    const cropPaths = new Array(elements.length).fill(undefined);
+    try {
+        const metadata = await sharp(imageBuffer).metadata();
+        if (!metadata.width || !metadata.height) {
+            return cropPaths;
+        }
+        const imageWidth = metadata.width;
+        const imageHeight = metadata.height;
+        const scale = viewportWidth && viewportWidth > 0 ? imageWidth / viewportWidth : 1;
+        const safeFileName = getSafeFilename(url);
+        const MAX_CROPS = 200;
+        let generated = 0;
+        for (let index = 0; index < elements.length; index++) {
+            const element = elements[index];
+            if (!element || !shouldGenerateElementCrop(element))
+                continue;
+            if (generated >= MAX_CROPS)
+                break;
+            const bbox = element.boundingBox;
+            if (!bbox)
+                continue;
+            const padding = 8;
+            const left = Math.max(0, Math.round((bbox.x - padding) * scale));
+            const top = Math.max(0, Math.round((bbox.y - padding) * scale));
+            const width = Math.min(imageWidth - left, Math.max(1, Math.round((bbox.width + padding * 2) * scale)));
+            const height = Math.min(imageHeight - top, Math.max(1, Math.round((bbox.height + padding * 2) * scale)));
+            if (width <= 0 || height <= 0)
+                continue;
+            const cropFileName = `${safeFileName}_element_${index + 1}.png`;
+            const cropPath = path.join(elementCropDir, cropFileName);
+            await sharp(imageBuffer)
+                .extract({ left, top, width, height })
+                .resize({ width: 320, height: 240, fit: "inside", withoutEnlargement: true })
+                .toFile(cropPath);
+            cropPaths[index] = `${publicUrl}/screenshots/elements/${cropFileName}`;
+            generated += 1;
+        }
+    }
+    catch (error) {
+        console.warn(`Failed to generate element crops for ${url}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return cropPaths;
+}
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction) {
     console.log("🚀 Starting the crawler with URL:", startUrl);
     console.log("📊 Crawler settings:", {
         maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth,
         defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements,
+        captureOnlyVisibleElements,
         styleExtraction: styleExtraction?.enabled ? styleExtraction.preset : "disabled",
     });
     let projectNumId = null;
@@ -814,6 +1026,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                     extractBorders: styleExtraction.extractBorders,
                     includeSelectors: styleExtraction.includeSelectors,
                     includeComputedStyles: styleExtraction.includeComputedStyles,
+                    captureOnlyVisibleElements: styleExtraction.captureOnlyVisibleElements ?? captureOnlyVisibleElements,
                 });
                 log.info(`Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables).length} CSS variables`);
             }
@@ -821,6 +1034,22 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             await updateProgress("processing", currentPage, totalPages, finalUrl);
             const screenshotSlices = await sliceScreenshot(fullPageBuffer, finalUrl, publicUrl);
             log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${finalUrl}`);
+            if (styleData?.elements?.length) {
+                const viewportWidth = page.viewportSize()?.width ?? null;
+                const cropPaths = await generateElementCrops(fullPageBuffer, finalUrl, styleData.elements, publicUrl, viewportWidth);
+                styleData.elements = styleData.elements.map((element, index) => {
+                    const styleSignature = buildElementStyleSignature(element.styles);
+                    const enriched = {
+                        ...element,
+                        styleSignature,
+                        cropPath: cropPaths[index],
+                    };
+                    enriched.componentFingerprint = buildElementFingerprint(enriched);
+                    return enriched;
+                });
+                const cropCount = cropPaths.filter(Boolean).length;
+                log.info(`Generated ${cropCount} element crop(s) for ${finalUrl}`);
+            }
             // ── Persist to SQLite ───────────────────────────────────────────────
             if (projectNumId !== null) {
                 try {
@@ -882,6 +1111,15 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             styleTokens: JSON.stringify(element.styleTokens?.slice() ?? []),
                             ariaLabel: element.ariaLabel,
                             role: element.role,
+                            parentTag: element.parentTag,
+                            parentSelector: element.parentSelector,
+                            ancestryPath: element.ancestryPath,
+                            nearestInteractiveSelector: element.nearestInteractiveSelector,
+                            isVisible: element.isVisible,
+                            regionLabel: element.regionLabel,
+                            styleSignature: element.styleSignature,
+                            componentFingerprint: element.componentFingerprint,
+                            cropPath: element.cropPath,
                             value: element.value,
                             placeholder: element.placeholder,
                             checked: element.checked,
@@ -905,6 +1143,8 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             text: el.text,
                             styles: "{}",
                             styleTokens: "[]",
+                            isVisible: true,
+                            regionLabel: el.y < 200 ? "top" : "content",
                             createdAt: now,
                             updatedAt: now,
                         }))

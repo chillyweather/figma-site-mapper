@@ -10,7 +10,7 @@ import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
-import { getInventoryOverview, getInventoryTokens, getInventoryClusters, getInventoryInconsistencies, } from "./services/inventory/index.js";
+import { getInventoryOverview, getInventoryTokens, getInventoryClusters, getInventoryInconsistencies, getInventoryRegions, } from "./services/inventory/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function isValidId(id) {
@@ -212,7 +212,7 @@ export async function buildServer() {
     });
     // ── Crawl ─────────────────────────────────────────────────────────────────
     server.post("/crawl", async (request, reply) => {
-        const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, fullRefresh, } = request.body;
+        const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, fullRefresh, captureOnlyVisibleElements, } = request.body;
         if (!url || !publicUrl) {
             return reply.status(400).send({ error: "URL and publicUrl are required" });
         }
@@ -241,6 +241,7 @@ export async function buildServer() {
             sampleSize,
             showBrowser,
             detectInteractiveElements: detectInteractiveElements !== false,
+            captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
             highlightAllElements: highlightAllElements || false,
             projectId,
             auth,
@@ -250,7 +251,7 @@ export async function buildServer() {
         return { message: "Crawl job successfully queued.", jobId: job.id };
     });
     server.post("/recrawl-page", async (request, reply) => {
-        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, } = request.body;
+        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, captureOnlyVisibleElements, } = request.body;
         if (!url || !publicUrl) {
             return reply.status(400).send({ error: "URL and publicUrl are required" });
         }
@@ -279,6 +280,7 @@ export async function buildServer() {
             sampleSize: 0,
             showBrowser: false,
             detectInteractiveElements: true,
+            captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
             highlightAllElements: false,
             projectId,
             auth,
@@ -509,6 +511,20 @@ export async function buildServer() {
         catch (error) {
             request.log.error(`Failed to build inventory inconsistencies: ${error instanceof Error ? error.message : String(error)}`);
             return reply.status(500).send({ error: "Failed to build inventory inconsistencies" });
+        }
+    });
+    server.get("/inventory/regions", async (request, reply) => {
+        const { projectId } = request.query;
+        if (!projectId)
+            return reply.status(400).send({ error: "projectId is required" });
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        try {
+            return await getInventoryRegions(projectId);
+        }
+        catch (error) {
+            request.log.error(`Failed to build inventory regions: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to build inventory regions" });
         }
     });
     return server;

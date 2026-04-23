@@ -3,11 +3,14 @@ import { db } from "../../db.js";
 import { elements, pages } from "../../schema.js";
 import { analyzeComponentClusters } from "./componentClustering.js";
 import { analyzeInconsistencies } from "./inconsistencyAnalysis.js";
+import { analyzeRegionsAndTemplates } from "./regionDetection.js";
 import { analyzeTokenCandidates } from "./tokenMining.js";
 import type {
   InventoryCluster,
   InventoryInconsistency,
   InventoryOverview,
+  InventoryRegionInsight,
+  InventoryTemplateInsight,
   InventoryTokenCandidate,
   ParsedInventoryElement,
   ParsedInventoryPage,
@@ -82,6 +85,15 @@ async function loadProjectData(projectId: string): Promise<{
       styleTokens: parseJson<string[]>(row.styleTokens, []),
       ariaLabel: row.ariaLabel ?? undefined,
       role: row.role ?? undefined,
+      parentTag: row.parentTag ?? undefined,
+      parentSelector: row.parentSelector ?? undefined,
+      ancestryPath: row.ancestryPath ?? undefined,
+      nearestInteractiveSelector: row.nearestInteractiveSelector ?? undefined,
+      isVisible: row.isVisible ?? undefined,
+      regionLabel: row.regionLabel ?? undefined,
+      styleSignature: row.styleSignature ?? undefined,
+      componentFingerprint: row.componentFingerprint ?? undefined,
+      cropPath: row.cropPath ?? undefined,
       value: row.value ?? undefined,
       placeholder: row.placeholder ?? undefined,
       checked: row.checked ?? undefined,
@@ -97,25 +109,40 @@ async function analyzeProject(projectId: string): Promise<{
   tokens: InventoryTokenCandidate[];
   clusters: InventoryCluster[];
   inconsistencies: InventoryInconsistency[];
+  regions: InventoryRegionInsight[];
+  templates: InventoryTemplateInsight[];
 }> {
   const data = await loadProjectData(projectId);
   const tokens = analyzeTokenCandidates(data.pages, data.elements);
   const clusters = analyzeComponentClusters(data.elements);
   const inconsistencies = analyzeInconsistencies(tokens, clusters);
+  const { regions, templates } = analyzeRegionsAndTemplates(
+    data.pages,
+    data.elements
+  );
 
   return {
     ...data,
     tokens,
     clusters,
     inconsistencies,
+    regions,
+    templates,
   };
 }
 
 export async function getInventoryOverview(
   projectId: string
 ): Promise<InventoryOverview> {
-  const { pages: projectPages, elements: projectElements, tokens, clusters, inconsistencies } =
-    await analyzeProject(projectId);
+  const {
+    pages: projectPages,
+    elements: projectElements,
+    tokens,
+    clusters,
+    inconsistencies,
+    regions,
+    templates,
+  } = await analyzeProject(projectId);
 
   return {
     projectId,
@@ -129,6 +156,8 @@ export async function getInventoryOverview(
     topClusters: clusters.slice(0, 10),
     topTokenCandidates: tokens.slice(0, 12),
     topInconsistencies: inconsistencies.slice(0, 10),
+    topRegions: regions.slice(0, 8),
+    templates: templates.slice(0, 8),
   };
 }
 
@@ -151,4 +180,15 @@ export async function getInventoryInconsistencies(
 ): Promise<{ projectId: string; inconsistencies: InventoryInconsistency[] }> {
   const { inconsistencies } = await analyzeProject(projectId);
   return { projectId, inconsistencies };
+}
+
+export async function getInventoryRegions(
+  projectId: string
+): Promise<{
+  projectId: string;
+  regions: InventoryRegionInsight[];
+  templates: InventoryTemplateInsight[];
+}> {
+  const { regions, templates } = await analyzeProject(projectId);
+  return { projectId, regions, templates };
 }

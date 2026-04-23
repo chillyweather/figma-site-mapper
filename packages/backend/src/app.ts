@@ -15,6 +15,7 @@ import {
   getInventoryTokens,
   getInventoryClusters,
   getInventoryInconsistencies,
+  getInventoryRegions,
 } from "./services/inventory/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -254,6 +255,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay,
       maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements,
       highlightAllElements, projectId, auth, styleExtraction, fullRefresh,
+      captureOnlyVisibleElements,
     } = request.body as any;
 
     if (!url || !publicUrl) {
@@ -287,6 +289,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       sampleSize,
       showBrowser,
       detectInteractiveElements: detectInteractiveElements !== false,
+      captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
       highlightAllElements: highlightAllElements || false,
       projectId,
       auth,
@@ -300,6 +303,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   server.post("/recrawl-page", async (request, reply) => {
     const {
       url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction,
+      captureOnlyVisibleElements,
     } = request.body as any;
 
     if (!url || !publicUrl) {
@@ -333,6 +337,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       sampleSize: 0,
       showBrowser: false,
       detectInteractiveElements: true,
+      captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
       highlightAllElements: false,
       projectId,
       auth,
@@ -599,6 +604,20 @@ export async function buildServer(): Promise<FastifyInstance> {
     } catch (error) {
       request.log.error(`Failed to build inventory inconsistencies: ${error instanceof Error ? error.message : String(error)}`);
       return reply.status(500).send({ error: "Failed to build inventory inconsistencies" });
+    }
+  });
+
+  server.get("/inventory/regions", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    try {
+      return await getInventoryRegions(projectId);
+    } catch (error) {
+      request.log.error(`Failed to build inventory regions: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to build inventory regions" });
     }
   });
 
