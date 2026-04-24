@@ -6,14 +6,16 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { eq, and, or, desc } from "drizzle-orm";
 import { db } from "./db.js";
-import { projects, pages, elements } from "./schema.js";
+import { projects, pages, elements, crawlRuns } from "./schema.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
 import { getInventoryTokens } from "./services/inventory/index.js";
-import { defaultWorkspacePath, workspaceRoot, } from "./services/workspace/paths.js";
+import { buildInventoryRenderModel } from "./services/inventory/renderModel.js";
+import { workspaceRoot, } from "./services/workspace/paths.js";
 import { getWorkspaceDecisionPayload, getWorkspaceStatus, } from "./services/workspace/index.js";
+import { InventoryOverviewSchema, InventoryDecisionsSchema, InventoryRenderDataSchema, } from "@sitemapper/shared";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function isValidId(id) {
@@ -77,6 +79,15 @@ async function readJsonFile(filePath, fallback) {
         return fallback;
     }
 }
+function devValidate(label, schema, data) {
+    if (process.env.NODE_ENV === "production")
+        return;
+    const result = schema.safeParse(data);
+    if (!result.success && result.error) {
+        const issues = result.error.issues.map((issue) => `${issue.path.join(".")} — ${issue.message}`).join("; ");
+        console.warn(`[dev-validation] ${label} failed: ${issues}`);
+    }
+}
 function workspaceAssetUrl(baseUrl, projectId, relativePath) {
     if (!relativePath || relativePath.includes("undefined"))
         return null;
@@ -85,91 +96,8 @@ function workspaceAssetUrl(baseUrl, projectId, relativePath) {
         .map((part) => encodeURIComponent(part))
         .join("/")}`;
 }
-async function buildInventoryRenderData(projectId, baseUrl) {
-    const workspacePath = defaultWorkspacePath(projectId);
-    const decisions = await getWorkspaceDecisionPayload(projectId);
-    const catalogPath = path.join(workspacePath, "catalog");
-    const entries = await fs.promises.readdir(catalogPath, { withFileTypes: true }).catch(() => []);
-    const groupsByFingerprint = new Map();
-    const elementsById = new Map();
-    const pagesPath = path.join(workspacePath, "pages");
-    const pageEntries = await fs.promises.readdir(pagesPath, { withFileTypes: true }).catch(() => []);
-    for (const entry of pageEntries) {
-        if (!entry.isDirectory())
-            continue;
-        const pageElements = await readJsonFile(path.join(pagesPath, entry.name, "elements.json"), []);
-        for (const element of pageElements) {
-            const id = typeof element.id === "string" ? element.id : null;
-            if (id)
-                elementsById.set(id, { ...element, pageId: entry.name });
-        }
-    }
-    for (const entry of entries) {
-        if (!entry.isDirectory())
-            continue;
-        const categoryFolder = entry.name;
-        const groups = await readJsonFile(path.join(catalogPath, categoryFolder, "groups.json"), []);
-        for (const group of groups) {
-            const fingerprint = typeof group.fingerprint === "string" ? group.fingerprint : null;
-            if (!fingerprint)
-                continue;
-            groupsByFingerprint.set(fingerprint, { ...group, categoryFolder });
-        }
-    }
-    const clustersRecord = decisions.clusters && typeof decisions.clusters === "object" && !Array.isArray(decisions.clusters)
-        ? decisions.clusters
-        : {};
-    const clusterExamples = {};
-    for (const cluster of Array.isArray(clustersRecord.clusters) ? clustersRecord.clusters : []) {
-        const clusterId = typeof cluster.id === "string" ? cluster.id : null;
-        if (!clusterId)
-            continue;
-        const examples = [];
-        const fingerprints = Array.isArray(cluster.memberFingerprints)
-            ? cluster.memberFingerprints.filter((value) => typeof value === "string")
-            : [];
-        for (const fingerprint of fingerprints) {
-            const group = groupsByFingerprint.get(fingerprint);
-            if (!group)
-                continue;
-            const categoryFolder = typeof group.categoryFolder === "string" ? group.categoryFolder : "";
-            const cropPath = typeof group.cropPath === "string" ? group.cropPath : undefined;
-            const cropContextPath = typeof group.cropContextPath === "string" ? group.cropContextPath : undefined;
-            const exemplarElementId = typeof group.exemplarElementId === "string"
-                ? group.exemplarElementId
-                : Array.isArray(group.elementIds) && typeof group.elementIds[0] === "string"
-                    ? group.elementIds[0]
-                    : null;
-            const exemplarElement = exemplarElementId ? elementsById.get(exemplarElementId) : null;
-            const cropUrl = cropPath
-                ? workspaceAssetUrl(baseUrl, projectId, `catalog/${categoryFolder}/${cropPath}`)
-                : null;
-            const cropContextUrl = cropContextPath
-                ? workspaceAssetUrl(baseUrl, projectId, `catalog/${categoryFolder}/${cropContextPath}`)
-                : null;
-            examples.push({
-                fingerprint,
-                shortFingerprint: fingerprint.slice(0, 18),
-                instanceCount: typeof group.instanceCount === "number" ? group.instanceCount : 0,
-                pageCount: typeof group.pageCount === "number" ? group.pageCount : 0,
-                textSamples: Array.isArray(group.textSamples) ? group.textSamples.slice(0, 3) : [],
-                elementId: exemplarElementId,
-                pageId: exemplarElement && typeof exemplarElement.pageId === "string"
-                    ? exemplarElement.pageId
-                    : null,
-                bbox: Array.isArray(exemplarElement?.bbox) ? exemplarElement.bbox : null,
-                cropUrl,
-                cropContextUrl,
-            });
-            if (examples.length >= 3)
-                break;
-        }
-        clusterExamples[clusterId] = examples;
-    }
-    return {
-        ...decisions,
-        clusterExamples,
-    };
+export async function buildInventoryRenderData(projectId, baseUrl) {
+    return buildInventoryRenderModel(projectId, baseUrl);
 }
 export async function buildServer() {
     const server = Fastify({ logger: fastifyLoggerConfig });
@@ -247,6 +175,32 @@ export async function buildServer() {
         db.delete(pages).where(eq(pages.projectId, pid)).run();
         db.delete(projects).where(eq(projects.id, pid)).run();
         return { ok: true, deletedId: id };
+    });
+    server.get("/projects/:projectId/crawl-runs", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        const rows = db
+            .select()
+            .from(crawlRuns)
+            .where(eq(crawlRuns.projectId, toId(projectId)))
+            .orderBy(desc(crawlRuns.startedAt))
+            .all();
+        return {
+            crawlRuns: rows.map((r) => ({
+                id: String(r.id),
+                projectId: String(r.projectId),
+                jobId: r.jobId,
+                startUrl: r.startUrl,
+                pageCount: r.pageCount,
+                elementCount: r.elementCount,
+                status: r.status,
+                startedAt: r.startedAt.toISOString(),
+                completedAt: r.completedAt?.toISOString() ?? null,
+            })),
+        };
     });
     // ── Job progress & status ─────────────────────────────────────────────────
     server.post("/progress/:jobId", async (request, reply) => {
@@ -630,7 +584,9 @@ export async function buildServer() {
         if (!projectExists(projectId))
             return reply.status(404).send({ error: "Project not found" });
         try {
-            return await getWorkspaceStatus(projectId);
+            const payload = await getWorkspaceStatus(projectId);
+            devValidate("InventoryOverview", InventoryOverviewSchema, payload);
+            return payload;
         }
         catch (error) {
             request.log.error(`Failed to build inventory overview: ${error instanceof Error ? error.message : String(error)}`);
@@ -644,7 +600,9 @@ export async function buildServer() {
         if (!projectExists(projectId))
             return reply.status(404).send({ error: "Project not found" });
         try {
-            return await getWorkspaceDecisionPayload(projectId);
+            const payload = await getWorkspaceDecisionPayload(projectId);
+            devValidate("InventoryDecisions", InventoryDecisionsSchema, payload);
+            return payload;
         }
         catch (error) {
             request.log.error(`Failed to load inventory decisions: ${error instanceof Error ? error.message : String(error)}`);
@@ -658,7 +616,9 @@ export async function buildServer() {
         if (!projectExists(projectId))
             return reply.status(404).send({ error: "Project not found" });
         try {
-            return await buildInventoryRenderData(projectId, requestBaseUrl(request));
+            const payload = await buildInventoryRenderData(projectId, requestBaseUrl(request));
+            devValidate("InventoryRenderData", InventoryRenderDataSchema, payload);
+            return payload;
         }
         catch (error) {
             request.log.error(`Failed to load inventory render data: ${error instanceof Error ? error.message : String(error)}`);

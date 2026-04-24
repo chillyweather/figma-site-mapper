@@ -79,6 +79,33 @@ sqlite.exec(`
 
   CREATE INDEX IF NOT EXISTS elements_page_id_type_idx ON elements(page_id, type);
   CREATE INDEX IF NOT EXISTS elements_project_id_type_idx ON elements(project_id, type);
+
+  CREATE TABLE IF NOT EXISTS crawl_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    job_id TEXT,
+    start_url TEXT NOT NULL,
+    settings_json TEXT NOT NULL DEFAULT '{}',
+    page_ids_json TEXT NOT NULL DEFAULT '[]',
+    page_count INTEGER NOT NULL DEFAULT 0,
+    element_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'completed',
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS inventory_builds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    crawl_run_id INTEGER,
+    workspace_path TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    page_count INTEGER NOT NULL DEFAULT 0,
+    element_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'completed',
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
 `);
 function ensureColumn(tableName, columnName, columnDefinition) {
     const columns = sqlite
@@ -104,6 +131,7 @@ ensureColumn("elements", "crop_context_path", "crop_context_path TEXT");
 ensureColumn("elements", "crop_error", "crop_error TEXT");
 ensureColumn("elements", "is_global_chrome", "is_global_chrome INTEGER DEFAULT 0");
 ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TEXT");
+ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
 export const db = drizzle(sqlite, { schema });
 export async function connectDB() {
     console.log(`✅ SQLite database ready at ${dbPath}`);

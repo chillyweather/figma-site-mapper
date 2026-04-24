@@ -753,7 +753,7 @@ async function generateAnnotatedScreenshot(imageBuffer, url, elementsToAnnotate,
         return undefined;
     return `${publicUrl}/screenshots/${annotatedFileName}`;
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction) {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction, crawlRunId) {
     console.log("🚀 Starting the crawler with URL:", startUrl);
     console.log("📊 Crawler settings:", {
         maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth,
@@ -791,6 +791,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     let isTerminating = false;
     let pageCounter = 1;
     let missingProjectIdWarned = false;
+    let persistedElementCount = 0;
     const shouldTerminate = () => !!(maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl);
     let authSuccess = false;
     if (auth) {
@@ -1272,6 +1273,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             : null,
                         lastCrawledAt: now,
                         lastCrawlJobId: jobId ?? null,
+                        lastCrawlRunId: crawlRunId ?? null,
                         createdAt: now,
                         updatedAt: now,
                     })
@@ -1287,6 +1289,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                                 : null,
                             lastCrawledAt: now,
                             lastCrawlJobId: jobId ?? null,
+                            lastCrawlRunId: crawlRunId ?? null,
                             updatedAt: now,
                         },
                     })
@@ -1367,6 +1370,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         for (let i = 0; i < allElements.length; i += ELEMENT_INSERT_CHUNK) {
                             db.insert(elements).values(allElements.slice(i, i + ELEMENT_INSERT_CHUNK)).run();
                         }
+                        persistedElementCount += allElements.length;
                         log.info(`Persisted ${allElements.length} elements for ${finalUrl}`);
                     }
                     else {
@@ -1620,6 +1624,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         visitedUrls: crawledPages.map((p) => toCanonicalUrl(p.url)),
         visitedPageIds: Array.from(visitedPageIds),
         pageCount: crawledPages.length,
+        elementCount: persistedElementCount,
         startUrl: canonicalStartUrl,
         capturedCookies,
     };

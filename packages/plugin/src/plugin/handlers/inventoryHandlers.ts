@@ -6,6 +6,7 @@ import {
   prepareInventory,
 } from "../services/apiClient";
 import { renderInventoryBoards } from "../../figmaRendering/renderInventoryBoards";
+import type { InventoryPluginToUiMessage } from "../../messages/inventoryMessages";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,14 +25,18 @@ function normalizeProgress(progress: unknown): number {
   return 0;
 }
 
+function postToUI(msg: InventoryPluginToUiMessage): void {
+  figma.ui.postMessage(msg);
+}
+
 async function postInventoryState(projectId: string): Promise<void> {
   const [overview, decisions] = await Promise.all([
     fetchInventoryOverview(projectId),
     fetchInventoryDecisions(projectId),
   ]);
 
-  figma.ui.postMessage({
-    type: "inventory-overview-loaded",
+  postToUI({
+    type: "inventory/loaded",
     projectId,
     overview,
     decisions,
@@ -44,8 +49,8 @@ export async function handleLoadInventoryOverviewRequest(msg: {
   const projectId = typeof msg.projectId === "string" ? msg.projectId.trim() : "";
 
   if (!projectId) {
-    figma.ui.postMessage({
-      type: "inventory-overview-error",
+    postToUI({
+      type: "inventory/error",
       projectId: null,
       error: "Select a project before loading inventory.",
     });
@@ -56,8 +61,8 @@ export async function handleLoadInventoryOverviewRequest(msg: {
     await postInventoryState(projectId);
   } catch (error) {
     console.error("Failed to load inventory overview", error);
-    figma.ui.postMessage({
-      type: "inventory-overview-error",
+    postToUI({
+      type: "inventory/error",
       projectId,
       error: error instanceof Error ? error.message : "Failed to load inventory overview.",
     });
@@ -70,8 +75,8 @@ export async function handlePrepareInventoryRequest(msg: {
   const projectId = typeof msg.projectId === "string" ? msg.projectId.trim() : "";
 
   if (!projectId) {
-    figma.ui.postMessage({
-      type: "inventory-prepare-error",
+    postToUI({
+      type: "inventory/error",
       projectId: null,
       error: "Select a project before preparing inventory.",
     });
@@ -80,8 +85,8 @@ export async function handlePrepareInventoryRequest(msg: {
 
   try {
     const queued = await prepareInventory(projectId);
-    figma.ui.postMessage({
-      type: "inventory-prepare-started",
+    postToUI({
+      type: "inventory/prepareStarted",
       projectId,
       jobId: queued.jobId,
     });
@@ -95,8 +100,8 @@ export async function handlePrepareInventoryRequest(msg: {
         status.status ||
         "Preparing inventory workspace";
 
-      figma.ui.postMessage({
-        type: "inventory-prepare-status",
+      postToUI({
+        type: "inventory/prepareStatus",
         projectId,
         jobId: queued.jobId,
         status: status.status,
@@ -106,8 +111,8 @@ export async function handlePrepareInventoryRequest(msg: {
 
       if (status.status === "completed") {
         await postInventoryState(projectId);
-        figma.ui.postMessage({
-          type: "inventory-prepare-completed",
+        postToUI({
+          type: "inventory/prepareCompleted",
           projectId,
           jobId: queued.jobId,
         });
@@ -115,8 +120,8 @@ export async function handlePrepareInventoryRequest(msg: {
       }
 
       if (status.status === "failed") {
-        figma.ui.postMessage({
-          type: "inventory-prepare-error",
+        postToUI({
+          type: "inventory/prepareError",
           projectId,
           jobId: queued.jobId,
           error: "Inventory workspace preparation failed.",
@@ -127,16 +132,16 @@ export async function handlePrepareInventoryRequest(msg: {
       await sleep(1500);
     }
 
-    figma.ui.postMessage({
-      type: "inventory-prepare-error",
+    postToUI({
+      type: "inventory/prepareError",
       projectId,
       jobId: queued.jobId,
       error: "Inventory preparation timed out. Check backend worker logs.",
     });
   } catch (error) {
     console.error("Failed to prepare inventory workspace", error);
-    figma.ui.postMessage({
-      type: "inventory-prepare-error",
+    postToUI({
+      type: "inventory/prepareError",
       projectId,
       error: error instanceof Error ? error.message : "Failed to prepare inventory workspace.",
     });
@@ -149,8 +154,8 @@ export async function handleRenderInventoryBoardsRequest(msg: {
   const projectId = typeof msg.projectId === "string" ? msg.projectId.trim() : "";
 
   if (!projectId) {
-    figma.ui.postMessage({
-      type: "inventory-render-error",
+    postToUI({
+      type: "inventory/renderError",
       projectId: null,
       error: "Select a project before rendering inventory boards.",
     });
@@ -159,27 +164,27 @@ export async function handleRenderInventoryBoardsRequest(msg: {
   }
 
   try {
-    figma.ui.postMessage({
-      type: "inventory-render-started",
+    postToUI({
+      type: "inventory/renderStarted",
       projectId,
     });
 
-    const decisions = await fetchInventoryRenderData(projectId);
-    if (!decisions.hasWorkspace) {
+    const renderData = await fetchInventoryRenderData(projectId);
+    if (!renderData.hasWorkspace) {
       throw new Error("Inventory workspace is not prepared yet.");
     }
 
-    await renderInventoryBoards(decisions);
+    await renderInventoryBoards(renderData);
 
-    figma.ui.postMessage({
-      type: "inventory-render-completed",
+    postToUI({
+      type: "inventory/renderCompleted",
       projectId,
     });
     figma.notify("Inventory boards rendered.");
   } catch (error) {
     console.error("Failed to render inventory boards", error);
-    figma.ui.postMessage({
-      type: "inventory-render-error",
+    postToUI({
+      type: "inventory/renderError",
       projectId,
       error: error instanceof Error ? error.message : "Failed to render inventory boards.",
     });

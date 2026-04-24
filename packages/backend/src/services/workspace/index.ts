@@ -1,5 +1,8 @@
 import fs from "fs";
 import path from "path";
+import { and, eq, desc } from "drizzle-orm";
+import { db } from "../../db.js";
+import { inventoryBuilds, crawlRuns } from "../../schema.js";
 import { buildContactSheets } from "./contactSheet.js";
 import { ensureDecisionScaffold, readDecisionFiles, decisionSummary } from "./decisions.js";
 import { loadWorkspaceData } from "./loadData.js";
@@ -18,6 +21,17 @@ import { writeWorkspaceReadme } from "./readme.js";
 import { buildColorSwatches } from "./swatches.js";
 import { buildTypographySpecimens } from "./typeSpecimens.js";
 import type { WorkspaceBuildResult } from "./types.js";
+
+export function getLatestCompletedCrawlRun(projectId: string) {
+  const n = parseInt(projectId, 10);
+  if (isNaN(n) || n <= 0) return null;
+  return db
+    .select()
+    .from(crawlRuns)
+    .where(and(eq(crawlRuns.projectId, n), eq(crawlRuns.status, "completed")))
+    .orderBy(desc(crawlRuns.completedAt))
+    .get() ?? null;
+}
 
 const GENERATED_ENTRIES = [
   "README.md",
@@ -71,27 +85,77 @@ export async function buildWorkspace(
   log(options.verbose, `Loading project ${projectId} from SQLite`);
   const data = await loadWorkspaceData(projectId);
 
-  log(options.verbose, `Resetting generated workspace at ${workspacePath}`);
-  await resetGeneratedWorkspace(workspacePath);
+  const latestCrawlRun = getLatestCompletedCrawlRun(projectId);
+  const crawlRunId = latestCrawlRun?.id ?? null;
 
-  for (const folder of allCatalogFolders()) {
-    await ensureDir(path.join(workspacePath, "catalog", folder, "crops"));
+  log(options.verbose, `Creating inventory build record`);
+  const projectNumId = parseInt(projectId, 10);
+  let buildRow: typeof inventoryBuilds.$inferSelect | null = null;
+  if (!isNaN(projectNumId) && projectNumId > 0) {
+    const [row] = db
+      .insert(inventoryBuilds)
+      .values({
+        projectId: projectNumId,
+        crawlRunId,
+        workspacePath,
+        schemaVersion: 1,
+        status: "running",
+        startedAt: new Date(),
+      })
+      .returning()
+      .all();
+    buildRow = row ?? null;
   }
 
-  log(options.verbose, "Writing project/page/catalog manifests");
-  const groupsByFolder = buildCatalogGroups(data.elements);
-  await writeProjectManifest(workspacePath, data, generatedAt);
-  await writeCatalogManifests(workspacePath, data, groupsByFolder);
-  await writePageManifests(workspacePath, data);
-  await writeRegionManifests(workspacePath, data);
+  try {
+    log(options.verbose, `Resetting generated workspace at ${workspacePath}`);
+    await resetGeneratedWorkspace(workspacePath);
 
-  log(options.verbose, "Generating contact sheets and token images");
-  await buildContactSheets(workspacePath, groupsByFolder);
-  await writeTokenFiles(workspacePath, data);
+    for (const folder of allCatalogFolders()) {
+      await ensureDir(path.join(workspacePath, "catalog", folder, "crops"));
+    }
 
-  await writeWorkspaceReadme(workspacePath, data, generatedAt);
-  await writeWorkspaceMeta(workspacePath, data, generatedAt);
-  await ensureDecisionScaffold(workspacePath);
+    log(options.verbose, "Writing project/page/catalog manifests");
+    const groupsByFolder = buildCatalogGroups(data.elements);
+    await writeProjectManifest(workspacePath, data, generatedAt);
+    await writeCatalogManifests(workspacePath, data, groupsByFolder);
+    await writePageManifests(workspacePath, data);
+    await writeRegionManifests(workspacePath, data);
+
+    log(options.verbose, "Generating contact sheets and token images");
+    await buildContactSheets(workspacePath, groupsByFolder);
+    await writeTokenFiles(workspacePath, data);
+
+    await writeWorkspaceReadme(workspacePath, data, generatedAt);
+    await writeWorkspaceMeta(workspacePath, data, generatedAt, {
+      inventoryBuildId: buildRow ? String(buildRow.id) : undefined,
+      crawlRunId: crawlRunId ? String(crawlRunId) : undefined,
+    });
+    await ensureDecisionScaffold(workspacePath);
+
+    if (buildRow) {
+      db.update(inventoryBuilds)
+        .set({
+          status: "completed",
+          pageCount: data.pages.length,
+          elementCount: data.elements.length,
+          completedAt: new Date(),
+        })
+        .where(eq(inventoryBuilds.id, buildRow.id))
+        .run();
+    }
+  } catch (error) {
+    if (buildRow) {
+      db.update(inventoryBuilds)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+        })
+        .where(eq(inventoryBuilds.id, buildRow.id))
+        .run();
+    }
+    throw error;
+  }
 
   return {
     projectId,
@@ -112,6 +176,11 @@ export async function getWorkspaceStatus(projectId: string, outPath?: string): P
     .catch(() => null);
   const summary = await decisionSummary(workspacePath);
 
+  const latestCrawlRun = getLatestCompletedCrawlRun(projectId);
+  const workspaceCrawlRunId = meta && typeof meta.crawlRunId === "string" ? meta.crawlRunId : null;
+  const latestCrawlRunId = latestCrawlRun ? String(latestCrawlRun.id) : null;
+  const isWorkspaceStale = Boolean(meta) && latestCrawlRunId !== null && workspaceCrawlRunId !== latestCrawlRunId;
+
   return {
     projectId,
     workspaceRoot: workspacePath,
@@ -120,6 +189,10 @@ export async function getWorkspaceStatus(projectId: string, outPath?: string): P
     pageCount: projectJson?.pageCount ?? 0,
     elementCount: projectJson?.elementCount ?? 0,
     decisionSummary: summary,
+    crawlRunId: workspaceCrawlRunId,
+    inventoryBuildId: meta && typeof meta.inventoryBuildId === "string" ? meta.inventoryBuildId : null,
+    latestCrawlRunId,
+    isWorkspaceStale,
   };
 }
 

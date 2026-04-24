@@ -2,11 +2,13 @@
   "name": "plugin",
   "version": "1.0.0",
   "scripts": {
+    "prebuild": "pnpm --filter @sitemapper/shared build",
     "build": "pnpm run build:ui && pnpm run build:code && pnpm run fix-ui-path",
     "build:ui": "vite build",
     "build:code": "vite build --config vite.code.config.ts",
     "fix-ui-path": "test -f dist/src/ui.html && mv dist/src/ui.html dist/ui.html && rmdir dist/src 2>/dev/null || true",
     "watch": "concurrently \"vite build --watch\" \"vite build --config vite.code.config.ts --watch\"",
+    "predev": "pnpm --filter @sitemapper/shared build",
     "dev": "pnpm run watch"
   },
   "devDependencies": {
@@ -19,6 +21,7 @@
     "vite-plugin-singlefile": "^0.13.5"
   },
   "dependencies": {
+    "@sitemapper/shared": "workspace:*",
     "@tabler/icons-react": "^3.35.0",
     "jotai": "^2.15.0",
     "react": "^18.2.0",

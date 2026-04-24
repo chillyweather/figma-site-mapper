@@ -44,68 +44,13 @@ export interface Project {
   updatedAt?: string;
 }
 
-export type InventoryCategory =
-  | "button"
-  | "link"
-  | "input"
-  | "select"
-  | "textarea"
-  | "heading"
-  | "image"
-  | "text-block"
-  | "other";
-
-export type InventoryTokenGroup =
-  | "color"
-  | "typography"
-  | "spacing"
-  | "radius"
-  | "shadow";
-
-export interface InventoryDecisionSummary {
-  hasDecisions: boolean;
-  clusterCount: number;
-  tokenCount: number;
-  inconsistencyCount: number;
-  templateCount: number;
-}
-
-export interface InventoryOverview {
-  projectId: string;
-  workspaceRoot: string;
-  hasWorkspace: boolean;
-  lastBuiltAt: string | null;
-  pageCount: number;
-  elementCount: number;
-  decisionSummary: InventoryDecisionSummary;
-}
-
-export interface InventoryDecisions {
-  projectId: string;
-  workspaceRoot: string;
-  hasWorkspace: boolean;
-  lastBuiltAt: string | null;
-  clusters: unknown;
-  tokens: unknown;
-  inconsistencies: unknown;
-  templates: unknown;
-  notes: string;
-  clusterExamples?: Record<
-    string,
-    Array<{
-      fingerprint: string;
-      shortFingerprint: string;
-      instanceCount: number;
-      pageCount: number;
-      textSamples: string[];
-      elementId: string | null;
-      pageId: string | null;
-      bbox: [number, number, number, number] | null;
-      cropUrl: string | null;
-      cropContextUrl: string | null;
-    }>
-  >;
-}
+export type {
+  InventoryCategory,
+  InventoryTokenGroup,
+  InventoryDecisionSummary,
+  InventoryOverview,
+  InventoryDecisions,
+} from "@sitemapper/shared";
 
 export interface InventoryPrepareJob {
   jobId: string;

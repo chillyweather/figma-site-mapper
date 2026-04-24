@@ -6,14 +6,22 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "predev": "pnpm --filter @sitemapper/shared build",
     "dev": "tsx watch src/index.ts",
+    "preworker": "pnpm --filter @sitemapper/shared build",
     "worker": "tsx watch src/worker.ts",
+    "prestart": "pnpm --filter @sitemapper/shared build",
     "start": "tsx src/index.ts",
+    "prebuild": "pnpm --filter @sitemapper/shared build",
     "build": "tsc",
     "inventory:prepare": "tsx src/cli/inventoryPrepare.ts",
     "inventory:refresh": "tsx src/cli/inventoryRefresh.ts",
     "inventory:status": "tsx src/cli/inventoryStatus.ts",
-    "inventory:export": "tsx src/cli/inventoryExport.ts"
+    "inventory:export": "tsx src/cli/inventoryExport.ts",
+    "inventory:validate": "tsx src/cli/inventoryValidate.ts",
+    "validate:workspace": "tsx src/cli/validateWorkspace.ts",
+    "validate:render-data": "tsx src/cli/validateRenderData.ts",
+    "validate:fingerprints": "tsx src/cli/validateFingerprints.ts"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +37,7 @@
   "dependencies": {
     "@fastify/cors": "^11.1.0",
     "@fastify/static": "^8.2.0",
+    "@sitemapper/shared": "workspace:*",
     "better-sqlite3": "^12.9.0",
     "bullmq": "^5.58.0",
     "crawlee": "^3.14.1",

@@ -36,6 +36,8 @@ import {
   handlePrepareInventoryRequest,
   handleRenderInventoryBoardsRequest,
 } from "./inventoryHandlers";
+import { dispatchInventoryMessage } from "./inventoryMessageDispatcher";
+import { isInventoryUiMessage } from "../../messages/inventoryMessages";
 
 /** Persist cookies for a domain */
 async function storeDomainCookies(
@@ -951,6 +953,12 @@ async function handleGetLastManifest(): Promise<void> {
  * Main message router for UI messages
  */
 export async function handleUIMessage(msg: any): Promise<void> {
+  // Route typed inventory messages through the dedicated dispatcher
+  if (isInventoryUiMessage(msg)) {
+    await dispatchInventoryMessage(msg);
+    return;
+  }
+
   switch (msg.type) {
     case "start-crawl":
       await handleStartCrawl(msg);

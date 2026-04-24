@@ -18,8 +18,36 @@ export const pages = sqliteTable("pages", {
   annotatedScreenshotPath: text("annotated_screenshot_path"),
   lastCrawledAt: integer("last_crawled_at", { mode: "timestamp_ms" }),
   lastCrawlJobId: text("last_crawl_job_id"),
+  lastCrawlRunId: integer("last_crawl_run_id"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const crawlRuns = sqliteTable("crawl_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  jobId: text("job_id"),
+  startUrl: text("start_url").notNull(),
+  settingsJson: text("settings_json").notNull().default("{}"),
+  pageIdsJson: text("page_ids_json").notNull().default("[]"),
+  pageCount: integer("page_count").notNull().default(0),
+  elementCount: integer("element_count").notNull().default(0),
+  status: text("status").notNull().default("completed"),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+});
+
+export const inventoryBuilds = sqliteTable("inventory_builds", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  crawlRunId: integer("crawl_run_id"),
+  workspacePath: text("workspace_path").notNull(),
+  schemaVersion: integer("schema_version").notNull(),
+  pageCount: integer("page_count").notNull().default(0),
+  elementCount: integer("element_count").notNull().default(0),
+  status: text("status").notNull().default("completed"),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp_ms" }),
 });
 
 export const elements = sqliteTable("elements", {
@@ -64,3 +92,5 @@ export const elements = sqliteTable("elements", {
 export type Project = typeof projects.$inferSelect;
 export type Page = typeof pages.$inferSelect;
 export type Element = typeof elements.$inferSelect;
+export type CrawlRun = typeof crawlRuns.$inferSelect;
+export type InventoryBuild = typeof inventoryBuilds.$inferSelect;

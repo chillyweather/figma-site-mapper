@@ -1033,11 +1033,13 @@ export async function runCrawler(
     includeSelectors: boolean;
     includeComputedStyles: boolean;
     captureOnlyVisibleElements?: boolean;
-  }
+  },
+  crawlRunId?: number
 ): Promise<{
   visitedUrls: string[];
   visitedPageIds: string[];
   pageCount: number;
+  elementCount: number;
   startUrl: string;
   capturedCookies: Array<{ name: string; value: string; domain: string }>;
 }> {
@@ -1084,6 +1086,7 @@ export async function runCrawler(
   let isTerminating = false;
   let pageCounter = 1;
   let missingProjectIdWarned = false;
+  let persistedElementCount = 0;
 
   const shouldTerminate = () =>
     !!(maxRequestsPerCrawl && maxRequestsPerCrawl > 0 && currentPage >= maxRequestsPerCrawl);
@@ -1635,6 +1638,7 @@ export async function runCrawler(
                   : null,
                 lastCrawledAt: now,
                 lastCrawlJobId: jobId ?? null,
+                lastCrawlRunId: crawlRunId ?? null,
                 createdAt: now,
                 updatedAt: now,
               })
@@ -1650,6 +1654,7 @@ export async function runCrawler(
                     : null,
                   lastCrawledAt: now,
                   lastCrawlJobId: jobId ?? null,
+                  lastCrawlRunId: crawlRunId ?? null,
                   updatedAt: now,
                 },
               })
@@ -1739,6 +1744,7 @@ export async function runCrawler(
               for (let i = 0; i < allElements.length; i += ELEMENT_INSERT_CHUNK) {
                 db.insert(elements).values(allElements.slice(i, i + ELEMENT_INSERT_CHUNK)).run();
               }
+              persistedElementCount += allElements.length;
               log.info(`Persisted ${allElements.length} elements for ${finalUrl}`);
             } else {
               log.info(`No elements to persist for ${finalUrl}`);
@@ -2003,6 +2009,7 @@ export async function runCrawler(
     visitedUrls: crawledPages.map((p) => toCanonicalUrl(p.url)),
     visitedPageIds: Array.from(visitedPageIds),
     pageCount: crawledPages.length,
+    elementCount: persistedElementCount,
     startUrl: canonicalStartUrl,
     capturedCookies,
   };

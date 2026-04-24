@@ -61,7 +61,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     parent.postMessage(
       {
         pluginMessage: {
-          type: "load-inventory-overview",
+          type: "inventory/load",
           projectId: activeProjectId,
         },
       },
@@ -85,7 +85,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     parent.postMessage(
       {
         pluginMessage: {
-          type: "prepare-inventory",
+          type: "inventory/prepare",
           projectId: activeProjectId,
         },
       },
@@ -111,7 +111,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     parent.postMessage(
       {
         pluginMessage: {
-          type: "render-inventory-boards",
+          type: "inventory/renderBoards",
           projectId: activeProjectId,
         },
       },
@@ -127,19 +127,19 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
       const matchesProject = !activeProjectId || msg.projectId === activeProjectId;
       if (!matchesProject) return;
 
-      if (msg.type === "inventory-overview-loaded") {
+      if (msg.type === "inventory/loaded") {
         setOverview(msg.overview as InventoryOverview);
         setDecisions((msg.decisions as InventoryDecisions | undefined) ?? null);
         setIsLoading(false);
         setError(null);
       }
 
-      if (msg.type === "inventory-overview-error") {
+      if (msg.type === "inventory/error") {
         setIsLoading(false);
         setError(typeof msg.error === "string" ? msg.error : "Failed to load inventory status.");
       }
 
-      if (msg.type === "inventory-prepare-started") {
+      if (msg.type === "inventory/prepareStarted") {
         setIsPreparing(true);
         setPrepareJob({
           jobId: String(msg.jobId ?? ""),
@@ -150,7 +150,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
         });
       }
 
-      if (msg.type === "inventory-prepare-status") {
+      if (msg.type === "inventory/prepareStatus") {
         setIsPreparing(msg.status !== "completed" && msg.status !== "failed");
         setPrepareJob({
           jobId: String(msg.jobId ?? ""),
@@ -165,7 +165,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
         });
       }
 
-      if (msg.type === "inventory-prepare-completed") {
+      if (msg.type === "inventory/prepareCompleted") {
         setIsPreparing(false);
         setPrepareJob((current) =>
           current
@@ -174,7 +174,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
         );
       }
 
-      if (msg.type === "inventory-prepare-error") {
+      if (msg.type === "inventory/prepareError") {
         setIsPreparing(false);
         setPrepareJob((current) =>
           current
@@ -184,16 +184,16 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
         setError(typeof msg.error === "string" ? msg.error : "Failed to prepare inventory workspace.");
       }
 
-      if (msg.type === "inventory-render-started") {
+      if (msg.type === "inventory/renderStarted") {
         setIsRendering(true);
         setError(null);
       }
 
-      if (msg.type === "inventory-render-completed") {
+      if (msg.type === "inventory/renderCompleted") {
         setIsRendering(false);
       }
 
-      if (msg.type === "inventory-render-error") {
+      if (msg.type === "inventory/renderError") {
         setIsRendering(false);
         setError(typeof msg.error === "string" ? msg.error : "Failed to render inventory boards.");
       }
@@ -242,9 +242,13 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
 
       {error && <div className="status-display status-error">{error}</div>}
 
-      <div className={`status-display ${hasWorkspace ? "status-success" : "status-warning"}`}>
+      <div className={`status-display ${hasWorkspace ? (overview?.isWorkspaceStale ? "status-warning" : "status-success") : "status-warning"}`}>
         <div style={{ fontWeight: 600, marginBottom: "6px" }}>
-          {hasWorkspace ? "Workspace ready" : "No prepared workspace"}
+          {hasWorkspace
+            ? overview?.isWorkspaceStale
+              ? "Workspace stale — rebuild recommended"
+              : "Workspace ready"
+            : "No prepared workspace"}
         </div>
         <div>Pages: {overview?.pageCount ?? 0}</div>
         <div>Elements: {overview?.elementCount ?? 0}</div>

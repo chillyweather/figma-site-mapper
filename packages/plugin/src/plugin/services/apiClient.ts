@@ -1,6 +1,7 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
 import type { InventoryDecisions, InventoryOverview } from "../../types";
+import type { InventoryRenderData } from "@sitemapper/shared";
 
 interface PageResponseItem {
   _id: string;
@@ -405,7 +406,7 @@ export async function fetchInventoryDecisions(
 
 export async function fetchInventoryRenderData(
   projectId: string
-): Promise<InventoryDecisions> {
+): Promise<InventoryRenderData> {
   const response = await fetch(
     `${BACKEND_URL}/inventory/render-data/${encodeURIComponent(projectId)}`
   );

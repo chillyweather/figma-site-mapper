@@ -1,9 +1,11 @@
 import "dotenv/config";
 import "./logger.js"; // must be first — redirects console.* to pino
 import { Worker } from "bullmq";
+import { eq } from "drizzle-orm";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
-import { connectDB } from "./db.js";
+import { connectDB, db } from "./db.js";
+import { crawlRuns } from "./schema.js";
 import { buildWorkspace } from "./services/workspace/index.js";
 await connectDB();
 const processor = async (job) => {
@@ -51,8 +53,49 @@ const processor = async (job) => {
     if (styleExtraction?.enabled) {
         console.log(`🎨 Style Extraction: enabled (preset: ${styleExtraction.preset})`);
     }
+    let crawlRunId;
     try {
-        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction);
+        const projectNumId = projectId ? parseInt(projectId, 10) : null;
+        if (projectNumId && !isNaN(projectNumId)) {
+            const [row] = db
+                .insert(crawlRuns)
+                .values({
+                projectId: projectNumId,
+                jobId: String(job.id ?? ""),
+                startUrl: url,
+                settingsJson: JSON.stringify({
+                    maxRequestsPerCrawl,
+                    deviceScaleFactor,
+                    delay,
+                    requestDelay,
+                    maxDepth,
+                    defaultLanguageOnly,
+                    sampleSize,
+                    detectInteractiveElements,
+                    captureOnlyVisibleElements,
+                    highlightAllElements,
+                    fullRefresh,
+                }),
+                status: "running",
+                startedAt: new Date(),
+            })
+                .returning()
+                .all();
+            crawlRunId = row?.id;
+        }
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId);
+        if (crawlRunId) {
+            db.update(crawlRuns)
+                .set({
+                status: "completed",
+                pageIdsJson: JSON.stringify(result.visitedPageIds),
+                pageCount: result.pageCount,
+                elementCount: result.elementCount,
+                completedAt: new Date(),
+            })
+                .where(eq(crawlRuns.id, crawlRunId))
+                .run();
+        }
         await job.updateData({
             ...job.data,
             visitedUrls: result.visitedUrls,
@@ -64,6 +107,12 @@ const processor = async (job) => {
         return result;
     }
     catch (error) {
+        if (crawlRunId) {
+            db.update(crawlRuns)
+                .set({ status: "failed", completedAt: new Date() })
+                .where(eq(crawlRuns.id, crawlRunId))
+                .run();
+        }
         console.error(`❌ Job ${job.id} failed:`, error);
         throw error;
     }

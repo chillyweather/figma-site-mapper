@@ -1,9 +1,11 @@
 import "dotenv/config";
 import "./logger.js"; // must be first — redirects console.* to pino
 import { Worker, Job } from "bullmq";
+import { eq } from "drizzle-orm";
 import { connection } from "./queue.js";
 import { runCrawler } from "./crawler.js";
-import { connectDB } from "./db.js";
+import { connectDB, db } from "./db.js";
+import { crawlRuns } from "./schema.js";
 import { buildWorkspace } from "./services/workspace/index.js";
 
 await connectDB();
@@ -78,7 +80,37 @@ const processor = async (job: Job) => {
     );
   }
 
+  let crawlRunId: number | undefined;
   try {
+    const projectNumId = projectId ? parseInt(projectId, 10) : null;
+    if (projectNumId && !isNaN(projectNumId)) {
+      const [row] = db
+        .insert(crawlRuns)
+        .values({
+          projectId: projectNumId,
+          jobId: String(job.id ?? ""),
+          startUrl: url,
+          settingsJson: JSON.stringify({
+            maxRequestsPerCrawl,
+            deviceScaleFactor,
+            delay,
+            requestDelay,
+            maxDepth,
+            defaultLanguageOnly,
+            sampleSize,
+            detectInteractiveElements,
+            captureOnlyVisibleElements,
+            highlightAllElements,
+            fullRefresh,
+          }),
+          status: "running",
+          startedAt: new Date(),
+        })
+        .returning()
+        .all();
+      crawlRunId = row?.id;
+    }
+
     const result = await runCrawler(
       url,
       publicUrl,
@@ -97,8 +129,23 @@ const processor = async (job: Job) => {
       fullRefresh === true,
       projectId,
       auth,
-      styleExtraction
+      styleExtraction,
+      crawlRunId
     );
+
+    if (crawlRunId) {
+      db.update(crawlRuns)
+        .set({
+          status: "completed",
+          pageIdsJson: JSON.stringify(result.visitedPageIds),
+          pageCount: result.pageCount,
+          elementCount: result.elementCount,
+          completedAt: new Date(),
+        })
+        .where(eq(crawlRuns.id, crawlRunId))
+        .run();
+    }
+
     await job.updateData({
       ...job.data,
       visitedUrls: result.visitedUrls,
@@ -109,6 +156,12 @@ const processor = async (job: Job) => {
     console.log(`✅ Finished job ${job.id}`);
     return result;
   } catch (error) {
+    if (crawlRunId) {
+      db.update(crawlRuns)
+        .set({ status: "failed", completedAt: new Date() })
+        .where(eq(crawlRuns.id, crawlRunId))
+        .run();
+    }
     console.error(`❌ Job ${job.id} failed:`, error);
     throw error;
   }

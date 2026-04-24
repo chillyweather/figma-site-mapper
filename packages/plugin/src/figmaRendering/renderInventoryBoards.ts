@@ -1,515 +1,166 @@
-import type { InventoryDecisions } from "../types";
+import type { InventoryRenderData, RenderBoard, RenderSection, RenderCard, RenderAsset } from "@sitemapper/shared";
+import {
+  loadFonts,
+  createText,
+  createFrame,
+  createBadge,
+  createMissingImageNote,
+  createImageRect,
+  hexToPaint,
+  addSectionTitle,
+  createGrid,
+  findOrCreateInventoryPage,
+  createSampleLink,
+  COLORS,
+  KIND_COLORS,
+} from "./inventory/shared";
+import { findOrCreateSampleAnchor } from "./inventory/sampleAnchors";
 
-type JsonRecord = Record<string, unknown>;
-
-const PAGE_NAME = "DS Inventory";
-const ANCHOR_CONTAINER_NAME = "DS Inventory Sample Anchors";
-
-const COLORS = {
-  ink: { r: 0.07, g: 0.09, b: 0.14 },
-  muted: { r: 0.39, g: 0.43, b: 0.5 },
-  panel: { r: 0.96, g: 0.97, b: 0.98 },
-  white: { r: 1, g: 1, b: 1 },
-  blue: { r: 0.15, g: 0.35, b: 0.93 },
-  pink: { r: 1, g: 0.09, b: 0.42 },
-  amber: { r: 0.92, g: 0.6, b: 0.14 },
-  red: { r: 0.86, g: 0.15, b: 0.15 },
-  green: { r: 0.06, g: 0.55, b: 0.34 },
-};
-
-function asRecord(value: unknown): JsonRecord {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : {};
-}
-
-function asArray(value: unknown): JsonRecord[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is JsonRecord => Boolean(item) && typeof item === "object")
-    : [];
-}
-
-function textValue(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-function arrayText(value: unknown, limit = 6): string {
-  if (!Array.isArray(value)) return "";
-  return value
-    .map((item) => String(item))
-    .filter(Boolean)
-    .slice(0, limit)
-    .join(", ");
-}
-
-function hexToPaint(value: string): SolidPaint | null {
-  const match = value.trim().match(/^#([0-9a-f]{6})$/i);
-  if (!match) return null;
-  const hex = match[1];
-  return {
-    type: "SOLID",
-    color: {
-      r: parseInt(hex.slice(0, 2), 16) / 255,
-      g: parseInt(hex.slice(2, 4), 16) / 255,
-      b: parseInt(hex.slice(4, 6), 16) / 255,
-    },
-  };
-}
-
-async function loadFonts(): Promise<void> {
-  await Promise.all([
-    figma.loadFontAsync({ family: "Inter", style: "Regular" }),
-    figma.loadFontAsync({ family: "Inter", style: "Medium" }),
-    figma.loadFontAsync({ family: "Inter", style: "Bold" }),
-  ]);
-}
-
-function createText(
-  characters: string,
-  options: {
-    size?: number;
-    style?: "Regular" | "Medium" | "Bold";
-    color?: RGB;
-    width?: number;
-  } = {}
-): TextNode {
-  const node = figma.createText();
-  node.fontName = { family: "Inter", style: options.style ?? "Regular" };
-  node.fontSize = options.size ?? 14;
-  node.lineHeight = { unit: "PERCENT", value: 140 };
-  node.fills = [{ type: "SOLID", color: options.color ?? COLORS.ink }];
-  node.characters = characters;
-  if (options.width) {
-    node.resize(options.width, node.height);
-    node.textAutoResize = "HEIGHT";
-  }
-  return node;
-}
-
-function createFrame(name: string, width: number): FrameNode {
-  const frame = figma.createFrame();
-  frame.name = name;
-  frame.layoutMode = "VERTICAL";
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "FIXED";
-  frame.resize(width, 100);
-  frame.paddingTop = 24;
-  frame.paddingRight = 24;
-  frame.paddingBottom = 24;
-  frame.paddingLeft = 24;
-  frame.itemSpacing = 12;
-  frame.cornerRadius = 18;
-  frame.fills = [{ type: "SOLID", color: COLORS.white }];
-  frame.strokes = [{ type: "SOLID", color: { r: 0.88, g: 0.9, b: 0.93 } }];
-  frame.strokeWeight = 1;
-  return frame;
-}
-
-function createBadge(label: string, color: RGB = COLORS.blue): FrameNode {
-  const frame = figma.createFrame();
-  frame.name = `Badge / ${label}`;
-  frame.layoutMode = "HORIZONTAL";
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "AUTO";
-  frame.paddingTop = 5;
-  frame.paddingRight = 10;
-  frame.paddingBottom = 5;
-  frame.paddingLeft = 10;
-  frame.cornerRadius = 999;
-  frame.fills = [{ type: "SOLID", color }];
-  frame.appendChild(createText(label, { size: 11, style: "Medium", color: COLORS.white }));
-  return frame;
-}
-
-function createCard(title: string, lines: string[], accent: RGB): FrameNode {
-  const card = createFrame(title, 360);
-  card.cornerRadius = 14;
-  card.paddingTop = 18;
-  card.paddingRight = 18;
-  card.paddingBottom = 18;
-  card.paddingLeft = 18;
-  card.itemSpacing = 8;
-  card.fills = [{ type: "SOLID", color: COLORS.panel }];
-  card.appendChild(createBadge(title, accent));
-  for (const line of lines.filter(Boolean)) {
-    card.appendChild(createText(line, { size: 12, color: COLORS.muted, width: 324 }));
-  }
-  return card;
-}
-
-function createSampleLink(anchor: FrameNode | null): TextNode {
-  const link = createText(
-    anchor ? "View sample" : "Sample page not rendered",
-    {
-      size: 12,
-      style: "Medium",
-      color: anchor ? COLORS.blue : COLORS.muted,
-      width: 324,
-    }
-  );
-
-  if (anchor) {
-    link.textDecoration = "UNDERLINE";
-    link.hyperlink = { type: "NODE", value: anchor.id };
-  }
-
-  return link;
-}
-
-function createMissingImageNote(): FrameNode {
-  const frame = figma.createFrame();
-  frame.name = "No Crop Available";
-  frame.layoutMode = "VERTICAL";
-  frame.primaryAxisSizingMode = "AUTO";
-  frame.counterAxisSizingMode = "FIXED";
-  frame.resize(324, 56);
-  frame.paddingTop = 12;
-  frame.paddingRight = 12;
-  frame.paddingBottom = 12;
-  frame.paddingLeft = 12;
-  frame.cornerRadius = 10;
-  frame.fills = [{ type: "SOLID", color: { r: 0.91, g: 0.93, b: 0.96 } }];
-  frame.appendChild(createText("No crop available for this cluster", { size: 11, color: COLORS.muted, width: 300 }));
-  return frame;
-}
-
-async function createImageRect(url: string, label: string): Promise<RectangleNode | null> {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const image = figma.createImage(bytes);
-    const rect = figma.createRectangle();
-    rect.name = label;
-    rect.resize(96, 72);
-    rect.cornerRadius = 10;
-    rect.fills = [
-      {
-        type: "IMAGE",
-        scaleMode: "FIT",
-        imageHash: image.hash,
-      },
-    ];
-    rect.strokes = [{ type: "SOLID", color: { r: 0.84, g: 0.86, b: 0.9 } }];
-    rect.strokeWeight = 1;
-    return rect;
-  } catch (error) {
-    console.warn(`Failed to load inventory crop ${url}`, error);
-    return null;
-  }
-}
-
-async function createClusterImageRow(clusterId: string, decisions: InventoryDecisions): Promise<FrameNode | null> {
-  const examples = decisions.clusterExamples?.[clusterId] ?? [];
-  const urls = examples
-    .map((example) => example.cropContextUrl || example.cropUrl)
-    .filter((url): url is string => typeof url === "string" && url.length > 0)
-    .slice(0, 3);
-
-  if (!urls.length) return null;
+async function createAssetRow(assets: RenderAsset[]): Promise<FrameNode | null> {
+  const imageAssets = assets.filter((a): a is RenderAsset & { kind: "image"; url: string } => a.kind === "image" && Boolean(a.url));
+  if (imageAssets.length === 0) return null;
 
   const row = figma.createFrame();
-  row.name = "Cluster Crop Examples";
+  row.name = "Asset Row";
   row.layoutMode = "HORIZONTAL";
   row.primaryAxisSizingMode = "AUTO";
   row.counterAxisSizingMode = "AUTO";
   row.itemSpacing = 8;
   row.fills = [];
 
-  for (let index = 0; index < urls.length; index += 1) {
-    const rect = await createImageRect(urls[index], `Crop ${index + 1}`);
+  for (let index = 0; index < imageAssets.length; index += 1) {
+    const rect = await createImageRect(imageAssets[index].url, `Asset ${index + 1}`);
     if (rect) row.appendChild(rect);
   }
 
   return row.children.length > 0 ? row : null;
 }
 
-function findRenderedPageByPageId(pageId: string | null | undefined): PageNode | null {
-  if (!pageId) return null;
-  for (const page of figma.root.children) {
-    if (page.type === "PAGE" && page.getPluginData("PAGE_ID") === pageId) {
-      return page;
+async function buildCard(card: RenderCard, accent: RGB): Promise<FrameNode> {
+  const frame = createFrame(card.title, 360);
+  frame.cornerRadius = 14;
+  frame.paddingTop = 18;
+  frame.paddingRight = 18;
+  frame.paddingBottom = 18;
+  frame.paddingLeft = 18;
+  frame.itemSpacing = 8;
+  frame.fills = [{ type: "SOLID", color: COLORS.panel }];
+  frame.appendChild(createBadge(card.title, accent));
+
+  if (card.subtitle) {
+    frame.appendChild(createText(card.subtitle, { size: 12, color: COLORS.muted, width: 324 }));
+  }
+
+  // Assets
+  const assetRow = await createAssetRow(card.assets);
+  if (assetRow) {
+    frame.insertChild(1, assetRow);
+  } else if (card.assets.some((a) => a.kind === "image")) {
+    frame.insertChild(1, createMissingImageNote());
+  }
+
+  // Color swatches
+  for (const asset of card.assets) {
+    if (asset.kind === "color" && asset.color) {
+      const paint = hexToPaint(asset.color);
+      if (paint) {
+        const swatch = figma.createRectangle();
+        swatch.name = `Swatch / ${asset.color}`;
+        swatch.resize(324, 56);
+        swatch.cornerRadius = 10;
+        swatch.fills = [paint];
+        frame.insertChild(1, swatch);
+      }
     }
   }
-  return null;
-}
 
-function getOrCreateAnchorContainer(page: PageNode): FrameNode {
-  const existing = page.findOne(
-    (node) => node.type === "FRAME" && node.name === ANCHOR_CONTAINER_NAME
-  ) as FrameNode | null;
-  if (existing) return existing;
+  // Body lines
+  for (const line of card.body.filter(Boolean)) {
+    frame.appendChild(createText(line, { size: 12, color: COLORS.muted, width: 324 }));
+  }
 
-  const frame = figma.createFrame();
-  frame.name = ANCHOR_CONTAINER_NAME;
-  frame.layoutMode = "NONE";
-  frame.fills = [];
-  frame.strokes = [];
-  frame.clipsContent = false;
-  frame.locked = false;
-  frame.resize(1, 1);
-  page.appendChild(frame);
+  // Links
+  for (const link of card.links) {
+    if (link.target.kind === "sample") {
+      const anchor = findOrCreateSampleAnchor(
+        card.id,
+        link.target.pageId,
+        link.target.elementId,
+        link.target.bbox
+      );
+      frame.appendChild(createSampleLink(anchor));
+    }
+  }
+
   return frame;
 }
 
-function findOrCreateSampleAnchor(
-  clusterId: string,
-  example: NonNullable<InventoryDecisions["clusterExamples"]>[string][number]
-): FrameNode | null {
-  if (!example.pageId || !example.elementId || !example.bbox) return null;
-  const targetPage = findRenderedPageByPageId(example.pageId);
-  if (!targetPage) return null;
+async function buildSection(section: RenderSection): Promise<FrameNode> {
+  const accent = KIND_COLORS[section.kind] ?? COLORS.blue;
+  const container = createFrame(section.title, 1200);
+  addSectionTitle(container, section.title, `${section.cards.length} items`);
+  const grid = createGrid(`${section.kind} Cards`);
 
-  const [x, y, width, height] = example.bbox;
-  if (![x, y, width, height].every((value) => Number.isFinite(value))) return null;
-
-  const storedScreenshotWidth = Number(targetPage.getPluginData("SCREENSHOT_WIDTH"));
-  const storedOriginalWidth = Number(targetPage.getPluginData("ORIGINAL_VIEWPORT_WIDTH"));
-  const scale =
-    Number.isFinite(storedScreenshotWidth) &&
-    Number.isFinite(storedOriginalWidth) &&
-    storedOriginalWidth > 0
-      ? storedScreenshotWidth / storedOriginalWidth
-      : 1;
-
-  const container = getOrCreateAnchorContainer(targetPage);
-  const anchorName = `DS Anchor / ${clusterId} / ${example.elementId}`;
-  let anchor = container.children.find(
-    (child): child is FrameNode =>
-      child.type === "FRAME" && child.getPluginData("DS_INVENTORY_ANCHOR") === anchorName
-  );
-
-  if (!anchor) {
-    anchor = figma.createFrame();
-    anchor.name = anchorName;
-    anchor.setPluginData("DS_INVENTORY_ANCHOR", anchorName);
-    anchor.fills = [{ type: "SOLID", color: COLORS.pink, opacity: 0.04 }];
-    anchor.strokes = [{ type: "SOLID", color: COLORS.pink, opacity: 0.35 }];
-    anchor.strokeWeight = 2;
-    anchor.cornerRadius = 8;
-    container.appendChild(anchor);
+  for (const card of section.cards) {
+    const cardNode = await buildCard(card, accent);
+    grid.appendChild(cardNode);
   }
 
-  anchor.x = x * scale;
-  anchor.y = y * scale;
-  anchor.resize(Math.max(16, width * scale), Math.max(16, height * scale));
-  anchor.locked = false;
-  return anchor;
+  container.appendChild(grid);
+  return container;
 }
 
-function addSectionTitle(parent: FrameNode, title: string, subtitle?: string): void {
-  parent.appendChild(createText(title, { size: 28, style: "Bold", width: 1120 }));
-  if (subtitle) {
-    parent.appendChild(createText(subtitle, { size: 14, color: COLORS.muted, width: 1120 }));
-  }
-}
+async function buildBoard(board: RenderBoard): Promise<FrameNode> {
+  const container = createFrame(board.title, 1280);
+  container.paddingTop = 40;
+  container.paddingBottom = 40;
+  container.itemSpacing = 24;
+  container.fills = [{ type: "SOLID", color: { r: 0.93, g: 0.95, b: 0.98 } }];
+  container.appendChild(createText(board.title, { size: 32, style: "Bold", width: 1200 }));
 
-function createGrid(name: string): FrameNode {
-  const grid = figma.createFrame();
-  grid.name = name;
-  grid.layoutMode = "HORIZONTAL";
-  grid.primaryAxisSizingMode = "AUTO";
-  grid.counterAxisSizingMode = "AUTO";
-  grid.layoutWrap = "WRAP";
-  grid.itemSpacing = 16;
-  grid.counterAxisSpacing = 16;
-  grid.fills = [];
-  grid.resize(1120, 100);
-  return grid;
-}
-
-async function buildClustersSection(decisions: InventoryDecisions): Promise<FrameNode> {
-  const clusters = asArray(asRecord(decisions.clusters).clusters);
-  const section = createFrame("Components", 1200);
-  addSectionTitle(section, "Components", `${clusters.length} agent-defined clusters`);
-  const grid = createGrid("Component Cluster Cards");
-
-  for (const cluster of clusters) {
-    const clusterId = textValue(cluster.id);
-    const examples = clusterId ? decisions.clusterExamples?.[clusterId] ?? [] : [];
-    const card = createCard(
-      textValue(cluster.name, clusterId || "Unnamed cluster"),
-      [
-        `ID: ${clusterId || "-"}`,
-        `Category: ${textValue(cluster.category, "-")}`,
-        `Confidence: ${textValue(cluster.confidence, "-")}`,
-        `Members: ${Array.isArray(cluster.memberFingerprints) ? cluster.memberFingerprints.length : 0}`,
-        examples.length > 0
-          ? `Examples: ${examples.map((example) => `${example.instanceCount}x`).join(" / ")}`
-          : "",
-        textValue(cluster.notes),
-      ],
-      COLORS.blue
-    );
-    if (clusterId) {
-      const imageRow = await createClusterImageRow(clusterId, decisions);
-      card.insertChild(1, imageRow ?? createMissingImageNote());
-      const firstExample = examples.find(
-        (example) => example.pageId && example.elementId && example.bbox
-      );
-      const anchor = firstExample ? findOrCreateSampleAnchor(clusterId, firstExample) : null;
-      card.insertChild(2, createSampleLink(anchor));
-    }
-    grid.appendChild(card);
+  for (const section of board.sections) {
+    container.appendChild(await buildSection(section));
   }
 
-  section.appendChild(grid);
-  return section;
+  return container;
 }
 
-function buildTokensSection(decisions: InventoryDecisions): FrameNode {
-  const tokenRecord = asRecord(decisions.tokens);
-  const section = createFrame("Tokens", 1200);
-  const tokenCount = ["colors", "typography", "spacing", "radii", "shadows"].reduce(
-    (sum, key) => sum + asArray(tokenRecord[key]).length,
-    0
-  );
-  addSectionTitle(section, "Tokens", `${tokenCount} accepted tokens`);
-
-  const colorGrid = createGrid("Color Tokens");
-  for (const token of asArray(tokenRecord.colors)) {
-    const value = textValue(token.value);
-    const card = createCard(
-      textValue(token.name, value),
-      [value, textValue(token.usage)],
-      COLORS.pink
-    );
-    const paint = hexToPaint(value);
-    if (paint) {
-      const swatch = figma.createRectangle();
-      swatch.name = `Swatch / ${value}`;
-      swatch.resize(324, 56);
-      swatch.cornerRadius = 10;
-      swatch.fills = [paint];
-      card.insertChild(1, swatch);
-    }
-    colorGrid.appendChild(card);
-  }
-  section.appendChild(colorGrid);
-
-  for (const key of ["typography", "spacing", "radii", "shadows"]) {
-    const tokens = asArray(tokenRecord[key]);
-    if (!tokens.length) continue;
-    section.appendChild(createText(key[0].toUpperCase() + key.slice(1), { size: 20, style: "Bold", width: 1120 }));
-    const grid = createGrid(`${key} Tokens`);
-    for (const token of tokens) {
-      grid.appendChild(
-        createCard(
-          textValue(token.name, "Unnamed token"),
-          [textValue(token.value), textValue(token.usage)],
-          COLORS.green
-        )
-      );
-    }
-    section.appendChild(grid);
-  }
-
-  return section;
-}
-
-function buildIssuesSection(decisions: InventoryDecisions): FrameNode {
-  const issues = asArray(asRecord(decisions.inconsistencies).issues);
-  const section = createFrame("Inconsistencies", 1200);
-  addSectionTitle(section, "Inconsistencies", `${issues.length} review items`);
-  const grid = createGrid("Issue Cards");
-  for (const issue of issues) {
-    const severity = textValue(issue.severity, "review");
-    grid.appendChild(
-      createCard(
-        textValue(issue.id, "Issue"),
-        [
-          `Severity: ${severity}`,
-          textValue(issue.description, textValue(issue.summary)),
-          `Recommendation: ${textValue(issue.recommendation, "-")}`,
-        ],
-        severity === "medium" ? COLORS.amber : severity === "high" ? COLORS.red : COLORS.muted
-      )
-    );
-  }
-  section.appendChild(grid);
-  return section;
-}
-
-function buildTemplatesSection(decisions: InventoryDecisions): FrameNode {
-  const templates = asArray(asRecord(decisions.templates).templates);
-  const section = createFrame("Templates", 1200);
-  addSectionTitle(section, "Templates", `${templates.length} page and section patterns`);
-  const grid = createGrid("Template Cards");
-  for (const template of templates) {
-    grid.appendChild(
-      createCard(
-        textValue(template.name, textValue(template.id, "Template")),
-        [
-          `ID: ${textValue(template.id, "-")}`,
-          `Pages: ${arrayText(template.pageIds) || "-"}`,
-          `Regions: ${arrayText(template.regions) || "-"}`,
-          textValue(template.notes),
-        ],
-        COLORS.blue
-      )
-    );
-  }
-  section.appendChild(grid);
-  return section;
-}
-
-function buildNotesSection(decisions: InventoryDecisions): FrameNode {
-  const section = createFrame("Notes", 1200);
-  addSectionTitle(section, "Notes", "Agent-written summary and caveats");
-  section.appendChild(createText(decisions.notes || "No notes written.", { size: 14, color: COLORS.muted, width: 1120 }));
-  return section;
-}
-
-function findOrCreateInventoryPage(): PageNode {
-  for (const page of figma.root.children) {
-    if (page.type === "PAGE" && page.getPluginData("SITEMAP_ROLE") === "ds-inventory") {
-      return page;
-    }
-  }
-  const page = figma.createPage();
-  page.name = PAGE_NAME;
-  page.setPluginData("SITEMAP_ROLE", "ds-inventory");
-  return page;
-}
-
-export async function renderInventoryBoards(decisions: InventoryDecisions): Promise<void> {
+export async function renderInventoryBoards(renderData: InventoryRenderData): Promise<void> {
   await loadFonts();
 
   const page = findOrCreateInventoryPage();
-  page.name = PAGE_NAME;
+  page.name = "DS Inventory";
   figma.currentPage = page;
 
   while (page.children.length > 0) {
     page.children[0].remove();
   }
 
-  const board = figma.createFrame();
-  board.name = `DS Inventory / Project ${decisions.projectId}`;
-  board.layoutMode = "VERTICAL";
-  board.primaryAxisSizingMode = "AUTO";
-  board.counterAxisSizingMode = "FIXED";
-  board.resize(1280, 100);
-  board.paddingTop = 56;
-  board.paddingRight = 40;
-  board.paddingBottom = 56;
-  board.paddingLeft = 40;
-  board.itemSpacing = 28;
-  board.fills = [{ type: "SOLID", color: { r: 0.93, g: 0.95, b: 0.98 } }];
-  page.appendChild(board);
+  const wrapper = figma.createFrame();
+  wrapper.name = `DS Inventory / Project ${renderData.projectId}`;
+  wrapper.layoutMode = "VERTICAL";
+  wrapper.primaryAxisSizingMode = "AUTO";
+  wrapper.counterAxisSizingMode = "FIXED";
+  wrapper.resize(1280, 100);
+  wrapper.paddingTop = 56;
+  wrapper.paddingRight = 40;
+  wrapper.paddingBottom = 56;
+  wrapper.paddingLeft = 40;
+  wrapper.itemSpacing = 28;
+  wrapper.fills = [{ type: "SOLID", color: { r: 0.93, g: 0.95, b: 0.98 } }];
+  page.appendChild(wrapper);
 
-  board.appendChild(createText("Design-System Inventory", { size: 40, style: "Bold", width: 1120 }));
-  board.appendChild(
+  wrapper.appendChild(createText("Design-System Inventory", { size: 40, style: "Bold", width: 1120 }));
+  wrapper.appendChild(
     createText(
-      `Project ${decisions.projectId} • Built ${decisions.lastBuiltAt ?? "unknown"} • Source: agent decisions`,
+      `Project ${renderData.projectId}${renderData.build.isWorkspaceStale ? " • Workspace stale" : ""}`,
       { size: 14, color: COLORS.muted, width: 1120 }
     )
   );
 
-  board.appendChild(await buildClustersSection(decisions));
-  board.appendChild(buildTokensSection(decisions));
-  board.appendChild(buildIssuesSection(decisions));
-  board.appendChild(buildTemplatesSection(decisions));
-  board.appendChild(buildNotesSection(decisions));
+  for (const board of renderData.boards) {
+    wrapper.appendChild(await buildBoard(board));
+  }
 
-  figma.viewport.scrollAndZoomIntoView([board]);
+  figma.viewport.scrollAndZoomIntoView([wrapper]);
 }

@@ -5,12 +5,15 @@ import { WORKSPACE_SCHEMA_VERSION, type WorkspaceData } from "./types.js";
 export async function writeWorkspaceMeta(
   workspacePath: string,
   data: WorkspaceData,
-  generatedAt: string
+  generatedAt: string,
+  extra?: { inventoryBuildId?: string; crawlRunId?: string }
 ): Promise<void> {
   await writeJson(path.join(workspacePath, ".workspace-meta.json"), {
     schemaVersion: WORKSPACE_SCHEMA_VERSION,
     lastBuiltAt: generatedAt,
     projectId: data.project.id,
+    inventoryBuildId: extra?.inventoryBuildId ?? null,
+    crawlRunId: extra?.crawlRunId ?? null,
     sourceDbRowVersions: {
       pageIds: data.pages.map((page) => page.id),
       elementCount: data.elements.length,

@@ -5,11 +5,13 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build:shared": "pnpm --filter @sitemapper/shared build",
     "dev:plugin": "pnpm --filter plugin dev",
+    "build:backend": "pnpm build:shared && pnpm --filter backend build",
     "build:plugin": "pnpm --filter plugin build",
     "dev:backend": "pnpm --filter backend dev",
     "dev:worker": "pnpm --filter backend worker",
-    "dev": "concurrently \"pnpm dev:plugin\" \"pnpm dev:backend\" \"pnpm dev:worker\""
+    "dev": "pnpm build:shared && concurrently \"pnpm dev:plugin\" \"pnpm dev:backend\" \"pnpm dev:worker\""
   },
   "keywords": [],
   "author": "",
