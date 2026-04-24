@@ -98,6 +98,9 @@ export interface InventoryDecisions {
       instanceCount: number;
       pageCount: number;
       textSamples: string[];
+      elementId: string | null;
+      pageId: string | null;
+      bbox: [number, number, number, number] | null;
       cropUrl: string | null;
       cropContextUrl: string | null;
     }>

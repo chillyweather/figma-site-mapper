@@ -91,6 +91,19 @@ async function buildInventoryRenderData(projectId, baseUrl) {
     const catalogPath = path.join(workspacePath, "catalog");
     const entries = await fs.promises.readdir(catalogPath, { withFileTypes: true }).catch(() => []);
     const groupsByFingerprint = new Map();
+    const elementsById = new Map();
+    const pagesPath = path.join(workspacePath, "pages");
+    const pageEntries = await fs.promises.readdir(pagesPath, { withFileTypes: true }).catch(() => []);
+    for (const entry of pageEntries) {
+        if (!entry.isDirectory())
+            continue;
+        const pageElements = await readJsonFile(path.join(pagesPath, entry.name, "elements.json"), []);
+        for (const element of pageElements) {
+            const id = typeof element.id === "string" ? element.id : null;
+            if (id)
+                elementsById.set(id, { ...element, pageId: entry.name });
+        }
+    }
     for (const entry of entries) {
         if (!entry.isDirectory())
             continue;
@@ -122,6 +135,12 @@ async function buildInventoryRenderData(projectId, baseUrl) {
             const categoryFolder = typeof group.categoryFolder === "string" ? group.categoryFolder : "";
             const cropPath = typeof group.cropPath === "string" ? group.cropPath : undefined;
             const cropContextPath = typeof group.cropContextPath === "string" ? group.cropContextPath : undefined;
+            const exemplarElementId = typeof group.exemplarElementId === "string"
+                ? group.exemplarElementId
+                : Array.isArray(group.elementIds) && typeof group.elementIds[0] === "string"
+                    ? group.elementIds[0]
+                    : null;
+            const exemplarElement = exemplarElementId ? elementsById.get(exemplarElementId) : null;
             const cropUrl = cropPath
                 ? workspaceAssetUrl(baseUrl, projectId, `catalog/${categoryFolder}/${cropPath}`)
                 : null;
@@ -134,6 +153,11 @@ async function buildInventoryRenderData(projectId, baseUrl) {
                 instanceCount: typeof group.instanceCount === "number" ? group.instanceCount : 0,
                 pageCount: typeof group.pageCount === "number" ? group.pageCount : 0,
                 textSamples: Array.isArray(group.textSamples) ? group.textSamples.slice(0, 3) : [],
+                elementId: exemplarElementId,
+                pageId: exemplarElement && typeof exemplarElement.pageId === "string"
+                    ? exemplarElement.pageId
+                    : null,
+                bbox: Array.isArray(exemplarElement?.bbox) ? exemplarElement.bbox : null,
                 cropUrl,
                 cropContextUrl,
             });

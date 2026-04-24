@@ -3,6 +3,7 @@ import type { InventoryDecisions } from "../types";
 type JsonRecord = Record<string, unknown>;
 
 const PAGE_NAME = "DS Inventory";
+const ANCHOR_CONTAINER_NAME = "DS Inventory Sample Anchors";
 
 const COLORS = {
   ink: { r: 0.07, g: 0.09, b: 0.14 },
@@ -136,6 +137,25 @@ function createCard(title: string, lines: string[], accent: RGB): FrameNode {
   return card;
 }
 
+function createSampleLink(anchor: FrameNode | null): TextNode {
+  const link = createText(
+    anchor ? "View sample" : "Sample page not rendered",
+    {
+      size: 12,
+      style: "Medium",
+      color: anchor ? COLORS.blue : COLORS.muted,
+      width: 324,
+    }
+  );
+
+  if (anchor) {
+    link.textDecoration = "UNDERLINE";
+    link.hyperlink = { type: "NODE", value: anchor.id };
+  }
+
+  return link;
+}
+
 function createMissingImageNote(): FrameNode {
   const frame = figma.createFrame();
   frame.name = "No Crop Available";
@@ -204,6 +224,79 @@ async function createClusterImageRow(clusterId: string, decisions: InventoryDeci
   return row.children.length > 0 ? row : null;
 }
 
+function findRenderedPageByPageId(pageId: string | null | undefined): PageNode | null {
+  if (!pageId) return null;
+  for (const page of figma.root.children) {
+    if (page.type === "PAGE" && page.getPluginData("PAGE_ID") === pageId) {
+      return page;
+    }
+  }
+  return null;
+}
+
+function getOrCreateAnchorContainer(page: PageNode): FrameNode {
+  const existing = page.findOne(
+    (node) => node.type === "FRAME" && node.name === ANCHOR_CONTAINER_NAME
+  ) as FrameNode | null;
+  if (existing) return existing;
+
+  const frame = figma.createFrame();
+  frame.name = ANCHOR_CONTAINER_NAME;
+  frame.layoutMode = "NONE";
+  frame.fills = [];
+  frame.strokes = [];
+  frame.clipsContent = false;
+  frame.locked = false;
+  frame.resize(1, 1);
+  page.appendChild(frame);
+  return frame;
+}
+
+function findOrCreateSampleAnchor(
+  clusterId: string,
+  example: NonNullable<InventoryDecisions["clusterExamples"]>[string][number]
+): FrameNode | null {
+  if (!example.pageId || !example.elementId || !example.bbox) return null;
+  const targetPage = findRenderedPageByPageId(example.pageId);
+  if (!targetPage) return null;
+
+  const [x, y, width, height] = example.bbox;
+  if (![x, y, width, height].every((value) => Number.isFinite(value))) return null;
+
+  const storedScreenshotWidth = Number(targetPage.getPluginData("SCREENSHOT_WIDTH"));
+  const storedOriginalWidth = Number(targetPage.getPluginData("ORIGINAL_VIEWPORT_WIDTH"));
+  const scale =
+    Number.isFinite(storedScreenshotWidth) &&
+    Number.isFinite(storedOriginalWidth) &&
+    storedOriginalWidth > 0
+      ? storedScreenshotWidth / storedOriginalWidth
+      : 1;
+
+  const container = getOrCreateAnchorContainer(targetPage);
+  const anchorName = `DS Anchor / ${clusterId} / ${example.elementId}`;
+  let anchor = container.children.find(
+    (child): child is FrameNode =>
+      child.type === "FRAME" && child.getPluginData("DS_INVENTORY_ANCHOR") === anchorName
+  );
+
+  if (!anchor) {
+    anchor = figma.createFrame();
+    anchor.name = anchorName;
+    anchor.setPluginData("DS_INVENTORY_ANCHOR", anchorName);
+    anchor.fills = [{ type: "SOLID", color: COLORS.pink, opacity: 0.04 }];
+    anchor.strokes = [{ type: "SOLID", color: COLORS.pink, opacity: 0.35 }];
+    anchor.strokeWeight = 2;
+    anchor.cornerRadius = 8;
+    container.appendChild(anchor);
+  }
+
+  anchor.x = x * scale;
+  anchor.y = y * scale;
+  anchor.resize(Math.max(16, width * scale), Math.max(16, height * scale));
+  anchor.locked = false;
+  return anchor;
+}
+
 function addSectionTitle(parent: FrameNode, title: string, subtitle?: string): void {
   parent.appendChild(createText(title, { size: 28, style: "Bold", width: 1120 }));
   if (subtitle) {
@@ -251,6 +344,11 @@ async function buildClustersSection(decisions: InventoryDecisions): Promise<Fram
     if (clusterId) {
       const imageRow = await createClusterImageRow(clusterId, decisions);
       card.insertChild(1, imageRow ?? createMissingImageNote());
+      const firstExample = examples.find(
+        (example) => example.pageId && example.elementId && example.bbox
+      );
+      const anchor = firstExample ? findOrCreateSampleAnchor(clusterId, firstExample) : null;
+      card.insertChild(2, createSampleLink(anchor));
     }
     grid.appendChild(card);
   }
