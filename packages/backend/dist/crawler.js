@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { db } from "./db.js";
 import { pages, elements } from "./schema.js";
-import { eq, and, notInArray } from "drizzle-orm";
+import { eq, and, notInArray, inArray } from "drizzle-orm";
 import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
@@ -167,12 +167,44 @@ function buildElementFingerprint(element) {
     });
     return [
         category,
-        element.regionLabel || "content",
-        element.parentTag || "none",
         bucketDimension(element.boundingBox?.width),
         bucketDimension(element.boundingBox?.height),
         element.styleSignature || "unstyled",
     ].join("|");
+}
+function isContextCropCategory(element) {
+    const category = categorizeElement({
+        id: "",
+        pageId: "",
+        projectId: "",
+        type: element.type,
+        selector: element.selector,
+        tagName: element.tagName,
+        elementId: element.id,
+        classes: element.classes,
+        bbox: element.boundingBox,
+        href: element.href,
+        text: element.text,
+        styles: element.styles ?? {},
+        styleTokens: element.styleTokens ?? [],
+        ariaLabel: element.ariaLabel,
+        role: element.role,
+        value: element.value,
+        placeholder: element.placeholder,
+        checked: element.checked,
+        src: element.src,
+        alt: element.alt,
+        parentTag: element.parentTag,
+        parentSelector: element.parentSelector,
+        ancestryPath: element.ancestryPath,
+        nearestInteractiveSelector: element.nearestInteractiveSelector,
+        isVisible: element.isVisible,
+        regionLabel: element.regionLabel,
+        styleSignature: element.styleSignature,
+        componentFingerprint: element.componentFingerprint,
+        cropPath: element.cropPath,
+    });
+    return ["button", "input", "select", "textarea", "link"].includes(category);
 }
 function shouldGenerateElementCrop(element) {
     const bbox = element.boundingBox;
@@ -197,6 +229,7 @@ function shouldGenerateElementCrop(element) {
     return hasText && hasVisualStyles;
 }
 async function extractStyleData(page, config) {
+    await page.evaluate("globalThis.__name = globalThis.__name || ((value) => value)");
     return await page.evaluate((params) => {
         const evaluateConfig = params.config;
         const styleProperties = params.styleProperties;
@@ -542,11 +575,18 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
 }
 const ELEMENT_INSERT_CHUNK = 200;
 async function generateElementCrops(imageBuffer, url, elements, publicUrl, viewportWidth) {
-    const cropPaths = new Array(elements.length).fill(undefined);
+    const results = Array.from({ length: elements.length }, () => ({}));
+    const summary = {
+        attempted: 0,
+        generated: 0,
+        contextGenerated: 0,
+        failed: 0,
+        capped: false,
+    };
     try {
         const metadata = await sharp(imageBuffer).metadata();
         if (!metadata.width || !metadata.height) {
-            return cropPaths;
+            return { results, summary };
         }
         const imageWidth = metadata.width;
         const imageHeight = metadata.height;
@@ -558,11 +598,14 @@ async function generateElementCrops(imageBuffer, url, elements, publicUrl, viewp
             const element = elements[index];
             if (!element || !shouldGenerateElementCrop(element))
                 continue;
-            if (generated >= MAX_CROPS)
+            if (generated >= MAX_CROPS) {
+                summary.capped = true;
                 break;
+            }
             const bbox = element.boundingBox;
             if (!bbox)
                 continue;
+            summary.attempted += 1;
             const padding = 8;
             const left = Math.max(0, Math.round((bbox.x - padding) * scale));
             const top = Math.max(0, Math.round((bbox.y - padding) * scale));
@@ -571,19 +614,144 @@ async function generateElementCrops(imageBuffer, url, elements, publicUrl, viewp
             if (width <= 0 || height <= 0)
                 continue;
             const cropFileName = `${safeFileName}_element_${index + 1}.png`;
+            const contextCropFileName = `${safeFileName}_element_${index + 1}_ctx.png`;
             const cropPath = path.join(elementCropDir, cropFileName);
-            await sharp(imageBuffer)
-                .extract({ left, top, width, height })
-                .resize({ width: 320, height: 240, fit: "inside", withoutEnlargement: true })
-                .toFile(cropPath);
-            cropPaths[index] = `${publicUrl}/screenshots/elements/${cropFileName}`;
-            generated += 1;
+            const contextCropPath = path.join(elementCropDir, contextCropFileName);
+            try {
+                await sharp(imageBuffer)
+                    .extract({ left, top, width, height })
+                    .resize({ width: 320, height: 240, fit: "inside", withoutEnlargement: true })
+                    .toFile(cropPath);
+                const stat = await fs.promises.stat(cropPath).catch(() => null);
+                if (!stat?.isFile()) {
+                    throw new Error("Crop file was not written");
+                }
+                results[index].cropPath = `${publicUrl}/screenshots/elements/${cropFileName}`;
+                if (isContextCropCategory(element)) {
+                    const contextPadding = Math.max(16, Math.round(Math.max(bbox.width, bbox.height) * 0.5));
+                    const contextLeft = Math.max(0, Math.round((bbox.x - contextPadding) * scale));
+                    const contextTop = Math.max(0, Math.round((bbox.y - contextPadding) * scale));
+                    const contextWidth = Math.min(imageWidth - contextLeft, Math.max(1, Math.round((bbox.width + contextPadding * 2) * scale)));
+                    const contextHeight = Math.min(imageHeight - contextTop, Math.max(1, Math.round((bbox.height + contextPadding * 2) * scale)));
+                    if (contextWidth > 0 && contextHeight > 0) {
+                        await sharp(imageBuffer)
+                            .extract({
+                            left: contextLeft,
+                            top: contextTop,
+                            width: contextWidth,
+                            height: contextHeight,
+                        })
+                            .resize({ width: 420, height: 320, fit: "inside", withoutEnlargement: true })
+                            .toFile(contextCropPath);
+                        const contextStat = await fs.promises.stat(contextCropPath).catch(() => null);
+                        if (contextStat?.isFile()) {
+                            results[index].cropContextPath = `${publicUrl}/screenshots/elements/${contextCropFileName}`;
+                            summary.contextGenerated += 1;
+                        }
+                    }
+                }
+                generated += 1;
+                summary.generated += 1;
+            }
+            catch (error) {
+                summary.failed += 1;
+                const message = error instanceof Error ? error.message : String(error);
+                results[index].cropError = message;
+                console.warn(`Element crop failed for ${url} element ${index + 1}: ${message}`);
+            }
         }
     }
     catch (error) {
+        summary.failed += summary.attempted;
         console.warn(`Failed to generate element crops for ${url}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    return cropPaths;
+    return { results, summary };
+}
+const ANNOTATION_COLORS = {
+    button: "#ef4444",
+    input: "#3b82f6",
+    select: "#3b82f6",
+    textarea: "#3b82f6",
+    link: "#a855f7",
+    heading: "#22c55e",
+    image: "#f59e0b",
+    other: "#64748b",
+};
+function escapeXml(value) {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+async function generateAnnotatedScreenshot(imageBuffer, url, elementsToAnnotate, publicUrl, viewportWidth) {
+    const metadata = await sharp(imageBuffer).metadata();
+    if (!metadata.width || !metadata.height)
+        return undefined;
+    const imageWidth = metadata.width;
+    const imageHeight = metadata.height;
+    const scale = viewportWidth && viewportWidth > 0 ? imageWidth / viewportWidth : 1;
+    const overlays = elementsToAnnotate
+        .filter((element) => element.isVisible !== false && element.boundingBox)
+        .slice(0, 1000)
+        .map((element) => {
+        const bbox = element.boundingBox;
+        const width = Math.max(1, Math.round(bbox.width * scale));
+        const height = Math.max(1, Math.round(bbox.height * scale));
+        if (width <= 0 || height <= 0)
+            return "";
+        const category = categorizeElement({
+            id: "",
+            pageId: "",
+            projectId: "",
+            type: element.type,
+            selector: element.selector,
+            tagName: element.tagName,
+            elementId: element.id,
+            classes: element.classes,
+            bbox,
+            href: element.href,
+            text: element.text,
+            styles: element.styles ?? {},
+            styleTokens: element.styleTokens ?? [],
+            ariaLabel: element.ariaLabel,
+            role: element.role,
+            value: element.value,
+            placeholder: element.placeholder,
+            checked: element.checked,
+            src: element.src,
+            alt: element.alt,
+            parentTag: element.parentTag,
+            parentSelector: element.parentSelector,
+            ancestryPath: element.ancestryPath,
+            nearestInteractiveSelector: element.nearestInteractiveSelector,
+            isVisible: element.isVisible,
+            regionLabel: element.regionLabel,
+            styleSignature: element.styleSignature,
+            componentFingerprint: element.componentFingerprint,
+            cropPath: element.cropPath,
+        });
+        const color = ANNOTATION_COLORS[category] ?? ANNOTATION_COLORS.other;
+        const x = Math.max(0, Math.round(bbox.x * scale));
+        const y = Math.max(0, Math.round(bbox.y * scale));
+        const label = escapeXml(category.slice(0, 4));
+        return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${color}" fill-opacity="0.12" stroke="${color}" stroke-width="2"/><text x="${x + 3}" y="${Math.max(12, y + 12)}" font-family="Arial, sans-serif" font-size="11" fill="${color}">${label}</text>`;
+    })
+        .join("");
+    if (!overlays)
+        return undefined;
+    const svg = Buffer.from(`<svg width="${imageWidth}" height="${imageHeight}" xmlns="http://www.w3.org/2000/svg">${overlays}</svg>`);
+    const safeFileName = getSafeFilename(url);
+    const annotatedFileName = `${safeFileName}_annotated.png`;
+    const annotatedPath = path.join(screenshotDir, annotatedFileName);
+    await sharp(imageBuffer)
+        .composite([{ input: svg, top: 0, left: 0 }])
+        .png()
+        .toFile(annotatedPath);
+    const stat = await fs.promises.stat(annotatedPath).catch(() => null);
+    if (!stat?.isFile())
+        return undefined;
+    return `${publicUrl}/screenshots/${annotatedFileName}`;
 }
 export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction) {
     console.log("🚀 Starting the crawler with URL:", startUrl);
@@ -795,9 +963,6 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 return;
             }
             currentPage++;
-            crawledUrls.add(finalUrl);
-            existingSectionUrls.push(finalUrl);
-            sectionUrlMap.set(sectionKey, existingSectionUrls);
             await updateProgress("crawling", currentPage, totalPages, finalUrl);
             await page.setExtraHTTPHeaders({
                 "Accept-Language": "en-US,en;q=0.9",
@@ -1034,21 +1199,60 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             await updateProgress("processing", currentPage, totalPages, finalUrl);
             const screenshotSlices = await sliceScreenshot(fullPageBuffer, finalUrl, publicUrl);
             log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${finalUrl}`);
+            let annotatedScreenshotPath;
             if (styleData?.elements?.length) {
                 const viewportWidth = page.viewportSize()?.width ?? null;
-                const cropPaths = await generateElementCrops(fullPageBuffer, finalUrl, styleData.elements, publicUrl, viewportWidth);
-                styleData.elements = styleData.elements.map((element, index) => {
+                const { results: cropResults, summary: cropSummary } = await generateElementCrops(fullPageBuffer, finalUrl, styleData.elements, publicUrl, viewportWidth);
+                const fingerprintBySelector = new Map();
+                const childCountBySelector = new Map();
+                styleData.elements = styleData.elements.map((element) => {
                     const styleSignature = buildElementStyleSignature(element.styles);
                     const enriched = {
                         ...element,
                         styleSignature,
-                        cropPath: cropPaths[index],
+                        isVisible: element.boundingBox.width * element.boundingBox.height === 0
+                            ? false
+                            : element.isVisible,
                     };
                     enriched.componentFingerprint = buildElementFingerprint(enriched);
+                    if (enriched.selector && enriched.componentFingerprint) {
+                        fingerprintBySelector.set(enriched.selector, enriched.componentFingerprint);
+                    }
+                    if (enriched.parentSelector) {
+                        childCountBySelector.set(enriched.parentSelector, (childCountBySelector.get(enriched.parentSelector) ?? 0) + 1);
+                    }
                     return enriched;
                 });
-                const cropCount = cropPaths.filter(Boolean).length;
-                log.info(`Generated ${cropCount} element crop(s) for ${finalUrl}`);
+                styleData.elements = styleData.elements.map((element, index) => {
+                    const cropResult = cropResults[index] ?? {};
+                    return {
+                        ...element,
+                        parentFingerprint: element.parentSelector
+                            ? fingerprintBySelector.get(element.parentSelector)
+                            : undefined,
+                        childCount: element.selector
+                            ? childCountBySelector.get(element.selector) ?? 0
+                            : 0,
+                        cropPath: cropResult.cropPath,
+                        cropContextPath: cropResult.cropContextPath,
+                        cropError: cropResult.cropError,
+                    };
+                });
+                const enrichedCount = styleData.elements.length;
+                const fingerprintCount = styleData.elements.filter((element) => Boolean(element.componentFingerprint)).length;
+                const parentFingerprintCount = styleData.elements.filter((element) => Boolean(element.parentFingerprint)).length;
+                const compositeCount = styleData.elements.filter((element) => (element.childCount ?? 0) > 0).length;
+                try {
+                    annotatedScreenshotPath = await generateAnnotatedScreenshot(fullPageBuffer, finalUrl, styleData.elements, publicUrl, viewportWidth);
+                }
+                catch (error) {
+                    log.info(`Annotated screenshot failed for ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`);
+                }
+                log.info(`Element enrichment for ${finalUrl}: ${fingerprintCount}/${enrichedCount} fingerprints, ${parentFingerprintCount} parent fingerprints, ${compositeCount} composite candidates`);
+                log.info(`Element crops for ${finalUrl}: ${cropSummary.generated}/${cropSummary.attempted} tight crops, ${cropSummary.contextGenerated} context crops, ${cropSummary.failed} failed${cropSummary.capped ? " (capped at 200)" : ""}`);
+                log.info(annotatedScreenshotPath
+                    ? `Annotated screenshot for ${finalUrl}: ${annotatedScreenshotPath}`
+                    : `Annotated screenshot for ${finalUrl}: not generated`);
             }
             // ── Persist to SQLite ───────────────────────────────────────────────
             if (projectNumId !== null) {
@@ -1061,6 +1265,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         url: finalUrl,
                         title,
                         screenshotPaths: JSON.stringify(screenshotSlices),
+                        annotatedScreenshotPath: annotatedScreenshotPath ?? null,
                         interactiveElements: JSON.stringify(interactiveElements),
                         globalStyles: styleData
                             ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
@@ -1075,6 +1280,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         set: {
                             title,
                             screenshotPaths: JSON.stringify(screenshotSlices),
+                            annotatedScreenshotPath: annotatedScreenshotPath ?? null,
                             interactiveElements: JSON.stringify(interactiveElements),
                             globalStyles: styleData
                                 ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
@@ -1119,7 +1325,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             regionLabel: element.regionLabel,
                             styleSignature: element.styleSignature,
                             componentFingerprint: element.componentFingerprint,
+                            parentFingerprint: element.parentFingerprint,
+                            childCount: element.childCount ?? 0,
                             cropPath: element.cropPath,
+                            cropContextPath: element.cropContextPath,
+                            cropError: element.cropError,
+                            isGlobalChrome: element.isGlobalChrome ?? false,
                             value: element.value,
                             placeholder: element.placeholder,
                             checked: element.checked,
@@ -1145,6 +1356,8 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             styleTokens: "[]",
                             isVisible: true,
                             regionLabel: el.y < 200 ? "top" : "content",
+                            childCount: 0,
+                            isGlobalChrome: false,
                             createdAt: now,
                             updatedAt: now,
                         }))
@@ -1177,6 +1390,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 styleData,
                 crawlOrder: pageCounter++,
             });
+            crawledUrls.add(finalUrl);
+            existingSectionUrls.push(finalUrl);
+            sectionUrlMap.set(sectionKey, existingSectionUrls);
             // Log discovered links
             try {
                 const links = await page.evaluate(() => Array.from(document.querySelectorAll("a[href]"))
@@ -1308,6 +1524,57 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             catch (cleanupError) {
                 console.error(`❌ Full refresh cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
             }
+        }
+    }
+    if (projectNumId !== null) {
+        try {
+            const pageRows = db
+                .select({ id: pages.id })
+                .from(pages)
+                .where(eq(pages.projectId, projectNumId))
+                .all();
+            const projectPageCount = pageRows.length;
+            const elementRows = db
+                .select({
+                id: elements.id,
+                pageId: elements.pageId,
+                componentFingerprint: elements.componentFingerprint,
+            })
+                .from(elements)
+                .where(eq(elements.projectId, projectNumId))
+                .all();
+            db.update(elements)
+                .set({ isGlobalChrome: false })
+                .where(eq(elements.projectId, projectNumId))
+                .run();
+            if (projectPageCount > 0) {
+                const pagesByFingerprint = new Map();
+                for (const elementRow of elementRows) {
+                    const fingerprint = elementRow.componentFingerprint;
+                    if (!fingerprint)
+                        continue;
+                    if (!pagesByFingerprint.has(fingerprint)) {
+                        pagesByFingerprint.set(fingerprint, new Set());
+                    }
+                    pagesByFingerprint.get(fingerprint).add(elementRow.pageId);
+                }
+                const globalFingerprints = new Set(Array.from(pagesByFingerprint.entries())
+                    .filter(([, pageIds]) => pageIds.size / projectPageCount >= 0.8)
+                    .map(([fingerprint]) => fingerprint));
+                const globalElementIds = elementRows
+                    .filter((elementRow) => elementRow.componentFingerprint && globalFingerprints.has(elementRow.componentFingerprint))
+                    .map((elementRow) => elementRow.id);
+                for (let i = 0; i < globalElementIds.length; i += ELEMENT_INSERT_CHUNK) {
+                    db.update(elements)
+                        .set({ isGlobalChrome: true })
+                        .where(inArray(elements.id, globalElementIds.slice(i, i + ELEMENT_INSERT_CHUNK)))
+                        .run();
+                }
+                console.log(`🌐 Marked ${globalElementIds.length} global chrome element(s) across ${globalFingerprints.size} fingerprint(s)`);
+            }
+        }
+        catch (error) {
+            console.warn(`Failed to compute global chrome hints: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     // Capture cookies before teardown

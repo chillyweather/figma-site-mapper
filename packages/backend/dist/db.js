@@ -28,6 +28,7 @@ sqlite.exec(`
     screenshot_paths TEXT NOT NULL DEFAULT '[]',
     interactive_elements TEXT NOT NULL DEFAULT '[]',
     global_styles TEXT,
+    annotated_screenshot_path TEXT,
     last_crawled_at INTEGER,
     last_crawl_job_id TEXT,
     created_at INTEGER NOT NULL,
@@ -61,7 +62,12 @@ sqlite.exec(`
     region_label TEXT,
     style_signature TEXT,
     component_fingerprint TEXT,
+    parent_fingerprint TEXT,
+    child_count INTEGER DEFAULT 0,
     crop_path TEXT,
+    crop_context_path TEXT,
+    crop_error TEXT,
+    is_global_chrome INTEGER DEFAULT 0,
     value TEXT,
     placeholder TEXT,
     checked INTEGER,
@@ -91,7 +97,13 @@ ensureColumn("elements", "is_visible", "is_visible INTEGER");
 ensureColumn("elements", "region_label", "region_label TEXT");
 ensureColumn("elements", "style_signature", "style_signature TEXT");
 ensureColumn("elements", "component_fingerprint", "component_fingerprint TEXT");
+ensureColumn("elements", "parent_fingerprint", "parent_fingerprint TEXT");
+ensureColumn("elements", "child_count", "child_count INTEGER DEFAULT 0");
 ensureColumn("elements", "crop_path", "crop_path TEXT");
+ensureColumn("elements", "crop_context_path", "crop_context_path TEXT");
+ensureColumn("elements", "crop_error", "crop_error TEXT");
+ensureColumn("elements", "is_global_chrome", "is_global_chrome INTEGER DEFAULT 0");
+ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TEXT");
 export const db = drizzle(sqlite, { schema });
 export async function connectDB() {
     console.log(`✅ SQLite database ready at ${dbPath}`);

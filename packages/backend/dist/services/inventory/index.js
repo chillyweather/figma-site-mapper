@@ -4,7 +4,7 @@ import { elements, pages } from "../../schema.js";
 import { analyzeComponentClusters } from "./componentClustering.js";
 import { analyzeInconsistencies } from "./inconsistencyAnalysis.js";
 import { analyzeRegionsAndTemplates } from "./regionDetection.js";
-import { analyzeTokenCandidates } from "./tokenMining.js";
+import { analyzeTokenCandidates, buildTokenFrequencyTable, } from "./tokenFrequencyTable.js";
 function isValidId(id) {
     const parsed = parseInt(id, 10);
     return !Number.isNaN(parsed) && parsed > 0 && String(parsed) === id;
@@ -44,6 +44,7 @@ async function loadProjectData(projectId) {
                 title: row.title,
                 cssVariables: globalStyles.cssVariables || {},
                 tokens: Array.isArray(globalStyles.tokens) ? globalStyles.tokens : [],
+                annotatedScreenshotPath: row.annotatedScreenshotPath ?? undefined,
             };
         }),
         elements: elementRows.map((row) => ({
@@ -70,7 +71,12 @@ async function loadProjectData(projectId) {
             regionLabel: row.regionLabel ?? undefined,
             styleSignature: row.styleSignature ?? undefined,
             componentFingerprint: row.componentFingerprint ?? undefined,
+            parentFingerprint: row.parentFingerprint ?? undefined,
+            childCount: row.childCount ?? undefined,
             cropPath: row.cropPath ?? undefined,
+            cropContextPath: row.cropContextPath ?? undefined,
+            cropError: row.cropError ?? undefined,
+            isGlobalChrome: row.isGlobalChrome ?? undefined,
             value: row.value ?? undefined,
             placeholder: row.placeholder ?? undefined,
             checked: row.checked ?? undefined,
@@ -113,8 +119,8 @@ export async function getInventoryOverview(projectId) {
     };
 }
 export async function getInventoryTokens(projectId) {
-    const { tokens } = await analyzeProject(projectId);
-    return { projectId, tokens };
+    const data = await loadProjectData(projectId);
+    return { projectId, tokens: buildTokenFrequencyTable(data.pages, data.elements) };
 }
 export async function getInventoryClusters(projectId) {
     const { clusters } = await analyzeProject(projectId);

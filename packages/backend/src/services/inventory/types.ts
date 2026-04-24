@@ -23,6 +23,7 @@ export interface ParsedInventoryPage {
   title: string;
   cssVariables: Record<string, string>;
   tokens: string[];
+  annotatedScreenshotPath?: string;
 }
 
 export interface ParsedInventoryElement {
@@ -54,7 +55,12 @@ export interface ParsedInventoryElement {
   regionLabel?: string;
   styleSignature?: string;
   componentFingerprint?: string;
+  parentFingerprint?: string;
+  childCount?: number;
   cropPath?: string;
+  cropContextPath?: string;
+  cropError?: string;
+  isGlobalChrome?: boolean;
   value?: string;
   placeholder?: string;
   checked?: boolean;
@@ -82,6 +88,28 @@ export interface InventoryTokenCandidate {
   tokenBacked: boolean;
   cssVariableNames: string[];
   styleTokenNames: string[];
+}
+
+export interface InventoryTokenFrequency {
+  value: string;
+  type: string;
+  usageCount: number;
+  pageCount: number;
+  pageIds: string[];
+  categoriesUsedIn: InventoryCategory[];
+  interactiveUsageCount: number;
+  tokenBacked: boolean;
+  cssVariableSources: string[];
+  styleTokenSources: string[];
+  exampleElementIds: string[];
+}
+
+export interface InventoryTokenFrequencyTable {
+  colors: InventoryTokenFrequency[];
+  typography: InventoryTokenFrequency[];
+  spacing: InventoryTokenFrequency[];
+  radii: InventoryTokenFrequency[];
+  shadows: InventoryTokenFrequency[];
 }
 
 export interface InventoryCluster {

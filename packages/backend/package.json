@@ -9,7 +9,11 @@
     "dev": "tsx watch src/index.ts",
     "worker": "tsx watch src/worker.ts",
     "start": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "inventory:prepare": "tsx src/cli/inventoryPrepare.ts",
+    "inventory:refresh": "tsx src/cli/inventoryRefresh.ts",
+    "inventory:status": "tsx src/cli/inventoryStatus.ts",
+    "inventory:export": "tsx src/cli/inventoryExport.ts"
   },
   "keywords": [],
   "author": "",

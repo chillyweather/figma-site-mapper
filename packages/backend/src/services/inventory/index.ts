@@ -4,7 +4,10 @@ import { elements, pages } from "../../schema.js";
 import { analyzeComponentClusters } from "./componentClustering.js";
 import { analyzeInconsistencies } from "./inconsistencyAnalysis.js";
 import { analyzeRegionsAndTemplates } from "./regionDetection.js";
-import { analyzeTokenCandidates } from "./tokenMining.js";
+import {
+  analyzeTokenCandidates,
+  buildTokenFrequencyTable,
+} from "./tokenFrequencyTable.js";
 import type {
   InventoryCluster,
   InventoryInconsistency,
@@ -12,6 +15,7 @@ import type {
   InventoryRegionInsight,
   InventoryTemplateInsight,
   InventoryTokenCandidate,
+  InventoryTokenFrequencyTable,
   ParsedInventoryElement,
   ParsedInventoryPage,
 } from "./types.js";
@@ -64,6 +68,7 @@ async function loadProjectData(projectId: string): Promise<{
         title: row.title,
         cssVariables: globalStyles.cssVariables || {},
         tokens: Array.isArray(globalStyles.tokens) ? globalStyles.tokens : [],
+        annotatedScreenshotPath: row.annotatedScreenshotPath ?? undefined,
       } satisfies ParsedInventoryPage;
     }),
     elements: elementRows.map((row) => ({
@@ -93,7 +98,12 @@ async function loadProjectData(projectId: string): Promise<{
       regionLabel: row.regionLabel ?? undefined,
       styleSignature: row.styleSignature ?? undefined,
       componentFingerprint: row.componentFingerprint ?? undefined,
+      parentFingerprint: row.parentFingerprint ?? undefined,
+      childCount: row.childCount ?? undefined,
       cropPath: row.cropPath ?? undefined,
+      cropContextPath: row.cropContextPath ?? undefined,
+      cropError: row.cropError ?? undefined,
+      isGlobalChrome: row.isGlobalChrome ?? undefined,
       value: row.value ?? undefined,
       placeholder: row.placeholder ?? undefined,
       checked: row.checked ?? undefined,
@@ -163,9 +173,9 @@ export async function getInventoryOverview(
 
 export async function getInventoryTokens(
   projectId: string
-): Promise<{ projectId: string; tokens: InventoryTokenCandidate[] }> {
-  const { tokens } = await analyzeProject(projectId);
-  return { projectId, tokens };
+): Promise<{ projectId: string; tokens: InventoryTokenFrequencyTable }> {
+  const data = await loadProjectData(projectId);
+  return { projectId, tokens: buildTokenFrequencyTable(data.pages, data.elements) };
 }
 
 export async function getInventoryClusters(

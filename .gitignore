@@ -23,6 +23,7 @@ pid.[0-9]*.log.unsupported
 /packages/backend/storage/
 /packages/backend/data/
 /packages/backend/logs/
+/packages/backend/workspace/
 /coverage
 
 # Environment Variables

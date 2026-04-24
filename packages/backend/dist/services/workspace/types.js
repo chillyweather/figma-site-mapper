@@ -1,0 +1,1 @@
+export const WORKSPACE_SCHEMA_VERSION = 1;

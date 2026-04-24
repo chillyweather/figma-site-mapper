@@ -37,14 +37,6 @@ export function buildClusterSignature(
     height: bucketDimension(bbox?.height),
   };
 
-  if (element.regionLabel) {
-    summary.region = element.regionLabel;
-  }
-
-  if (element.parentTag) {
-    summary.parentTag = element.parentTag;
-  }
-
   const addStyle = (property: string, outputKey = property) => {
     const value = getNormalizedStyle(element.styles, property);
     if (value) {
@@ -96,9 +88,5 @@ export function buildClusterSignature(
     .map(([k, v]) => `${k}:${v}`)
     .join("|");
 
-  const key = element.componentFingerprint
-    ? `${element.componentFingerprint}|${baseKey}`
-    : baseKey;
-
-  return { key, summary };
+  return { key: `${category}|${baseKey}`, summary };
 }
