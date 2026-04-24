@@ -34,6 +34,7 @@ import {
 import {
   handleLoadInventoryOverviewRequest,
   handlePrepareInventoryRequest,
+  handleRenderInventoryBoardsRequest,
 } from "./inventoryHandlers";
 
 /** Persist cookies for a domain */
@@ -1033,6 +1034,13 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "prepare-inventory": {
       await handlePrepareInventoryRequest({
+        projectId: msg.projectId || null,
+      });
+      break;
+    }
+
+    case "render-inventory-boards": {
+      await handleRenderInventoryBoardsRequest({
         projectId: msg.projectId || null,
       });
       break;

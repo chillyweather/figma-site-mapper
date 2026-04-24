@@ -36,6 +36,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
   const [prepareJob, setPrepareJob] = useState<InventoryPrepareJob | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
@@ -103,6 +104,21 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     }
   }, [command]);
 
+  const renderBoards = useCallback(() => {
+    if (!activeProjectId || isRendering) return;
+    setError(null);
+    setIsRendering(true);
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "render-inventory-boards",
+          projectId: activeProjectId,
+        },
+      },
+      "*"
+    );
+  }, [activeProjectId, isRendering]);
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
@@ -166,6 +182,20 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
             : null
         );
         setError(typeof msg.error === "string" ? msg.error : "Failed to prepare inventory workspace.");
+      }
+
+      if (msg.type === "inventory-render-started") {
+        setIsRendering(true);
+        setError(null);
+      }
+
+      if (msg.type === "inventory-render-completed") {
+        setIsRendering(false);
+      }
+
+      if (msg.type === "inventory-render-error") {
+        setIsRendering(false);
+        setError(typeof msg.error === "string" ? msg.error : "Failed to render inventory boards.");
       }
     };
 
@@ -310,8 +340,18 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
 
       <div style={{ marginTop: "24px" }}>
         <h4 className="section-header">Render Boards</h4>
-        <div className="status-display status-neutral">
-          Figma board rendering is intentionally deferred until the decision files are validated.
+        <div className={`status-display ${decisionSummary?.hasDecisions ? "status-info" : "status-neutral"}`}>
+          <div style={{ marginBottom: "10px" }}>
+            Render a first-pass Figma board from the agent decision files.
+          </div>
+          <button
+            onClick={renderBoards}
+            disabled={!decisionSummary?.hasDecisions || isRendering}
+            className={`button-primary ${!decisionSummary?.hasDecisions || isRendering ? "button-flow-disabled" : ""}`}
+            style={{ width: "100%" }}
+          >
+            {isRendering ? "Rendering Boards..." : "Render Inventory Boards"}
+          </button>
         </div>
       </div>
     </div>

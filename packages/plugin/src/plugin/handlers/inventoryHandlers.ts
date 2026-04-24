@@ -4,6 +4,7 @@ import {
   getJobStatus,
   prepareInventory,
 } from "../services/apiClient";
+import { renderInventoryBoards } from "../../figmaRendering/renderInventoryBoards";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -138,5 +139,49 @@ export async function handlePrepareInventoryRequest(msg: {
       projectId,
       error: error instanceof Error ? error.message : "Failed to prepare inventory workspace.",
     });
+  }
+}
+
+export async function handleRenderInventoryBoardsRequest(msg: {
+  projectId?: string | null;
+}): Promise<void> {
+  const projectId = typeof msg.projectId === "string" ? msg.projectId.trim() : "";
+
+  if (!projectId) {
+    figma.ui.postMessage({
+      type: "inventory-render-error",
+      projectId: null,
+      error: "Select a project before rendering inventory boards.",
+    });
+    figma.notify("Select a project before rendering inventory boards.", { error: true });
+    return;
+  }
+
+  try {
+    figma.ui.postMessage({
+      type: "inventory-render-started",
+      projectId,
+    });
+
+    const decisions = await fetchInventoryDecisions(projectId);
+    if (!decisions.hasWorkspace) {
+      throw new Error("Inventory workspace is not prepared yet.");
+    }
+
+    await renderInventoryBoards(decisions);
+
+    figma.ui.postMessage({
+      type: "inventory-render-completed",
+      projectId,
+    });
+    figma.notify("Inventory boards rendered.");
+  } catch (error) {
+    console.error("Failed to render inventory boards", error);
+    figma.ui.postMessage({
+      type: "inventory-render-error",
+      projectId,
+      error: error instanceof Error ? error.message : "Failed to render inventory boards.",
+    });
+    figma.notify("Failed to render inventory boards.", { error: true });
   }
 }
