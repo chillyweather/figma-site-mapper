@@ -10,7 +10,8 @@ import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
-import { getInventoryOverview, getInventoryTokens, getInventoryClusters, getInventoryInconsistencies, getInventoryRegions, } from "./services/inventory/index.js";
+import { getInventoryTokens } from "./services/inventory/index.js";
+import { getWorkspaceDecisionPayload, getWorkspaceStatus, } from "./services/workspace/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function isValidId(id) {
@@ -21,6 +22,14 @@ function isValidId(id) {
 }
 function toId(id) {
     return parseInt(id, 10);
+}
+function projectExists(projectId) {
+    const row = db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.id, toId(projectId)))
+        .get();
+    return Boolean(row);
 }
 function getUrlLookupCandidates(rawUrl) {
     const candidates = new Set();
@@ -159,6 +168,24 @@ export async function buildServer() {
                 status = "processing";
                 break;
             default: status = "pending";
+        }
+        if (jobData.type === "inventory-prepare") {
+            return {
+                jobId,
+                type: "inventory-prepare",
+                status,
+                progress: detailedProgress ?? (typeof job.progress === "number" ? job.progress : 0),
+                detailedProgress,
+                result: {
+                    projectId: jobData.projectId ?? null,
+                    workspaceRoot: jobData.workspaceRoot ?? null,
+                    pageCount: typeof jobData.pageCount === "number" ? jobData.pageCount : 0,
+                    elementCount: typeof jobData.elementCount === "number" ? jobData.elementCount : 0,
+                    categoryCounts: jobData.categoryCounts ?? null,
+                    generatedAt: jobData.generatedAt ?? null,
+                    lastCompletedAt: jobData.lastCompletedAt ?? null,
+                },
+            };
         }
         return {
             jobId,
@@ -457,18 +484,51 @@ export async function buildServer() {
         return { element: serializeElement(elementRow) };
     });
     // ── Inventory ─────────────────────────────────────────────────────────────
+    server.post("/inventory/prepare/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        const job = await crawlQueue.add("inventory-prepare", {
+            type: "inventory-prepare",
+            projectId,
+        });
+        return {
+            message: "Inventory workspace prepare job queued.",
+            type: "inventory-prepare",
+            projectId,
+            jobId: job.id,
+        };
+    });
     server.get("/inventory/overview", async (request, reply) => {
         const { projectId } = request.query;
         if (!projectId)
             return reply.status(400).send({ error: "projectId is required" });
         if (!isValidId(projectId))
             return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
         try {
-            return await getInventoryOverview(projectId);
+            return await getWorkspaceStatus(projectId);
         }
         catch (error) {
             request.log.error(`Failed to build inventory overview: ${error instanceof Error ? error.message : String(error)}`);
             return reply.status(500).send({ error: "Failed to build inventory overview" });
+        }
+    });
+    server.get("/inventory/decisions/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        try {
+            return await getWorkspaceDecisionPayload(projectId);
+        }
+        catch (error) {
+            request.log.error(`Failed to load inventory decisions: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to load inventory decisions" });
         }
     });
     server.get("/inventory/tokens", async (request, reply) => {
@@ -477,54 +537,14 @@ export async function buildServer() {
             return reply.status(400).send({ error: "projectId is required" });
         if (!isValidId(projectId))
             return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
         try {
             return await getInventoryTokens(projectId);
         }
         catch (error) {
             request.log.error(`Failed to build inventory tokens: ${error instanceof Error ? error.message : String(error)}`);
             return reply.status(500).send({ error: "Failed to build inventory tokens" });
-        }
-    });
-    server.get("/inventory/clusters", async (request, reply) => {
-        const { projectId } = request.query;
-        if (!projectId)
-            return reply.status(400).send({ error: "projectId is required" });
-        if (!isValidId(projectId))
-            return reply.status(400).send({ error: "Invalid projectId" });
-        try {
-            return await getInventoryClusters(projectId);
-        }
-        catch (error) {
-            request.log.error(`Failed to build inventory clusters: ${error instanceof Error ? error.message : String(error)}`);
-            return reply.status(500).send({ error: "Failed to build inventory clusters" });
-        }
-    });
-    server.get("/inventory/inconsistencies", async (request, reply) => {
-        const { projectId } = request.query;
-        if (!projectId)
-            return reply.status(400).send({ error: "projectId is required" });
-        if (!isValidId(projectId))
-            return reply.status(400).send({ error: "Invalid projectId" });
-        try {
-            return await getInventoryInconsistencies(projectId);
-        }
-        catch (error) {
-            request.log.error(`Failed to build inventory inconsistencies: ${error instanceof Error ? error.message : String(error)}`);
-            return reply.status(500).send({ error: "Failed to build inventory inconsistencies" });
-        }
-    });
-    server.get("/inventory/regions", async (request, reply) => {
-        const { projectId } = request.query;
-        if (!projectId)
-            return reply.status(400).send({ error: "projectId is required" });
-        if (!isValidId(projectId))
-            return reply.status(400).send({ error: "Invalid projectId" });
-        try {
-            return await getInventoryRegions(projectId);
-        }
-        catch (error) {
-            request.log.error(`Failed to build inventory regions: ${error instanceof Error ? error.message : String(error)}`);
-            return reply.status(500).send({ error: "Failed to build inventory regions" });
         }
     });
     return server;

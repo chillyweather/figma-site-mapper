@@ -1,20 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db.js";
 import { elements, pages } from "../../schema.js";
-import { analyzeComponentClusters } from "./componentClustering.js";
-import { analyzeInconsistencies } from "./inconsistencyAnalysis.js";
-import { analyzeRegionsAndTemplates } from "./regionDetection.js";
-import {
-  analyzeTokenCandidates,
-  buildTokenFrequencyTable,
-} from "./tokenFrequencyTable.js";
+import { buildTokenFrequencyTable } from "./tokenFrequencyTable.js";
 import type {
-  InventoryCluster,
-  InventoryInconsistency,
-  InventoryOverview,
-  InventoryRegionInsight,
-  InventoryTemplateInsight,
-  InventoryTokenCandidate,
   InventoryTokenFrequencyTable,
   ParsedInventoryElement,
   ParsedInventoryPage,
@@ -113,92 +101,9 @@ async function loadProjectData(projectId: string): Promise<{
   };
 }
 
-async function analyzeProject(projectId: string): Promise<{
-  pages: ParsedInventoryPage[];
-  elements: ParsedInventoryElement[];
-  tokens: InventoryTokenCandidate[];
-  clusters: InventoryCluster[];
-  inconsistencies: InventoryInconsistency[];
-  regions: InventoryRegionInsight[];
-  templates: InventoryTemplateInsight[];
-}> {
-  const data = await loadProjectData(projectId);
-  const tokens = analyzeTokenCandidates(data.pages, data.elements);
-  const clusters = analyzeComponentClusters(data.elements);
-  const inconsistencies = analyzeInconsistencies(tokens, clusters);
-  const { regions, templates } = analyzeRegionsAndTemplates(
-    data.pages,
-    data.elements
-  );
-
-  return {
-    ...data,
-    tokens,
-    clusters,
-    inconsistencies,
-    regions,
-    templates,
-  };
-}
-
-export async function getInventoryOverview(
-  projectId: string
-): Promise<InventoryOverview> {
-  const {
-    pages: projectPages,
-    elements: projectElements,
-    tokens,
-    clusters,
-    inconsistencies,
-    regions,
-    templates,
-  } = await analyzeProject(projectId);
-
-  return {
-    projectId,
-    summary: {
-      pageCount: projectPages.length,
-      elementCount: projectElements.length,
-      clusterCount: clusters.length,
-      tokenCandidateCount: tokens.length,
-      inconsistencyCount: inconsistencies.length,
-    },
-    topClusters: clusters.slice(0, 10),
-    topTokenCandidates: tokens.slice(0, 12),
-    topInconsistencies: inconsistencies.slice(0, 10),
-    topRegions: regions.slice(0, 8),
-    templates: templates.slice(0, 8),
-  };
-}
-
 export async function getInventoryTokens(
   projectId: string
 ): Promise<{ projectId: string; tokens: InventoryTokenFrequencyTable }> {
   const data = await loadProjectData(projectId);
   return { projectId, tokens: buildTokenFrequencyTable(data.pages, data.elements) };
-}
-
-export async function getInventoryClusters(
-  projectId: string
-): Promise<{ projectId: string; clusters: InventoryCluster[] }> {
-  const { clusters } = await analyzeProject(projectId);
-  return { projectId, clusters };
-}
-
-export async function getInventoryInconsistencies(
-  projectId: string
-): Promise<{ projectId: string; inconsistencies: InventoryInconsistency[] }> {
-  const { inconsistencies } = await analyzeProject(projectId);
-  return { projectId, inconsistencies };
-}
-
-export async function getInventoryRegions(
-  projectId: string
-): Promise<{
-  projectId: string;
-  regions: InventoryRegionInsight[];
-  templates: InventoryTemplateInsight[];
-}> {
-  const { regions, templates } = await analyzeProject(projectId);
-  return { projectId, regions, templates };
 }

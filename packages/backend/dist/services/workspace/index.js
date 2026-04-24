@@ -92,6 +92,35 @@ export async function getWorkspaceStatus(projectId, outPath) {
         decisionSummary: summary,
     };
 }
+export async function getWorkspaceDecisionPayload(projectId, outPath) {
+    const workspacePath = outPath ?? defaultWorkspacePath(projectId);
+    const meta = await readWorkspaceMeta(workspacePath);
+    if (!meta) {
+        return {
+            projectId,
+            workspaceRoot: workspacePath,
+            hasWorkspace: false,
+            lastBuiltAt: null,
+            clusters: {},
+            tokens: {},
+            inconsistencies: {},
+            templates: {},
+            notes: "",
+        };
+    }
+    const decisions = await readDecisionFiles(workspacePath);
+    return {
+        projectId,
+        workspaceRoot: workspacePath,
+        hasWorkspace: true,
+        lastBuiltAt: meta.lastBuiltAt ?? null,
+        clusters: decisions.clusters ?? {},
+        tokens: decisions.tokens ?? {},
+        inconsistencies: decisions.inconsistencies ?? {},
+        templates: decisions.templates ?? {},
+        notes: decisions.notes ?? "",
+    };
+}
 export async function exportDecisions(projectId, outPath) {
     const workspacePath = outPath ?? defaultWorkspacePath(projectId);
     const meta = await readWorkspaceMeta(workspacePath);

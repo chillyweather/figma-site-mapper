@@ -53,15 +53,21 @@ export async function decisionSummary(workspacePath) {
     const tokens = decisions.tokens;
     const inconsistencies = decisions.inconsistencies;
     const templates = decisions.templates;
+    const notes = typeof decisions.notes === "string" ? decisions.notes : "";
+    const clusterCount = Array.isArray(clusters?.clusters) ? clusters.clusters.length : 0;
+    const tokenCount = tokens
+        ? Object.values(tokens).reduce((count, value) => count + (Array.isArray(value) ? value.length : 0), 0)
+        : 0;
+    const inconsistencyCount = Array.isArray(inconsistencies?.issues)
+        ? inconsistencies.issues.length
+        : 0;
+    const templateCount = Array.isArray(templates?.templates) ? templates.templates.length : 0;
+    const hasMeaningfulNotes = notes.replace(/^# Inventory Notes\s*/i, "").trim().length > 0;
     return {
-        hasDecisions: Object.keys(decisions).length > 0,
-        clusterCount: Array.isArray(clusters?.clusters) ? clusters.clusters.length : 0,
-        tokenCount: tokens
-            ? Object.values(tokens).reduce((count, value) => count + (Array.isArray(value) ? value.length : 0), 0)
-            : 0,
-        inconsistencyCount: Array.isArray(inconsistencies?.issues)
-            ? inconsistencies.issues.length
-            : 0,
-        templateCount: Array.isArray(templates?.templates) ? templates.templates.length : 0,
+        hasDecisions: clusterCount + tokenCount + inconsistencyCount + templateCount > 0 || hasMeaningfulNotes,
+        clusterCount,
+        tokenCount,
+        inconsistencyCount,
+        templateCount,
     };
 }
