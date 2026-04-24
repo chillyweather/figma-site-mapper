@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { eq, and, or, desc } from "drizzle-orm";
 import { db } from "./db.js";
@@ -11,6 +12,7 @@ import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
 import { getInventoryTokens } from "./services/inventory/index.js";
+import { defaultWorkspacePath, workspaceRoot, } from "./services/workspace/paths.js";
 import { getWorkspaceDecisionPayload, getWorkspaceStatus, } from "./services/workspace/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +60,93 @@ function getUrlLookupCandidates(rawUrl) {
     }
     return Array.from(candidates);
 }
+function requestBaseUrl(request) {
+    const host = Array.isArray(request.headers.host)
+        ? request.headers.host[0]
+        : request.headers.host;
+    return `http://${host || "localhost:3006"}`;
+}
+async function readJsonFile(filePath, fallback) {
+    const content = await fs.promises.readFile(filePath, "utf8").catch(() => null);
+    if (!content)
+        return fallback;
+    try {
+        return JSON.parse(content);
+    }
+    catch {
+        return fallback;
+    }
+}
+function workspaceAssetUrl(baseUrl, projectId, relativePath) {
+    if (!relativePath || relativePath.includes("undefined"))
+        return null;
+    return `${baseUrl}/workspace/${encodeURIComponent(projectId)}/${relativePath
+        .split(path.sep)
+        .map((part) => encodeURIComponent(part))
+        .join("/")}`;
+}
+async function buildInventoryRenderData(projectId, baseUrl) {
+    const workspacePath = defaultWorkspacePath(projectId);
+    const decisions = await getWorkspaceDecisionPayload(projectId);
+    const catalogPath = path.join(workspacePath, "catalog");
+    const entries = await fs.promises.readdir(catalogPath, { withFileTypes: true }).catch(() => []);
+    const groupsByFingerprint = new Map();
+    for (const entry of entries) {
+        if (!entry.isDirectory())
+            continue;
+        const categoryFolder = entry.name;
+        const groups = await readJsonFile(path.join(catalogPath, categoryFolder, "groups.json"), []);
+        for (const group of groups) {
+            const fingerprint = typeof group.fingerprint === "string" ? group.fingerprint : null;
+            if (!fingerprint)
+                continue;
+            groupsByFingerprint.set(fingerprint, { ...group, categoryFolder });
+        }
+    }
+    const clustersRecord = decisions.clusters && typeof decisions.clusters === "object" && !Array.isArray(decisions.clusters)
+        ? decisions.clusters
+        : {};
+    const clusterExamples = {};
+    for (const cluster of Array.isArray(clustersRecord.clusters) ? clustersRecord.clusters : []) {
+        const clusterId = typeof cluster.id === "string" ? cluster.id : null;
+        if (!clusterId)
+            continue;
+        const examples = [];
+        const fingerprints = Array.isArray(cluster.memberFingerprints)
+            ? cluster.memberFingerprints.filter((value) => typeof value === "string")
+            : [];
+        for (const fingerprint of fingerprints) {
+            const group = groupsByFingerprint.get(fingerprint);
+            if (!group)
+                continue;
+            const categoryFolder = typeof group.categoryFolder === "string" ? group.categoryFolder : "";
+            const cropPath = typeof group.cropPath === "string" ? group.cropPath : undefined;
+            const cropContextPath = typeof group.cropContextPath === "string" ? group.cropContextPath : undefined;
+            const cropUrl = cropPath
+                ? workspaceAssetUrl(baseUrl, projectId, `catalog/${categoryFolder}/${cropPath}`)
+                : null;
+            const cropContextUrl = cropContextPath
+                ? workspaceAssetUrl(baseUrl, projectId, `catalog/${categoryFolder}/${cropContextPath}`)
+                : null;
+            examples.push({
+                fingerprint,
+                shortFingerprint: fingerprint.slice(0, 18),
+                instanceCount: typeof group.instanceCount === "number" ? group.instanceCount : 0,
+                pageCount: typeof group.pageCount === "number" ? group.pageCount : 0,
+                textSamples: Array.isArray(group.textSamples) ? group.textSamples.slice(0, 3) : [],
+                cropUrl,
+                cropContextUrl,
+            });
+            if (examples.length >= 3)
+                break;
+        }
+        clusterExamples[clusterId] = examples;
+    }
+    return {
+        ...decisions,
+        clusterExamples,
+    };
+}
 export async function buildServer() {
     const server = Fastify({ logger: fastifyLoggerConfig });
     await server.register(cors, {
@@ -72,6 +161,13 @@ export async function buildServer() {
         await fastify.register(fastifyStatic, {
             root: path.join(__dirname, "..", "screenshots"),
             prefix: "/screenshots/",
+        });
+    });
+    await server.register(async function (fastify) {
+        await fastify.register(fastifyStatic, {
+            root: workspaceRoot,
+            prefix: "/workspace/",
+            decorateReply: false,
         });
     });
     server.get("/", async () => ({ hello: "world" }));
@@ -529,6 +625,20 @@ export async function buildServer() {
         catch (error) {
             request.log.error(`Failed to load inventory decisions: ${error instanceof Error ? error.message : String(error)}`);
             return reply.status(500).send({ error: "Failed to load inventory decisions" });
+        }
+    });
+    server.get("/inventory/render-data/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        try {
+            return await buildInventoryRenderData(projectId, requestBaseUrl(request));
+        }
+        catch (error) {
+            request.log.error(`Failed to load inventory render data: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to load inventory render data" });
         }
     });
     server.get("/inventory/tokens", async (request, reply) => {

@@ -136,6 +136,74 @@ function createCard(title: string, lines: string[], accent: RGB): FrameNode {
   return card;
 }
 
+function createMissingImageNote(): FrameNode {
+  const frame = figma.createFrame();
+  frame.name = "No Crop Available";
+  frame.layoutMode = "VERTICAL";
+  frame.primaryAxisSizingMode = "AUTO";
+  frame.counterAxisSizingMode = "FIXED";
+  frame.resize(324, 56);
+  frame.paddingTop = 12;
+  frame.paddingRight = 12;
+  frame.paddingBottom = 12;
+  frame.paddingLeft = 12;
+  frame.cornerRadius = 10;
+  frame.fills = [{ type: "SOLID", color: { r: 0.91, g: 0.93, b: 0.96 } }];
+  frame.appendChild(createText("No crop available for this cluster", { size: 11, color: COLORS.muted, width: 300 }));
+  return frame;
+}
+
+async function createImageRect(url: string, label: string): Promise<RectangleNode | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const image = figma.createImage(bytes);
+    const rect = figma.createRectangle();
+    rect.name = label;
+    rect.resize(96, 72);
+    rect.cornerRadius = 10;
+    rect.fills = [
+      {
+        type: "IMAGE",
+        scaleMode: "FIT",
+        imageHash: image.hash,
+      },
+    ];
+    rect.strokes = [{ type: "SOLID", color: { r: 0.84, g: 0.86, b: 0.9 } }];
+    rect.strokeWeight = 1;
+    return rect;
+  } catch (error) {
+    console.warn(`Failed to load inventory crop ${url}`, error);
+    return null;
+  }
+}
+
+async function createClusterImageRow(clusterId: string, decisions: InventoryDecisions): Promise<FrameNode | null> {
+  const examples = decisions.clusterExamples?.[clusterId] ?? [];
+  const urls = examples
+    .map((example) => example.cropContextUrl || example.cropUrl)
+    .filter((url): url is string => typeof url === "string" && url.length > 0)
+    .slice(0, 3);
+
+  if (!urls.length) return null;
+
+  const row = figma.createFrame();
+  row.name = "Cluster Crop Examples";
+  row.layoutMode = "HORIZONTAL";
+  row.primaryAxisSizingMode = "AUTO";
+  row.counterAxisSizingMode = "AUTO";
+  row.itemSpacing = 8;
+  row.fills = [];
+
+  for (let index = 0; index < urls.length; index += 1) {
+    const rect = await createImageRect(urls[index], `Crop ${index + 1}`);
+    if (rect) row.appendChild(rect);
+  }
+
+  return row.children.length > 0 ? row : null;
+}
+
 function addSectionTitle(parent: FrameNode, title: string, subtitle?: string): void {
   parent.appendChild(createText(title, { size: 28, style: "Bold", width: 1120 }));
   if (subtitle) {
@@ -157,26 +225,34 @@ function createGrid(name: string): FrameNode {
   return grid;
 }
 
-function buildClustersSection(decisions: InventoryDecisions): FrameNode {
+async function buildClustersSection(decisions: InventoryDecisions): Promise<FrameNode> {
   const clusters = asArray(asRecord(decisions.clusters).clusters);
   const section = createFrame("Components", 1200);
   addSectionTitle(section, "Components", `${clusters.length} agent-defined clusters`);
   const grid = createGrid("Component Cluster Cards");
 
   for (const cluster of clusters) {
-    grid.appendChild(
-      createCard(
-        textValue(cluster.name, textValue(cluster.id, "Unnamed cluster")),
-        [
-          `ID: ${textValue(cluster.id, "-")}`,
-          `Category: ${textValue(cluster.category, "-")}`,
-          `Confidence: ${textValue(cluster.confidence, "-")}`,
-          `Members: ${Array.isArray(cluster.memberFingerprints) ? cluster.memberFingerprints.length : 0}`,
-          textValue(cluster.notes),
-        ],
-        COLORS.blue
-      )
+    const clusterId = textValue(cluster.id);
+    const examples = clusterId ? decisions.clusterExamples?.[clusterId] ?? [] : [];
+    const card = createCard(
+      textValue(cluster.name, clusterId || "Unnamed cluster"),
+      [
+        `ID: ${clusterId || "-"}`,
+        `Category: ${textValue(cluster.category, "-")}`,
+        `Confidence: ${textValue(cluster.confidence, "-")}`,
+        `Members: ${Array.isArray(cluster.memberFingerprints) ? cluster.memberFingerprints.length : 0}`,
+        examples.length > 0
+          ? `Examples: ${examples.map((example) => `${example.instanceCount}x`).join(" / ")}`
+          : "",
+        textValue(cluster.notes),
+      ],
+      COLORS.blue
     );
+    if (clusterId) {
+      const imageRow = await createClusterImageRow(clusterId, decisions);
+      card.insertChild(1, imageRow ?? createMissingImageNote());
+    }
+    grid.appendChild(card);
   }
 
   section.appendChild(grid);
@@ -331,7 +407,7 @@ export async function renderInventoryBoards(decisions: InventoryDecisions): Prom
     )
   );
 
-  board.appendChild(buildClustersSection(decisions));
+  board.appendChild(await buildClustersSection(decisions));
   board.appendChild(buildTokensSection(decisions));
   board.appendChild(buildIssuesSection(decisions));
   board.appendChild(buildTemplatesSection(decisions));

@@ -403,6 +403,22 @@ export async function fetchInventoryDecisions(
   return response.json();
 }
 
+export async function fetchInventoryRenderData(
+  projectId: string
+): Promise<InventoryDecisions> {
+  const response = await fetch(
+    `${BACKEND_URL}/inventory/render-data/${encodeURIComponent(projectId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch inventory render data: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
 export async function prepareInventory(
   projectId: string
 ): Promise<{ jobId: string; projectId: string; type: "inventory-prepare" }> {

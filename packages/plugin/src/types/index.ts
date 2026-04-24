@@ -90,6 +90,18 @@ export interface InventoryDecisions {
   inconsistencies: unknown;
   templates: unknown;
   notes: string;
+  clusterExamples?: Record<
+    string,
+    Array<{
+      fingerprint: string;
+      shortFingerprint: string;
+      instanceCount: number;
+      pageCount: number;
+      textSamples: string[];
+      cropUrl: string | null;
+      cropContextUrl: string | null;
+    }>
+  >;
 }
 
 export interface InventoryPrepareJob {

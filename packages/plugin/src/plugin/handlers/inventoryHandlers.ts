@@ -1,6 +1,7 @@
 import {
   fetchInventoryDecisions,
   fetchInventoryOverview,
+  fetchInventoryRenderData,
   getJobStatus,
   prepareInventory,
 } from "../services/apiClient";
@@ -163,7 +164,7 @@ export async function handleRenderInventoryBoardsRequest(msg: {
       projectId,
     });
 
-    const decisions = await fetchInventoryDecisions(projectId);
+    const decisions = await fetchInventoryRenderData(projectId);
     if (!decisions.hasWorkspace) {
       throw new Error("Inventory workspace is not prepared yet.");
     }
