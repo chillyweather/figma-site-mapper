@@ -31,7 +31,10 @@ import {
   handleRenderMarkupRequest,
   handleClearMarkupRequest,
 } from "./markupHandler";
-import { handleLoadInventoryOverviewRequest } from "./inventoryHandlers";
+import {
+  handleLoadInventoryOverviewRequest,
+  handlePrepareInventoryRequest,
+} from "./inventoryHandlers";
 
 /** Persist cookies for a domain */
 async function storeDomainCookies(
@@ -1023,6 +1026,13 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "load-inventory-overview": {
       await handleLoadInventoryOverviewRequest({
+        projectId: msg.projectId || null,
+      });
+      break;
+    }
+
+    case "prepare-inventory": {
+      await handlePrepareInventoryRequest({
         projectId: msg.projectId || null,
       });
       break;

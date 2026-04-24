@@ -62,87 +62,42 @@ export type InventoryTokenGroup =
   | "radius"
   | "shadow";
 
-export interface InventoryTokenCandidate {
-  candidateId: string;
-  group: InventoryTokenGroup;
-  property: string;
-  value: string;
-  usageCount: number;
-  pageCount: number;
-  interactiveUsageCount: number;
-  categoriesUsedIn: InventoryCategory[];
-  tokenBacked: boolean;
-  cssVariableNames: string[];
-  styleTokenNames: string[];
-}
-
-export interface InventoryCluster {
-  clusterId: string;
-  familyId: string;
-  category: InventoryCategory;
-  label: string;
-  confidence: number;
-  instanceCount: number;
-  pageCount: number;
-  signature: Record<string, string>;
-  variantHints: string[];
-  variantAxes: Array<{
-    name: string;
-    values: string[];
-    currentValue?: string;
-  }>;
-  canonicalElementId?: string;
-  canonicalCropPath?: string;
-  exampleElementIds: string[];
-  exampleCropPaths: string[];
-  memberElementIds: string[];
-  pageIds: string[];
-}
-
-export interface InventoryRegionInsight {
-  regionLabel: string;
-  pageCount: number;
-  elementCount: number;
-  prevalence: number;
-  topCategories: InventoryCategory[];
-}
-
-export interface InventoryTemplateInsight {
-  templateId: string;
-  label: string;
-  pageCount: number;
-  pageIds: string[];
-  sampleUrls: string[];
-}
-
-export interface InventoryInconsistency {
-  inconsistencyId: string;
-  type:
-    | "near-duplicate-clusters"
-    | "cluster-outlier"
-    | "untokenized-frequent-value";
-  category: InventoryCategory | "token";
-  summary: string;
-  impactScore: number;
-  exampleElementIds: string[];
-  clusterIds: string[];
-  pageIds: string[];
+export interface InventoryDecisionSummary {
+  hasDecisions: boolean;
+  clusterCount: number;
+  tokenCount: number;
+  inconsistencyCount: number;
+  templateCount: number;
 }
 
 export interface InventoryOverview {
   projectId: string;
-  summary: {
-    pageCount: number;
-    elementCount: number;
-    clusterCount: number;
-    tokenCandidateCount: number;
-    inconsistencyCount: number;
-  };
-  topClusters: InventoryCluster[];
-  topTokenCandidates: InventoryTokenCandidate[];
-  topInconsistencies: InventoryInconsistency[];
-  topRegions: InventoryRegionInsight[];
-  templates: InventoryTemplateInsight[];
+  workspaceRoot: string;
+  hasWorkspace: boolean;
+  lastBuiltAt: string | null;
+  pageCount: number;
+  elementCount: number;
+  decisionSummary: InventoryDecisionSummary;
+}
+
+export interface InventoryDecisions {
+  projectId: string;
+  workspaceRoot: string;
+  hasWorkspace: boolean;
+  lastBuiltAt: string | null;
+  clusters: unknown;
+  tokens: unknown;
+  inconsistencies: unknown;
+  templates: unknown;
+  notes: string;
+}
+
+export interface InventoryPrepareJob {
+  jobId: string;
+  projectId: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  stage?: string;
+  progress: number;
 }
 
 export interface FlowProgress {

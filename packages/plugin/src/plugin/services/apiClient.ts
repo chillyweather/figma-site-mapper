@@ -1,13 +1,6 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
-import {
-  InventoryCluster,
-  InventoryInconsistency,
-  InventoryOverview,
-  InventoryRegionInsight,
-  InventoryTemplateInsight,
-  InventoryTokenCandidate,
-} from "../../types";
+import type { InventoryDecisions, InventoryOverview } from "../../types";
 
 interface PageResponseItem {
   _id: string;
@@ -266,23 +259,7 @@ interface JobPagesResponse extends PagesByIdsResponse {
 
 interface InventoryTokensResponse {
   projectId: string;
-  tokens: InventoryTokenCandidate[];
-}
-
-interface InventoryClustersResponse {
-  projectId: string;
-  clusters: InventoryCluster[];
-}
-
-interface InventoryInconsistenciesResponse {
-  projectId: string;
-  inconsistencies: InventoryInconsistency[];
-}
-
-interface InventoryRegionsResponse {
-  projectId: string;
-  regions: InventoryRegionInsight[];
-  templates: InventoryTemplateInsight[];
+  tokens: Record<string, unknown>;
 }
 
 /**
@@ -410,50 +387,43 @@ export async function fetchInventoryTokens(
   return response.json();
 }
 
-export async function fetchInventoryClusters(
+export async function fetchInventoryDecisions(
   projectId: string
-): Promise<InventoryClustersResponse> {
+): Promise<InventoryDecisions> {
   const response = await fetch(
-    `${BACKEND_URL}/inventory/clusters?projectId=${encodeURIComponent(projectId)}`
+    `${BACKEND_URL}/inventory/decisions/${encodeURIComponent(projectId)}`
   );
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch inventory clusters: ${response.status} ${response.statusText}`
+      `Failed to fetch inventory decisions: ${response.status} ${response.statusText}`
     );
   }
 
   return response.json();
 }
 
-export async function fetchInventoryInconsistencies(
+export async function prepareInventory(
   projectId: string
-): Promise<InventoryInconsistenciesResponse> {
+): Promise<{ jobId: string; projectId: string; type: "inventory-prepare" }> {
   const response = await fetch(
-    `${BACKEND_URL}/inventory/inconsistencies?projectId=${encodeURIComponent(projectId)}`
+    `${BACKEND_URL}/inventory/prepare/${encodeURIComponent(projectId)}`,
+    { method: "POST" }
   );
 
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch inventory inconsistencies: ${response.status} ${response.statusText}`
+      `Failed to prepare inventory workspace: ${response.status} ${response.statusText}`
     );
   }
 
-  return response.json();
-}
-
-export async function fetchInventoryRegions(
-  projectId: string
-): Promise<InventoryRegionsResponse> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/regions?projectId=${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inventory regions: ${response.status} ${response.statusText}`
-    );
+  const data = await response.json();
+  if (!data || typeof data.jobId !== "string") {
+    throw new Error("Backend did not return an inventory prepare job id");
   }
-
-  return response.json();
+  return {
+    jobId: data.jobId,
+    projectId: String(data.projectId ?? projectId),
+    type: "inventory-prepare",
+  };
 }
