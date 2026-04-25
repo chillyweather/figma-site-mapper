@@ -21,7 +21,8 @@
     "inventory:validate": "tsx src/cli/inventoryValidate.ts",
     "validate:workspace": "tsx src/cli/validateWorkspace.ts",
     "validate:render-data": "tsx src/cli/validateRenderData.ts",
-    "validate:fingerprints": "tsx src/cli/validateFingerprints.ts"
+    "validate:fingerprints": "tsx src/cli/validateFingerprints.ts",
+    "discovery:basics": "tsx src/cli/validateDiscoveryBasics.ts"
   },
   "keywords": [],
   "author": "",
