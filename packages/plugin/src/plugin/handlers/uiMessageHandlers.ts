@@ -265,6 +265,8 @@ export async function handleGetStatus(
         )
       : [];
     const hasSubsetPages = visitedPageIds.length > 0;
+    const isApprovedCrawl = Array.isArray(jobResult.approvedUrls)
+      || (jobResult.discoveryRunId !== null && jobResult.discoveryRunId !== undefined);
 
     if (result.status === "completed" && projectId && startUrl) {
       if (hasRenderedSitemap) {
@@ -338,6 +340,27 @@ export async function handleGetStatus(
         }
 
         if (!manifestData) {
+          if (isApprovedCrawl) {
+            // For discovery-driven approved crawls, never fall back to the full project —
+            // doing so would render every existing page on the canvas instead of just the
+            // approved subset. Surface a clear error instead.
+            figma.ui.postMessage({
+              type: "status-update",
+              jobId,
+              status: "error",
+              detailedProgress: {
+                stage:
+                  "Approved capture finished but produced no pages. Check that the approved URLs are reachable.",
+                progress: 100,
+              },
+            });
+            figma.notify(
+              "Approved capture finished but produced no pages. Check the worker logs for skipped URLs.",
+              { error: true }
+            );
+            hasRenderedSitemap = false;
+            return;
+          }
           manifestData = await buildManifestFromProject(projectId, startUrl, {
             detectInteractiveElements: detectInteractiveFromJob,
           });
@@ -345,7 +368,7 @@ export async function handleGetStatus(
           console.log("Successfully built manifest from project data");
         }
 
-        if (subsetUsed && !manifestData.tree) {
+        if (subsetUsed && !manifestData.tree && !isApprovedCrawl) {
           console.warn(
             "Subset manifest contained no pages, rebuilding from full project"
           );

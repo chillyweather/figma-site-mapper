@@ -23,6 +23,7 @@
 
 - `packages/backend` is a two-process app: API entrypoint `src/index.ts`, worker entrypoint `src/worker.ts`. Crawls will not run with the API alone.
 - `packages/plugin` has two build targets: UI `src/ui.tsx` via `vite.config.ts` -> `dist/ui.html`, and Figma sandbox code `src/main.ts` via `vite.code.config.ts` -> `dist/code.js`. `manifest.json` points at those built files.
+- Current capture flow is discovery-first: `Recommended` and `Exact URLs` both submit approved URL lists through `/crawl/approved`. `Legacy` is the old broad-crawl/debug path.
 - Design-system inventory is agent-driven. Backend prepares workspace artifacts, Claude writes decisions under `packages/backend/workspace/<projectId>/decisions/`, and the plugin renders `DS Inventory` boards from those decisions.
 
 ## Gotchas
@@ -35,6 +36,7 @@
 - Import `./logger.js` first in any new backend entrypoint so console output is captured. Runtime logs are written to `packages/backend/logs/app.log`.
 - Local generated state lives under `packages/backend/data/`, `packages/backend/screenshots/`, `packages/backend/storage/`, `packages/backend/logs/`, `packages/backend/workspace/`, and `packages/plugin/dist/`.
 - Workspace files are ignored by Git. Agent-written `decisions/*.json` are operational data, not tracked source, unless explicitly promoted to fixtures.
+- Preserve interactive/link data for future flow-building work, but do not reintroduce old automatic canvas highlight/flow overlays for approved captures.
 
 ## Inventory Workflow
 

@@ -811,14 +811,36 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             authSuccess = false;
         }
     }
+    // Build the allowlist set including www/non-www variants so post-redirect URLs match.
+    function expandHostVariants(normalized) {
+        try {
+            const u = new URL(normalized);
+            const variants = [u.toString()];
+            const host = u.hostname;
+            if (host.startsWith("www.")) {
+                const swapped = new URL(u.toString());
+                swapped.hostname = host.slice(4);
+                variants.push(swapped.toString());
+            }
+            else {
+                const swapped = new URL(u.toString());
+                swapped.hostname = `www.${host}`;
+                variants.push(swapped.toString());
+            }
+            return variants;
+        }
+        catch {
+            return [normalized];
+        }
+    }
     const approvedUrlSeeds = approvedUrls && approvedUrls.length > 0
         ? approvedUrls.map((u) => normalizeUrl(u))
         : null;
     const approvedUrlSet = approvedUrlSeeds
-        ? new Set(approvedUrlSeeds)
+        ? new Set(approvedUrlSeeds.flatMap(expandHostVariants))
         : null;
     if (approvedUrlSet) {
-        console.log(`📋 Approved URL allowlist active (${approvedUrlSet.size} URLs)`);
+        console.log(`📋 Approved URL allowlist active (${approvedUrlSet.size} URLs incl. host variants)`);
     }
     const sectionUrlMap = new Map();
     const crawledUrls = new Set();
@@ -850,6 +872,11 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         try {
             const u = new URL(url);
             u.hash = "";
+            // Strip trailing slash from path (unless path is just "/") so that
+            // post-redirect URLs match discovery-normalized allowlist entries.
+            if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
+                u.pathname = u.pathname.slice(0, -1);
+            }
             return u.toString();
         }
         catch {

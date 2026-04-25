@@ -1,24 +1,207 @@
 # Figma Site Mapper
 
-A Figma plugin + Node.js backend that crawls websites, renders interactive sitemap pages in Figma, extracts design-system evidence, and prepares an agent-reviewed design-system inventory.
+A Figma plugin + Node.js backend for turning a real website into design-system evidence inside Figma.
 
-## How it works
+The current workflow is not "crawl everything and hope it is useful." The plugin first helps the designer choose a meaningful page set, captures only the approved URLs, renders those pages into Figma, prepares an agent-readable inventory workspace, and then renders agent decisions back as a `DS Inventory` board.
 
-1. In the plugin, create/select a project and start a crawl.
-2. The backend worker crawls the site with Playwright, captures screenshots, detects elements, extracts styles, and stores everything in local SQLite.
-3. The plugin renders the crawl result onto the Figma canvas: a linked index page, per-URL screenshot pages, badge-linked navigation flows, and optional markup overlays.
-4. In the plugin Inventory tab, prepare an agent-ready workspace from the crawl.
-5. Outside the plugin, run `/ds-inventory <projectId>` in Claude Code. The agent reviews workspace contact sheets, screenshots, and token tables, then writes decisions to `packages/backend/workspace/<projectId>/decisions/`.
-6. Back in the plugin, refresh Inventory and render a `DS Inventory` Figma page from those decisions.
+## Overview
+
+The app has three parts:
+
+- **Figma plugin**: the designer-facing UI. It runs discovery/capture, renders screenshot pages, prepares inventory workspaces, and renders inventory boards.
+- **Backend API + worker**: Fastify API, BullMQ worker, Playwright crawler, SQLite storage, screenshot/style extraction, and inventory workspace generation.
+- **Claude Code inventory pass**: an agent reads the generated workspace and writes structured design-system decisions.
+
+The intended end-to-end process:
+
+1. Start Redis, backend API, backend worker, and plugin watcher.
+2. Open the Figma plugin and select or create a project.
+3. Use **Recommended** discovery to find candidate pages, or **Exact URLs** to provide a fixed list.
+4. Approve the pages to capture.
+5. The backend captures only the approved URLs and stores screenshots, DOM/style data, elements, and crawl-run metadata in SQLite.
+6. The plugin renders an `Index` page plus one Figma page per captured URL.
+7. In the `Inventory` tab, rebuild the inventory workspace.
+8. Run `/ds-inventory <projectId>` in Claude Code from the repo root.
+9. Refresh the `Inventory` tab and render `DS Inventory` boards from the agent decisions.
+
+## User Guide
+
+### 1. Start The Local Stack
+
+Install dependencies once:
+
+```bash
+pnpm install
+```
+
+Create `packages/backend/.env`:
+
+```env
+REDIS_URL="redis://localhost:6379"
+PUBLIC_URL="http://localhost:3006"
+NODE_ENV="development"
+```
+
+Start Redis:
+
+```bash
+docker compose up redis -d
+```
+
+Start the app:
+
+```bash
+pnpm dev
+```
+
+Or split logs across terminals:
+
+```bash
+pnpm dev:backend
+pnpm dev:worker
+pnpm dev:plugin
+```
+
+Required running pieces:
+
+- API server on `http://localhost:3006`
+- Worker process for crawl and inventory jobs
+- Plugin watcher that writes `packages/plugin/dist`
+
+Sanity check:
+
+```bash
+curl http://localhost:3006/
+```
+
+Expected response:
+
+```json
+{"hello":"world"}
+```
+
+### 2. Load The Plugin In Figma
+
+1. Open Figma Desktop.
+2. Go to `Plugins -> Development -> Import plugin from manifest`.
+3. Select `packages/plugin/manifest.json`.
+4. Run **Figma Site Mapper** from development plugins.
+
+`pnpm dev:plugin` is a build watcher, not a browser dev server. Figma reads the built files from `packages/plugin/dist`.
+
+### 3. Choose A Project
+
+Open plugin settings with the gear icon.
+
+You can:
+
+- select an existing project
+- create a new project
+- set screenshot width and scale
+- set crawl defaults
+
+For design-system inventory work, keep **Extract DOM & Style Data** enabled.
+
+### 4. Choose Pages To Capture
+
+The `Crawling` tab has three capture modes.
+
+**Recommended**
+
+Use this for normal design-system discovery. Enter the website URL and optional seed URLs. Set the page budget to the number of meaningful pages you want, then run discovery. The backend recommends candidate pages based on route diversity, page type, seeds, and crawl constraints. Review the candidates, select the pages you want, then start capture.
+
+**Exact URLs**
+
+Use this when you already know the page set. Paste one URL per line and start capture. This still goes through the approved-capture path, so the backend captures only those URLs.
+
+**Legacy**
+
+Use only for older broad-crawl behavior or debugging. It follows links according to crawl settings and limits. It is less controlled than Recommended or Exact URLs.
+
+Important behavior:
+
+- Approved capture uses the approved URL list, not the global max-request setting.
+- If a selected URL redirects, blocks, or fails, the final rendered count can be lower than the requested count.
+- With **Treat this crawl as a full refresh** enabled, stale project pages are removed from SQLite and stale generated Figma pages for that project are removed from the canvas.
+- Interactive/link data is preserved for future flow work, but approved capture does not draw old-style interactive highlight boxes on the canvas.
+
+### 5. Review The Rendered Capture
+
+After capture completes, the plugin renders:
+
+- an `Index` page
+- one generated Figma page per captured URL
+- screenshot slices for tall pages
+- navigation back to the index
+- source URL links in page navigation
+
+Generated screenshot pages store plugin data keys used by markup, styling, inventory, and sample links: `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHOT_WIDTH`, and `ORIGINAL_VIEWPORT_WIDTH`.
+
+### 6. Prepare Inventory Workspace
+
+Open the `Inventory` tab.
+
+Click `Rebuild Inventory Workspace`.
+
+The backend generates:
+
+```text
+packages/backend/workspace/<projectId>/
+```
+
+That workspace contains contact sheets, crop images, token tables, page metadata, element metadata, region hints, and decision file scaffolding. It is generated runtime data and is ignored by Git.
+
+### 7. Run The Agent Inventory Pass
+
+From the repo root, run Claude Code and invoke:
+
+```text
+/ds-inventory <projectId>
+```
+
+Example:
+
+```text
+/ds-inventory 4
+```
+
+The agent reads the workspace and writes decisions to:
+
+```text
+packages/backend/workspace/<projectId>/decisions/
+```
+
+Expected decision files:
+
+- `clusters.json`
+- `tokens.json`
+- `inconsistencies.json`
+- `templates.json`
+- `notes.md`
+
+### 8. Render DS Inventory Boards
+
+Back in the plugin:
+
+1. Open `Inventory`.
+2. Click `Refresh`.
+3. Confirm decision counts appear.
+4. Click `Render Inventory Boards`.
+
+The plugin creates or replaces a `DS Inventory` page. The board includes component clusters, token cards, inconsistencies, templates, notes, crop thumbnails where available, and `View sample` links back to the source screenshot pages.
+
+`View sample` links require the captured screenshot pages to exist in the same Figma file. If those pages were deleted, cards may show `Sample page not rendered`.
 
 ## Features
 
-- Full-site and single-page crawling with configurable depth, rate limiting, and section sampling
+- Recommended discovery flow for selecting a meaningful page set before capture
+- Exact URL capture for designer-provided page lists
+- Legacy broad crawl for debugging and backwards-compatible runs
+- Approved capture that only crawls selected URLs
 - Screenshot capture with automatic slicing for tall pages (>4096 px)
-- Link and button detection with Figma badge overlays
-- CSS style/token extraction (88 properties + CSS custom properties)
+- DOM and style extraction for inventory evidence
 - On-demand markup overlays filtered by element category
-- DB-first flow navigation — jumps to an already-crawled page or triggers a recrawl
+- DB-first page lookup and single-page recrawl
 - Project snapshot rendering from stored data at any time
 - Authentication support: credentials, cookies, or manual login via visible browser
 - Agent-driven design-system inventory workspace with contact sheets, token tables, annotated screenshots, and persisted decision files
@@ -59,7 +242,7 @@ NODE_ENV="development"
 
 No database config needed — SQLite is used automatically. The DB file is created at `packages/backend/data/sitemapper.db` on first run.
 
-### 1. Start Redis
+### Start Redis
 
 Redis is required for the job queue. The easiest way is Docker:
 
@@ -69,7 +252,7 @@ docker compose up redis -d
 
 This starts a Redis container on `localhost:6379` and keeps it running in the background. You only need to do this once — it persists across restarts unless you explicitly stop it.
 
-### 2. Start The App
+### Start The App
 
 Everything in one terminal:
 
@@ -105,7 +288,7 @@ Expected:
 {"hello":"world"}
 ```
 
-### 3. Load The Plugin In Figma Desktop
+### Load The Plugin In Figma Desktop
 
 1. Open Figma Desktop.
 2. Go to `Plugins → Development → Import plugin from manifest`.
@@ -114,129 +297,20 @@ Expected:
 
 `pnpm dev:plugin` is a build watcher, not a web dev server. Figma loads the built files from `packages/plugin/dist`.
 
-## Full Workflow
+## Current Workflow Summary
 
-This is the recommended order for a normal run.
+Use this order for a normal run:
 
-### A. Outside The Plugin
-
-1. Start Redis:
-
-```bash
-docker compose up redis -d
-```
-
-2. Start the dev stack:
-
-```bash
-pnpm dev
-```
-
-Or run the three processes separately:
-
-```bash
-pnpm dev:backend
-pnpm dev:worker
-pnpm dev:plugin
-```
-
-3. Open Figma Desktop and run the development plugin.
-
-### B. Inside The Plugin: Crawl And Render Sitemap
-
-1. Select or create a project.
-2. Enter the target site URL.
-3. Configure crawl limits:
-   - `Max requests` controls how many pages are crawled.
-   - `Max depth` controls link traversal depth.
-   - Style extraction should stay enabled for inventory work.
-4. Click the crawl/start button.
-5. Wait for crawl progress to complete.
-6. The plugin renders:
-   - an `Index` page
-   - one Figma page per crawled URL
-   - screenshot frames
-   - navigation badges/links
-7. Optional: use Mapping/Flows/Markup/Styling tools on the rendered screenshot pages.
-
-### C. Inside The Plugin: Prepare Inventory Workspace
-
-1. Open the `Inventory` tab.
-2. Confirm the active project is correct.
-3. Click `Prepare Inventory` or `Rebuild Inventory Workspace`.
-4. Wait for the prepare job to finish.
-5. The tab should show:
-   - workspace ready
-   - page count
-   - element count
-   - workspace path
-
-The workspace is generated at:
-
-```text
-packages/backend/workspace/<projectId>/
-```
-
-Generated workspace/data folders are intentionally ignored by Git.
-
-### D. Outside The Plugin: Agent Inventory Pass
-
-Run Claude Code from the repository root and invoke the inventory skill:
-
-```text
-/ds-inventory <projectId>
-```
-
-Example:
-
-```text
-/ds-inventory 4
-```
-
-The agent reads:
-
-- `packages/backend/workspace/<projectId>/README.md`
-- `project.json`
-- `pages/*`
-- `catalog/*/contact-sheet.png`
-- `catalog/*/groups.json`
-- `tokens/*`
-- `regions/*`
-
-The agent writes decisions to:
-
-```text
-packages/backend/workspace/<projectId>/decisions/
-```
-
-Expected decision files:
-
-- `clusters.json`
-- `tokens.json`
-- `inconsistencies.json`
-- `templates.json`
-- `notes.md`
-
-### E. Inside The Plugin: Render Design-System Inventory
-
-1. Return to the plugin.
-2. Open `Inventory`.
-3. Click `Refresh`.
-4. Confirm decision counts appear.
-5. Click `Render Inventory Boards`.
-6. The plugin creates or replaces a `DS Inventory` Figma page.
-
-The rendered board currently includes:
-
-- component cards
-- token cards and color swatches
-- inconsistency cards
-- template cards
-- notes
-- component crop thumbnails where available
-- `View sample` links from component cards back to source screenshot anchors
-
-`View sample` links require the crawl screenshot pages to exist in the Figma file. If the screenshot pages are not present, cards may show `Sample page not rendered`.
+1. Start Redis and `pnpm dev`.
+2. Load the Figma development plugin.
+3. Select/create a project.
+4. Use `Recommended` discovery or `Exact URLs`.
+5. Approve/capture the chosen pages.
+6. Verify generated screenshot pages in Figma.
+7. Open `Inventory` and rebuild the workspace.
+8. Run `/ds-inventory <projectId>` in Claude Code.
+9. Refresh `Inventory`.
+10. Render `DS Inventory` boards.
 
 ## CLI Inventory Commands
 

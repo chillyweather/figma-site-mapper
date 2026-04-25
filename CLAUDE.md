@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-A Figma plugin + Node.js backend that crawls websites, renders them as interactive sitemaps in Figma, and prepares agent-reviewed design-system inventories. The backend crawls with Playwright, stores results in SQLite, generates an agent-ready workspace on disk, and serves data via a REST API. The plugin renders screenshots, navigation flows, element markup overlays, style tables, inventory status, and `DS Inventory` boards directly onto the Figma canvas.
+A Figma plugin + Node.js backend that discovers meaningful website pages, captures approved URLs, renders them as screenshot pages in Figma, and prepares agent-reviewed design-system inventories. The backend crawls with Playwright, stores results in SQLite, generates an agent-ready workspace on disk, and serves data via a REST API. The plugin renders screenshot pages, markup/styling tools, inventory status, and `DS Inventory` boards directly onto the Figma canvas.
 
 ## Dev startup
 
@@ -78,13 +78,17 @@ Current required plugin-data keys are `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHO
 
 ## Data flow
 
-### Crawl and sitemap flow
+### Discovery, capture, and sitemap flow
 
-1. Plugin UI → `POST /crawl` with project ID and settings
-2. API validates project exists in SQLite, enqueues BullMQ job
-3. Worker calls `runCrawler()` → Playwright crawls → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` → old elements deleted → new elements batch-inserted in chunks of 200
-4. Worker writes `visitedPageIds` (integer strings) back to the BullMQ job
-5. Plugin polls `GET /status/:jobId` → fetches `GET /jobs/:jobId/pages` → renders Figma frames → stores `PAGE_ID` in Figma plugin data
+1. Recommended mode: Plugin UI calls `POST /discovery/start`, reviews candidates from `GET /discovery/:runId`, then submits selected candidates to `POST /discovery/:runId/approval`.
+2. Exact URLs mode: Plugin creates a minimal discovery run from the pasted URLs and approves those URLs through the same approval path.
+3. Approved capture calls `POST /crawl/approved` with an explicit approved URL list. This path sets `maxRequestsPerCrawl` to the approved URL count and disables automatic interactive highlight rendering.
+4. Legacy mode still calls `POST /crawl` with broad crawl settings. Use it only for backwards-compatible broad crawl/debug behavior.
+5. API validates project/run IDs in SQLite and enqueues a BullMQ job.
+6. Worker calls `runCrawler()` → Playwright crawls only allowed URLs when an approved allowlist is present → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` → old elements deleted → new elements batch-inserted in chunks of 200.
+7. Worker writes `visitedPageIds` (integer strings), `visitedUrls`, and `pageCount` back to the BullMQ job.
+8. Plugin polls `GET /status/:jobId` → fetches only the job subset from `GET /pages/by-ids` → renders Figma pages → stores `PROJECT_ID`, `URL`, and `PAGE_ID` in Figma plugin data.
+9. If the job was a full refresh, backend removes stale SQLite pages and the plugin removes stale generated Figma pages for the same project.
 
 ### Design-system inventory flow
 
@@ -143,6 +147,12 @@ packages/plugin/src/
 
 ## Current implementation state
 
+- Discovery and approved capture are implemented:
+  - Recommended discovery proposes candidate pages before capture
+  - Exact URLs capture uses the same approved-capture path
+  - approved capture no longer uses the global max-request setting
+  - approved capture preserves interactive data but does not draw old interactive highlight overlays
+  - full refresh removes stale generated Figma pages for the active project
 - Phases A-D of the agent-driven inventory pivot are complete.
 - Phase E is MVP complete:
   - plugin renders a `DS Inventory` page from decisions
@@ -155,7 +165,7 @@ packages/plugin/src/
   - improve board layout and split large boards if needed
   - tighten render-data schema validation
 
-Before adding more rendering complexity, prioritize plugin cleanup/polish and broader crawl validation.
+Flow-building will be revisited later with a different model. Preserve link/interactive data in the DB, but do not rebuild the old visible flow/highlight behavior as the default capture experience.
 
 ## Generated and ignored runtime state
 

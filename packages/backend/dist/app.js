@@ -283,6 +283,8 @@ export async function buildServer() {
                         ? jobData.visitedUrls.length
                         : 0,
                 lastCompletedAt: jobData.lastCompletedAt ?? null,
+                approvedUrls: Array.isArray(jobData.approvedUrls) ? jobData.approvedUrls : null,
+                discoveryRunId: jobData.discoveryRunId ?? null,
             },
         };
     });
