@@ -227,23 +227,6 @@ export interface SettingsViewProps {
   handleFullRefreshChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   showBrowser: boolean;
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  detectInteractiveElements: boolean;
-  handleDetectInteractiveElementsChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  highlightAllElements: boolean;
-  handleHighlightAllElementsChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  highlightElementFilters: ElementFilters;
-  handleHighlightFilterChange: (
-    elementType: keyof ElementFilters,
-    checked: boolean
-  ) => void;
-  captureOnlyVisibleElements: boolean;
-  handleCaptureOnlyVisibleElementsChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   authStatus: "idle" | "authenticating" | "success" | "failed" | null;
@@ -310,60 +293,18 @@ export interface SettingsViewProps {
 }
 
 export interface MainViewProps {
-  projects: Project[];
   activeProjectId: string | null;
-  onProjectChange: (projectId: string | null) => void;
-  onCreateProject: (name: string) => Promise<void>;
-  onRefreshProjects: () => Promise<void>;
-  isProjectLoading: boolean;
-  isCreatingProject: boolean;
-  projectError: string | null;
   url: string;
   handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
   jobId: string | null;
   handleSubmit: (e: React.FormEvent) => void;
   status: string;
-  handleClose: () => void;
   switchToSettings: () => void;
-  badgeLinks: FlowLink[];
-  checkedLinks: Set<string>;
-  handleLinkCheck: (linkId: string, checked: boolean) => void;
-  handleShowFlow: () => void;
-  flowProgress: FlowProgress;
-  focusedBadgeNumber?: number | null;
   crawlProgress: CrawlProgress;
   authStatus: "idle" | "authenticating" | "success" | "failed" | null;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   onAuthorize: () => void;
-  // Element styling props
-  categorizedElements: CategorizedElements | null;
-  elementFilters: ElementFilters;
-  onElementFilterChange: (
-    elementType: keyof ElementFilters,
-    checked: boolean
-  ) => void;
-  handleShowStyling: () => void;
-  manifestData: any;
-  selectedPageUrl: string;
-  onPageSelection: (pageUrl: string) => void;
-  markupFilters: ElementFilters;
-  supportedMarkupFilters: Array<keyof ElementFilters>;
-  onMarkupFilterChange: (
-    filter: keyof ElementFilters,
-    checked: boolean
-  ) => void;
-  onRenderMarkup: () => void;
-  onClearMarkup: () => void;
-  isMarkupRendering: boolean;
-  markupStatus: string;
-  activeMarkupPage: {
-    pageId: string | null;
-    pageUrl: string | null;
-    pageName?: string;
-  } | null;
-  selectedMarkupFilterCount: number;
-  // Styling snapshot props
   handleRenderSnapshot: () => void;
   isRenderingSnapshot: boolean;
 }
@@ -376,7 +317,6 @@ export interface CrawlingTabProps {
   handleSubmit: (e: React.FormEvent) => void;
   handleRenderSnapshot: () => void;
   status: string;
-  handleClose: () => void;
   crawlProgress: CrawlProgress;
   projectSelected: boolean;
   isRenderingSnapshot: boolean;

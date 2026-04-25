@@ -1,23 +1,12 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import { useAtom } from "jotai";
-import {
-  currentViewAtom,
-  elementFiltersAtom,
-  categorizedElementsAtom,
-  selectedPageUrlAtom,
-  manifestDataAtom,
-} from "../store/atoms";
+import { currentViewAtom } from "../store/atoms";
 import { useSettings } from "../hooks/useSettings";
 import { useCrawl } from "../hooks/useCrawl";
-import { useFlowMapping } from "../hooks/useFlowMapping";
-import { useElementData } from "../hooks/useElementData";
 import { useProjects } from "../hooks/useProjects";
-import { useMarkup } from "../hooks/useMarkup";
 import { MainView } from "./MainView";
 import { SettingsView } from "./SettingsView";
-import { StylingView } from "./StylingView";
 import { getPresetConfig } from "../utils/stylePresets";
-import { ElementFilters } from "../types";
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useAtom(currentViewAtom);
@@ -45,56 +34,6 @@ export const App: React.FC = () => {
     createProject,
     deleteProject,
   } = useProjects();
-  const {
-    badgeLinks,
-    checkedLinks,
-    handleLinkCheck,
-    handleShowFlow,
-    flowProgress,
-    focusedBadgeNumber,
-  } = useFlowMapping();
-
-  // Element mode, filters, and page selection
-  const [selectedPageUrl, setSelectedPageUrl] = useAtom(selectedPageUrlAtom);
-  const [manifestData] = useAtom(manifestDataAtom);
-
-  // Load and categorize elements from manifest for selected page
-  useElementData(selectedPageUrl);
-
-  const [elementFilters, setElementFilters] = useAtom(elementFiltersAtom);
-  const [categorizedElements] = useAtom(categorizedElementsAtom);
-
-  const {
-    filters: markupFilters,
-    activePage: activeMarkupPage,
-    isRendering: isMarkupRendering,
-    status: markupStatus,
-    handleFilterChange: handleMarkupFilterChange,
-    handleRenderMarkup,
-    handleClearMarkup,
-    supportedFilters: supportedMarkupFilters,
-    selectedFilterCount: selectedMarkupFilterCount,
-  } = useMarkup();
-
-  // Element filter handler
-  const handleElementFilterChange = useCallback(
-    (elementType: keyof ElementFilters, checked: boolean) => {
-      setElementFilters((prev) => ({
-        ...prev,
-        [elementType]: checked,
-      }));
-    },
-    [setElementFilters]
-  );
-
-  // Page selection handler
-  const handlePageSelection = useCallback(
-    (pageUrl: string) => {
-      setSelectedPageUrl(pageUrl);
-    },
-    [setSelectedPageUrl]
-  );
-
   const handleProjectChange = useCallback(
     (projectId: string | null) => {
       setActiveProjectId(projectId);
@@ -116,19 +55,6 @@ export const App: React.FC = () => {
     [deleteProject]
   );
 
-  // Styling mode handler
-  const handleShowStyling = useCallback(() => {
-    console.log("Creating styling page for current page");
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "show-styling-elements",
-        },
-      },
-      "*"
-    );
-  }, []);
-
   // View switching
   const switchToMain = useCallback(
     () => setCurrentView("main"),
@@ -138,11 +64,6 @@ export const App: React.FC = () => {
     () => setCurrentView("settings"),
     [setCurrentView]
   );
-
-  // Handle close
-  const handleClose = useCallback(() => {
-    parent.postMessage({ pluginMessage: { type: "close" } }, "*");
-  }, []);
 
   // Input handlers with Jotai
   const handleUrlChange = useCallback(
@@ -222,71 +143,12 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
-  const handleDetectInteractiveElementsChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("detectInteractiveElements", e.target.checked);
-    },
-    [updateSetting]
-  );
-
-  const handleHighlightAllElementsChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("highlightAllElements", e.target.checked);
-    },
-    [updateSetting]
-  );
-
-  const handleHighlightFilterChange = useCallback(
-    (elementType: keyof ElementFilters, checked: boolean) => {
-      updateSetting("highlightElementFilters", {
-        ...settings.highlightElementFilters,
-        [elementType]: checked,
-      });
-    },
-    [updateSetting, settings.highlightElementFilters]
-  );
-
-  const handleCaptureOnlyVisibleElementsChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("captureOnlyVisibleElements", e.target.checked);
-    },
-    [updateSetting]
-  );
-
   const handleAuthMethodChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       updateSetting(
         "authMethod",
         e.target.value as "none" | "manual" | "credentials" | "cookies"
       );
-    },
-    [updateSetting]
-  );
-
-  const handleLoginUrlChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("loginUrl", e.target.value);
-    },
-    [updateSetting]
-  );
-
-  const handleUsernameChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("username", e.target.value);
-    },
-    [updateSetting]
-  );
-
-  const handlePasswordChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateSetting("password", e.target.value);
-    },
-    [updateSetting]
-  );
-
-  const handleCookiesChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      updateSetting("cookies", e.target.value);
     },
     [updateSetting]
   );
@@ -406,9 +268,7 @@ export const App: React.FC = () => {
   // Note: Project persistence is handled by useProjects.setActiveProjectId
   // via the 'save-project' message, so no separate useEffect needed here
 
-  return currentView === "styling" ? (
-    <StylingView onBack={switchToMain} />
-  ) : currentView === "settings" ? (
+  return currentView === "settings" ? (
     <SettingsView
       url={settings.url}
       screenshotWidth={settings.screenshotWidth}
@@ -431,18 +291,6 @@ export const App: React.FC = () => {
       handleFullRefreshChange={handleFullRefreshChange}
       showBrowser={settings.showBrowser}
       handleShowBrowserChange={handleShowBrowserChange}
-      detectInteractiveElements={settings.detectInteractiveElements}
-      handleDetectInteractiveElementsChange={
-        handleDetectInteractiveElementsChange
-      }
-      highlightAllElements={settings.highlightAllElements}
-      handleHighlightAllElementsChange={handleHighlightAllElementsChange}
-      highlightElementFilters={settings.highlightElementFilters}
-      handleHighlightFilterChange={handleHighlightFilterChange}
-      captureOnlyVisibleElements={settings.captureOnlyVisibleElements}
-      handleCaptureOnlyVisibleElementsChange={
-        handleCaptureOnlyVisibleElementsChange
-      }
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
       authStatus={authStatus}
@@ -490,51 +338,20 @@ export const App: React.FC = () => {
     />
   ) : (
     <MainView
-      projects={projects}
       activeProjectId={activeProjectId}
-      onProjectChange={handleProjectChange}
-      onCreateProject={handleCreateProject}
-      onRefreshProjects={refresh}
-      isProjectLoading={isProjectLoading}
-      isCreatingProject={isCreatingProject}
-      projectError={projectError}
       url={settings.url}
       handleUrlChange={handleUrlChange}
       isLoading={isLoading}
       jobId={jobId}
       handleSubmit={handleSubmit}
       status={status}
-      handleClose={handleClose}
       switchToSettings={switchToSettings}
-      badgeLinks={badgeLinks}
-      checkedLinks={checkedLinks}
-      handleLinkCheck={handleLinkCheck}
-      handleShowFlow={handleShowFlow}
-      flowProgress={flowProgress}
-      focusedBadgeNumber={focusedBadgeNumber}
       crawlProgress={crawlProgress}
       authStatus={authStatus}
       authMethod={settings.authMethod}
       onAuthorize={handleOpenAuthSession}
-      // Element styling props
-      categorizedElements={categorizedElements}
-      elementFilters={elementFilters}
-      onElementFilterChange={handleElementFilterChange}
-      handleShowStyling={handleShowStyling}
-      manifestData={manifestData}
-      selectedPageUrl={selectedPageUrl}
-      onPageSelection={handlePageSelection}
       handleRenderSnapshot={handleRenderSnapshot}
       isRenderingSnapshot={isRenderingSnapshot}
-      markupFilters={markupFilters}
-      supportedMarkupFilters={supportedMarkupFilters}
-      onMarkupFilterChange={handleMarkupFilterChange}
-      onRenderMarkup={handleRenderMarkup}
-      onClearMarkup={handleClearMarkup}
-      isMarkupRendering={isMarkupRendering}
-      markupStatus={markupStatus}
-      activeMarkupPage={activeMarkupPage}
-      selectedMarkupFilterCount={selectedMarkupFilterCount}
     />
   );
 };

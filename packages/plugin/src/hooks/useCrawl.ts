@@ -80,8 +80,8 @@ export function useCrawl() {
               fullRefresh: settings.fullRefresh,
               sampleSize: parseSampleSize(settings.sampleSize),
               showBrowser: settings.showBrowser,
-              detectInteractiveElements: settings.detectInteractiveElements,
-              highlightAllElements: settings.highlightAllElements,
+              detectInteractiveElements: true,
+              highlightAllElements: false,
               highlightElementFilters: settings.highlightElementFilters,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
@@ -164,7 +164,7 @@ export function useCrawl() {
             projectId: activeProjectId,
             startUrl: settings.url.trim(),
             screenshotWidth,
-            detectInteractiveElements: settings.detectInteractiveElements,
+            detectInteractiveElements: true,
           },
         },
         "*"
@@ -178,7 +178,6 @@ export function useCrawl() {
     setStatus,
     settings.screenshotWidth,
     settings.url,
-    settings.detectInteractiveElements,
     setIsRenderingSnapshot,
     setCrawlProgress,
   ]);
@@ -401,7 +400,7 @@ export function useCrawl() {
               type: "get-status",
               jobId,
               screenshotWidth: parseScreenshotWidth(settings.screenshotWidth),
-              detectInteractiveElements: settings.detectInteractiveElements,
+              detectInteractiveElements: true,
             },
           },
           "*"
@@ -415,7 +414,7 @@ export function useCrawl() {
         intervalRef.current = null;
       }
     };
-  }, [jobId, settings.screenshotWidth, settings.detectInteractiveElements]);
+  }, [jobId, settings.screenshotWidth]);
 
   return {
     isLoading,

@@ -7,10 +7,10 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   deviceScaleFactor: "1",
   delay: "0",
   requestDelay: "1000",
-  maxDepth: "2",
+  maxDepth: "0",
   defaultLanguageOnly: true,
   fullRefresh: false,
-  sampleSize: "3",
+  sampleSize: "0",
   showBrowser: false,
   detectInteractiveElements: true,
   highlightAllElements: false,
@@ -32,8 +32,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   username: "",
   password: "",
   cookies: "",
-  // Style Extraction - OFF by default, user opts in
-  extractStyles: false,
+  // Inventory workflow needs DOM/style data by default.
+  extractStyles: true,
   styleExtractionPreset: "smart",
   // Custom preset defaults (smart preset values)
   extractInteractive: true,

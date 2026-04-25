@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from "react";
 import {
-  IconSettings,
   IconKey,
   IconCheck,
   IconX,
@@ -36,14 +35,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleFullRefreshChange,
   showBrowser,
   handleShowBrowserChange,
-  detectInteractiveElements,
-  handleDetectInteractiveElementsChange,
-  highlightAllElements,
-  handleHighlightAllElementsChange,
-  highlightElementFilters,
-  handleHighlightFilterChange,
-  captureOnlyVisibleElements,
-  handleCaptureOnlyVisibleElementsChange,
   authMethod,
   handleAuthMethodChange,
   authStatus,
@@ -336,10 +327,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         type="number"
         value={maxDepth}
         onChange={handleMaxDepthChange}
-        placeholder="Max crawl depth (2)"
+        placeholder="Max crawl depth (0)"
         disabled={isLoading || !!jobId}
         className="form-input"
-        min="1"
+        min="0"
         max="10"
       />
       <div className="settings-description">
@@ -350,10 +341,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         type="number"
         value={sampleSize}
         onChange={handleSampleSizeChange}
-        placeholder="Pages per section (3)"
+        placeholder="Pages per section (0)"
         disabled={isLoading || !!jobId}
         className="form-input"
-        min="1"
+        min="0"
         max="20"
       />
       <div className="settings-description">
@@ -399,164 +390,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="settings-description">
         Keep browser visible for manual intervention (CAPTCHA, login, etc.)
       </div>
-      <label className="settings-label">
-        <input
-          id="detect-interactive-elements-checkbox"
-          type="checkbox"
-          checked={detectInteractiveElements}
-          onChange={handleDetectInteractiveElementsChange}
-          disabled={isLoading || !!jobId}
-        />
-        Detect interactive elements
-      </label>
-      <div className="settings-description">
-        Add numbered frames around links and buttons for user journey mapping
-      </div>
-
-      <label className="settings-label" style={{ marginTop: "12px" }}>
-        <input
-          id="highlight-all-elements-checkbox"
-          type="checkbox"
-          checked={highlightAllElements}
-          onChange={handleHighlightAllElementsChange}
-          disabled={isLoading || !!jobId || !extractStyles}
-        />
-        Highlight detected elements
-      </label>
-      <div className="settings-description">
-        Create color-coded highlights for detected elements. Requires style
-        extraction to be enabled.
-      </div>
-
-      {highlightAllElements && (
-        <div className="settings-group">
-          <div className="settings-group-title">
-            Element Types to Highlight:
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.buttons}
-                onChange={(e) =>
-                  handleHighlightFilterChange("buttons", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#28A745", marginRight: "4px" }}>●</span>{" "}
-              Buttons
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.links}
-                onChange={(e) =>
-                  handleHighlightFilterChange("links", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#0066CC", marginRight: "4px" }}>●</span>{" "}
-              Links
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.inputs}
-                onChange={(e) =>
-                  handleHighlightFilterChange("inputs", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
-              Form Inputs
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.textareas}
-                onChange={(e) =>
-                  handleHighlightFilterChange("textareas", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
-              Textareas
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.selects}
-                onChange={(e) =>
-                  handleHighlightFilterChange("selects", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#FD7E14", marginRight: "4px" }}>●</span>{" "}
-              Selects
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.headings}
-                onChange={(e) =>
-                  handleHighlightFilterChange("headings", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#6F42C1", marginRight: "4px" }}>●</span>{" "}
-              Headings
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.images}
-                onChange={(e) =>
-                  handleHighlightFilterChange("images", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#20C997", marginRight: "4px" }}>●</span>{" "}
-              Images
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.paragraphs}
-                onChange={(e) =>
-                  handleHighlightFilterChange("paragraphs", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
-              Paragraphs
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.divs}
-                onChange={(e) =>
-                  handleHighlightFilterChange("divs", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
-              Divs
-            </label>
-            <label className="settings-label">
-              <input
-                type="checkbox"
-                checked={highlightElementFilters.other}
-                onChange={(e) =>
-                  handleHighlightFilterChange("other", e.target.checked)
-                }
-                disabled={isLoading || !!jobId}
-              />
-              <span style={{ color: "#6C757D", marginRight: "4px" }}>●</span>{" "}
-              Other
-            </label>
-          </div>
-        </div>
-      )}
     </div>
 
     <div id="authentication-section" className="settings-section">
@@ -627,25 +460,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               Authentication failed
             </div>
           )}
-        </div>
-      )}
-
-      {authStatus === "authenticating" && (
-        <div className="status-display status-warning" style={{ marginTop: "4px" }}>
-          <IconKey size={12} />
-          Authenticating...
-        </div>
-      )}
-      {authStatus === "success" && (
-        <div className="status-display status-success" style={{ marginTop: "4px" }}>
-          <IconCheck size={12} />
-          Authentication successful
-        </div>
-      )}
-      {authStatus === "failed" && (
-        <div className="status-display status-error" style={{ marginTop: "4px" }}>
-          <IconX size={12} />
-          Authentication failed - will crawl public pages only
         </div>
       )}
     </div>

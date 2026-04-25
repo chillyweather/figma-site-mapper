@@ -12,7 +12,6 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   handleSubmit,
   handleRenderSnapshot,
   status,
-  handleClose,
   crawlProgress,
   projectSelected,
   isRenderingSnapshot,
@@ -23,6 +22,7 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   const disableActions =
     isLoading || isRenderingSnapshot || !!jobId || !projectSelected;
   const trimmedUrl = url.trim();
+  const showAuthorize = authMethod === "manual";
   const authorizeDisabled = disableActions || !trimmedUrl;
 
   const authorizeLabel = (() => {
@@ -107,24 +107,25 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           </div>
         </div>
 
-        <div className="form-group">
-          <button
-            id="authorize-button"
-            type="button"
-            onClick={onAuthorize}
-            disabled={authorizeDisabled}
-            className={`button-secondary ${authorizeDisabled ? "button-flow-disabled" : ""}`}
-          >
-            {authorizeLabel}
-          </button>
-          <div className="form-hint">
-            Opens a dedicated browser so you can log in or solve CAPTCHA before
-            crawling. When finished, close the browser window (Cmd+Q / Ctrl+Q)
-            so cookies can be captured.
+        {showAuthorize && (
+          <div className="form-group">
+            <button
+              id="authorize-button"
+              type="button"
+              onClick={onAuthorize}
+              disabled={authorizeDisabled}
+              className={`button-secondary ${authorizeDisabled ? "button-flow-disabled" : ""}`}
+            >
+              {authorizeLabel}
+            </button>
+            <div className="form-hint">
+              Opens a browser for login or CAPTCHA. Close that browser when
+              finished so cookies can be captured.
+            </div>
+            {renderAuthStatus()}
+            {manualReminder}
           </div>
-          {renderAuthStatus()}
-          {manualReminder}
-        </div>
+        )}
 
         <button
           id="start-crawl-button"
@@ -153,8 +154,8 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           className={`button-secondary ${disableActions ? "button-flow-disabled" : ""}`}
         >
           {isRenderingSnapshot
-            ? "Rendering Snapshot..."
-            : "Render Project Snapshot"}
+            ? "Rendering Screenshot Pages..."
+            : "Render Screenshot Pages"}
         </button>
       </div>
 
@@ -168,13 +169,6 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
         </div>
       )}
 
-      <button
-        id="close-plugin-button"
-        onClick={handleClose}
-        className="button-secondary"
-      >
-        Close
-      </button>
     </div>
   );
 };

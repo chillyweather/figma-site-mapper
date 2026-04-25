@@ -13,7 +13,7 @@ import type { ManifestData } from "../plugin/types";
 
 // Settings atoms
 export const settingsAtom = atom<PluginSettings>(DEFAULT_SETTINGS);
-export const currentViewAtom = atom<"main" | "settings" | "styling">("main");
+export const currentViewAtom = atom<"main" | "settings">("main");
 
 // Crawl state atoms
 export const isLoadingAtom = atom(false);
