@@ -61,6 +61,23 @@ function normalizeRelativeWorkspacePath(...parts: string[]): string {
   return path.posix.normalize(parts.filter(Boolean).join("/")).replace(/^(\.\.\/)+/, "");
 }
 
+function workspaceRelativePathExists(workspacePath: string, relativePath: string | undefined): boolean {
+  if (!relativePath || relativePath.includes("undefined")) return false;
+  const normalized = normalizeRelativeWorkspacePath(relativePath);
+  return fs.existsSync(path.join(workspacePath, ...normalized.split("/")));
+}
+
+function existingWorkspaceAssetUrl(
+  workspacePath: string,
+  baseUrl: string,
+  projectId: string,
+  relativePath: string | undefined
+): string | null {
+  if (!workspaceRelativePathExists(workspacePath, relativePath)) return null;
+  if (!relativePath) return null;
+  return workspaceAssetUrl(baseUrl, projectId, normalizeRelativeWorkspacePath(relativePath));
+}
+
 interface ClusterExample {
   fingerprint: string;
   shortFingerprint: string;
@@ -72,6 +89,118 @@ interface ClusterExample {
   bbox: [number, number, number, number] | null;
   cropUrl: string | null;
   cropContextUrl: string | null;
+}
+
+function elementToExample(
+  element: Record<string, unknown>,
+  workspacePath: string,
+  projectId: string,
+  baseUrl: string
+): ClusterExample | null {
+  const elementId = typeof element.id === "string" ? element.id : null;
+  const pageId = typeof element.pageId === "string" ? element.pageId : null;
+  if (!elementId || !pageId) return null;
+
+  const fingerprint = typeof element.fingerprint === "string"
+    ? element.fingerprint
+    : typeof element.componentFingerprint === "string"
+    ? element.componentFingerprint
+    : `element:${elementId}`;
+  const rawCrop = typeof element.crop === "string" ? element.crop : undefined;
+  const rawCropContext = typeof element.cropContext === "string" ? element.cropContext : undefined;
+  const cropPath = rawCrop ? normalizeRelativeWorkspacePath("pages", pageId, rawCrop) : undefined;
+  const cropContextPath = rawCropContext ? normalizeRelativeWorkspacePath("pages", pageId, rawCropContext) : undefined;
+  const cropUrl = existingWorkspaceAssetUrl(workspacePath, baseUrl, projectId, cropPath);
+  const cropContextUrl = existingWorkspaceAssetUrl(workspacePath, baseUrl, projectId, cropContextPath);
+
+  return {
+    fingerprint,
+    shortFingerprint: fingerprint.slice(0, 18),
+    instanceCount: 1,
+    pageCount: 1,
+    textSamples: typeof element.text === "string" && element.text.trim()
+      ? [element.text.trim().replace(/\s+/g, " ").slice(0, 120)]
+      : [],
+    elementId,
+    pageId,
+    bbox: Array.isArray(element.bbox) ? (element.bbox as [number, number, number, number]) : null,
+    cropUrl,
+    cropContextUrl,
+  };
+}
+
+function scoreElementForCluster(
+  cluster: Record<string, unknown>,
+  element: Record<string, unknown>
+): number {
+  const clusterText = [
+    textValue(cluster.id),
+    textValue(cluster.name),
+    textValue(cluster.category),
+  ].join(" ").toLowerCase();
+  const elementText = [
+    textValue(element.text),
+    textValue(element.category),
+    textValue(element.tag),
+    textValue(element.region),
+  ].join(" ").toLowerCase();
+  const category = textValue(element.category);
+  const tag = textValue(element.tag).toLowerCase();
+  const text = textValue(element.text).replace(/\s+/g, " ").trim().toLowerCase();
+  const region = textValue(element.region).toLowerCase();
+  const hasCrop = typeof element.crop === "string" || typeof element.cropContext === "string";
+  const hasBbox = Array.isArray(element.bbox);
+  let score = 0;
+
+  if (hasCrop) score += 30;
+  if (hasBbox) score += 10;
+  if (element.visible !== false) score += 5;
+
+  if (clusterText.includes("button") && category === "button") score += 45;
+  if (clusterText.includes("link") && category === "link") score += 45;
+  if (clusterText.includes("heading") && category === "heading") score += 45;
+  if ((clusterText.includes("logo") || clusterText.includes("image")) && category === "image") score += 45;
+  if ((clusterText.includes("stats") || clusterText.includes("text-block")) && category === "text-block") score += 35;
+
+  if (clusterText.includes("primary") && text.includes("start free")) score += 120;
+  if (clusterText.includes("outline") && text.includes("contact sales")) score += 120;
+  if ((clusterText.includes("demo") || clusterText.includes("request")) && text.includes("request a demo")) score += 120;
+  if (clusterText.includes("nav-trigger") && region === "top" && category === "button") score += 90;
+  if (clusterText.includes("chip") && (category === "button" || category === "link") && text.length > 0 && text.length <= 40) score += 60;
+
+  if (clusterText.includes("final-cta") && (elementText.includes("ready to see") || elementText.includes("runs on atera"))) score += 120;
+  if (clusterText.includes("global.header") && (region === "top" || element.isGlobalChrome === true)) score += 95;
+  if (clusterText.includes("global.footer") && (region === "bottom" || element.isGlobalChrome === true)) score += 85;
+  if (clusterText.includes("faq") && (text.includes("what is") || text.includes("faq"))) score += 120;
+  if (clusterText.includes("stats") && /\b\d+([.,]\d+)?\s*(%|k|x|min|hrs?)?\b/i.test(text)) score += 110;
+  if (clusterText.includes("logo") && category === "image") score += 100;
+  if (clusterText.includes("product-summary") && (elementText.includes("robin") || elementText.includes("essentials suite"))) score += 120;
+  if (clusterText.includes("section-title") && category === "heading" && (tag === "h2" || tag === "h3")) score += 90;
+  if (clusterText.includes("eyebrow") && text.length > 0 && text.length <= 60 && (category === "heading" || category === "text-block")) score += 75;
+  if (clusterText.includes("read-case-study") && text.includes("read case study")) score += 120;
+  if (clusterText.includes("learn-more") && text.includes("learn more")) score += 120;
+
+  return score;
+}
+
+function fallbackExamplesForCluster(
+  cluster: Record<string, unknown>,
+  elements: Record<string, unknown>[],
+  workspacePath: string,
+  projectId: string,
+  baseUrl: string,
+  existingIds: Set<string>
+): ClusterExample[] {
+  return elements
+    .map((element) => ({ element, score: scoreElementForCluster(cluster, element) }))
+    .filter(({ element, score }) => {
+      const id = typeof element.id === "string" ? element.id : "";
+      return score >= 80 && id && !existingIds.has(id);
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ element }) => elementToExample(element, workspacePath, projectId, baseUrl))
+    .filter((example): example is ClusterExample => Boolean(example));
 }
 
 export async function buildInventoryRenderModel(
@@ -90,6 +219,7 @@ export async function buildInventoryRenderModel(
   // Load catalog groups and elements for enrichment
   const groupsByFingerprint = new Map<string, Record<string, unknown>>();
   const elementsById = new Map<string, Record<string, unknown>>();
+  const allElements: Record<string, unknown>[] = [];
 
   const catalogPath = path.join(workspacePath, "catalog");
   const entries = await fs.promises.readdir(catalogPath, { withFileTypes: true }).catch(() => []);
@@ -117,7 +247,9 @@ export async function buildInventoryRenderModel(
     );
     for (const element of pageElements) {
       const id = typeof element.id === "string" ? element.id : null;
-      if (id) elementsById.set(id, { ...element, pageId: entry.name });
+      const enrichedElement = { ...element, pageId: entry.name };
+      if (id) elementsById.set(id, enrichedElement);
+      allElements.push(enrichedElement);
     }
   }
 
@@ -177,37 +309,15 @@ export async function buildInventoryRenderModel(
         const element = elementsById.get(elementId);
         if (!element) continue;
 
-        const pageId = typeof element.pageId === "string" ? element.pageId : null;
-        const fingerprint = typeof element.fingerprint === "string"
-          ? element.fingerprint
-          : typeof element.componentFingerprint === "string"
-          ? element.componentFingerprint
-          : `element:${elementId}`;
-        const rawCrop = typeof element.crop === "string" ? element.crop : undefined;
-        const rawCropContext = typeof element.cropContext === "string" ? element.cropContext : undefined;
-        const cropUrl = pageId && rawCrop
-          ? workspaceAssetUrl(baseUrl, projectId, normalizeRelativeWorkspacePath("pages", pageId, rawCrop))
-          : null;
-        const cropContextUrl = pageId && rawCropContext
-          ? workspaceAssetUrl(baseUrl, projectId, normalizeRelativeWorkspacePath("pages", pageId, rawCropContext))
-          : null;
-
-        examples.push({
-          fingerprint,
-          shortFingerprint: fingerprint.slice(0, 18),
-          instanceCount: 1,
-          pageCount: pageId ? 1 : 0,
-          textSamples: typeof element.text === "string" && element.text.trim()
-            ? [element.text.trim().slice(0, 120)]
-            : [],
-          elementId,
-          pageId,
-          bbox: Array.isArray(element.bbox) ? (element.bbox as [number, number, number, number]) : null,
-          cropUrl,
-          cropContextUrl,
-        });
+        const example = elementToExample(element, workspacePath, projectId, baseUrl);
+        if (example) examples.push(example);
         if (examples.length >= 3) break;
       }
+    }
+
+    if (examples.length === 0 || examples.every((example) => !example.cropUrl && !example.cropContextUrl)) {
+      const existingIds = new Set(examples.map((example) => example.elementId).filter((id): id is string => Boolean(id)));
+      examples.push(...fallbackExamplesForCluster(cluster, allElements, workspacePath, projectId, baseUrl, existingIds));
     }
     clusterExamples.set(clusterId, examples);
   }
