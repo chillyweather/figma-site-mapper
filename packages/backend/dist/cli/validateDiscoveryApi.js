@@ -117,7 +117,7 @@ async function main() {
         url: `/discovery/${runId}/approval`,
         payload: {
             approvedCandidateIds: candidateIds,
-            manualUrls: ["https://example.com/contact"],
+            manualUrls: ["https://example.com/contact", "https://www.example.com/contact/"],
             excludedCandidateIds: [],
         },
     });
@@ -127,6 +127,7 @@ async function main() {
     check(assertTrue(Array.isArray(approvalBody.approvedUrls), "approval returns approvedUrls array"));
     check(assertTrue(approvalBody.approvedUrls.length >= candidateIds.length, "approvedUrls includes candidates"));
     check(assertTrue(approvalBody.approvedUrls.includes("https://example.com/contact"), "manual URL included in approvedUrls"));
+    check(assertEqual(approvalBody.approvedUrls.filter((url) => url.endsWith("/contact")).length, 1, "approval dedupes www/non-www URL variants"));
     // Verify DB state after approval
     const approvedDb = db
         .select()

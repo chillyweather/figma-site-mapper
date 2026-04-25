@@ -17,9 +17,34 @@ import type {
   DiscoveryPhase,
   DiscoveryResult,
   DiscoveryCandidate,
+  PluginSettings,
 } from "../types";
 
 export type { CrawlMode };
+
+function buildStyleExtractionSettings(settings: PluginSettings): Record<string, unknown> | undefined {
+  if (!settings.extractStyles) {
+    return undefined;
+  }
+
+  return {
+    enabled: true,
+    preset: settings.styleExtractionPreset,
+    extractInteractiveElements: settings.extractInteractive,
+    extractStructuralElements: settings.extractStructural,
+    extractTextElements: settings.extractContentBlocks,
+    extractFormElements: settings.extractFormElements,
+    extractMediaElements: settings.extractCustomComponents,
+    extractColors: settings.extractColors,
+    extractTypography: settings.extractTypography,
+    extractSpacing: settings.extractSpacing,
+    extractLayout: settings.extractLayout,
+    extractBorders: settings.extractBorders,
+    includeSelectors: true,
+    includeComputedStyles: true,
+    captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
+  };
+}
 
 export function useDiscovery() {
   const { settings } = useSettings();
@@ -193,6 +218,7 @@ export function useDiscovery() {
           screenshotWidth: parseScreenshotWidth(settings.screenshotWidth),
           deviceScaleFactor: parseDeviceScaleFactor(settings.deviceScaleFactor),
           fullRefresh: settings.fullRefresh,
+          styleExtraction: buildStyleExtractionSettings(settings),
         },
       },
       "*"
@@ -233,6 +259,7 @@ export function useDiscovery() {
           screenshotWidth: parseScreenshotWidth(settings.screenshotWidth),
           deviceScaleFactor: parseDeviceScaleFactor(settings.deviceScaleFactor),
           fullRefresh: settings.fullRefresh,
+          styleExtraction: buildStyleExtractionSettings(settings),
         },
       },
       "*"

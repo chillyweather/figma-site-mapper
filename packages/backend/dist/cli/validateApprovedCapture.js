@@ -158,18 +158,20 @@ async function main() {
         payload: {
             projectId,
             discoveryRunId,
-            approvedUrls: candidateUrls,
+            approvedUrls: [...candidateUrls, candidateUrls[0]],
             fullRefresh: true,
         },
     });
     check(assertEqual(approvedRes.statusCode, 200, "POST /crawl/approved returns 200"));
     const approvedBody = JSON.parse(approvedRes.body);
     check(assertTrue(!!approvedBody.jobId, "jobId returned"));
-    check(assertEqual(approvedBody.approvedCount, 3, "approvedCount is 3"));
+    check(assertEqual(approvedBody.approvedCount, 3, "approvedCount is deduped to 3"));
     const queuedJob = await crawlQueue.getJob(String(approvedBody.jobId));
     check(assertEqual(queuedJob?.data.maxRequestsPerCrawl, 3, "queued approved crawl limit equals approved URL count"));
     check(assertEqual(queuedJob?.data.approvedUrls?.length, 3, "queued approved crawl carries exactly 3 allowlisted URLs"));
     check(assertEqual(queuedJob?.data.renderInteractiveHighlights, false, "approved crawl disables automatic interactive highlight rendering"));
+    check(assertEqual(queuedJob?.data.styleExtraction?.enabled, true, "approved crawl defaults style extraction on"));
+    check(assertEqual(queuedJob?.data.styleExtraction?.preset, "smart", "approved crawl defaults smart style extraction"));
     // Verify crawl run record was created with discoveryRunId and approvedUrlsJson
     // Note: crawl run is created by the worker when it processes the job.
     // In this test, the job is queued but the worker isn't running, so we verify

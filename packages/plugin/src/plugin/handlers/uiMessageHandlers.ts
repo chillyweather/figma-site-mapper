@@ -1042,6 +1042,7 @@ async function handleSubmitDiscoveryApproval(msg: {
   screenshotWidth: number;
   deviceScaleFactor: number;
   fullRefresh: boolean;
+  styleExtraction?: Record<string, unknown>;
 }): Promise<void> {
   hasRenderedSitemap = false;
 
@@ -1068,6 +1069,7 @@ async function handleSubmitDiscoveryApproval(msg: {
       fullRefresh: msg.fullRefresh,
       screenshotWidth: msg.screenshotWidth,
       deviceScaleFactor: msg.deviceScaleFactor,
+      styleExtraction: msg.styleExtraction,
     });
 
     figma.ui.postMessage({
@@ -1090,6 +1092,7 @@ async function handleSubmitExactUrls(msg: {
   screenshotWidth: number;
   deviceScaleFactor: number;
   fullRefresh: boolean;
+  styleExtraction?: Record<string, unknown>;
 }): Promise<void> {
   hasRenderedSitemap = false;
 
@@ -1134,6 +1137,7 @@ async function handleSubmitExactUrls(msg: {
       fullRefresh: msg.fullRefresh,
       screenshotWidth: msg.screenshotWidth,
       deviceScaleFactor: msg.deviceScaleFactor,
+      styleExtraction: msg.styleExtraction,
     });
 
     figma.ui.postMessage({

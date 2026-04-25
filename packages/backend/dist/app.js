@@ -30,6 +30,57 @@ function isValidId(id) {
 function toId(id) {
     return parseInt(id, 10);
 }
+function defaultInventoryStyleExtraction() {
+    return {
+        enabled: true,
+        preset: "smart",
+        extractInteractiveElements: true,
+        extractStructuralElements: true,
+        extractTextElements: true,
+        extractFormElements: true,
+        extractMediaElements: false,
+        extractColors: true,
+        extractTypography: true,
+        extractSpacing: true,
+        extractLayout: true,
+        extractBorders: true,
+        includeSelectors: true,
+        includeComputedStyles: true,
+        captureOnlyVisibleElements: true,
+    };
+}
+function effectiveCaptureUrlKey(url) {
+    try {
+        const parsed = new URL(url);
+        parsed.hash = "";
+        let host = parsed.hostname.toLowerCase();
+        if (host.startsWith("www.")) {
+            host = host.slice(4);
+        }
+        const port = parsed.port ? `:${parsed.port}` : "";
+        let pathname = parsed.pathname.replace(/\/{2,}/g, "/");
+        if (pathname.length > 1 && pathname.endsWith("/")) {
+            pathname = pathname.slice(0, -1);
+        }
+        return `${parsed.protocol}//${host}${port}${pathname}${parsed.search}`;
+    }
+    catch {
+        return url;
+    }
+}
+function dedupeEffectiveCaptureUrls(urls) {
+    const seen = new Set();
+    const deduped = [];
+    for (const url of urls) {
+        const key = effectiveCaptureUrlKey(url);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        deduped.push(url);
+    }
+    return deduped;
+}
 function projectExists(projectId) {
     const row = db
         .select({ id: projects.id })
@@ -417,9 +468,10 @@ export async function buildServer() {
             .get();
         if (!run)
             return reply.status(404).send({ error: "Discovery run not found" });
-        const normalizedApprovedUrls = approvedUrls
+        const rawNormalizedApprovedUrls = approvedUrls
             .map((url) => normalizeUrl(url)?.url)
             .filter((url) => Boolean(url));
+        const normalizedApprovedUrls = dedupeEffectiveCaptureUrls(rawNormalizedApprovedUrls);
         if (normalizedApprovedUrls.length === 0) {
             return reply.status(400).send({ error: "No valid approvedUrls provided" });
         }
@@ -454,7 +506,7 @@ export async function buildServer() {
             highlightAllElements: false,
             fullRefresh: body.fullRefresh === true,
             projectId,
-            styleExtraction: body.styleExtraction,
+            styleExtraction: body.styleExtraction ?? defaultInventoryStyleExtraction(),
             approvedUrls: normalizedApprovedUrls,
             discoveryRunId,
         });
@@ -906,9 +958,10 @@ export async function buildServer() {
             .from(discoveryCandidates)
             .where(and(eq(discoveryCandidates.discoveryRunId, run.id), eq(discoveryCandidates.isApproved, true)))
             .all();
+        const approvedUrls = dedupeEffectiveCaptureUrls(approvedRows.map((r) => r.url));
         return {
             ok: true,
-            approvedUrls: approvedRows.map((r) => r.url),
+            approvedUrls,
         };
     });
     return server;

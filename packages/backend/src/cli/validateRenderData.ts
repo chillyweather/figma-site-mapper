@@ -44,6 +44,27 @@ async function main(): Promise<void> {
   // Verify asset URLs map to existing files
   const workspacePath = defaultWorkspacePath(projectId);
   const allCards: RenderCard[] = payload.boards.flatMap((board) => board.sections.flatMap((section) => section.cards));
+  const componentCards = payload.boards
+    .flatMap((board) => board.sections)
+    .filter((section) => section.kind === "components")
+    .flatMap((section) => section.cards);
+  const componentCardsWithImage = componentCards.filter((card) =>
+    card.assets.some((asset) => asset.kind === "image" && Boolean(asset.url))
+  );
+  const componentCardsWithSample = componentCards.filter((card) =>
+    card.links.some((link) => link.target.kind === "sample")
+  );
+
+  if (componentCards.length > 0 && componentCardsWithImage.length === 0) {
+    warnings.push(
+      "Component cards have no crop assets. Check that the latest crawl had style extraction enabled and workspace catalog groups have cropPath/cropContextPath."
+    );
+  }
+  if (componentCards.length > 0 && componentCardsWithSample.length === 0) {
+    warnings.push(
+      "Component cards have no sample links. Check decision memberFingerprints or representativeElementIds."
+    );
+  }
 
   for (const card of allCards) {
     for (const asset of card.assets) {

@@ -57,6 +57,10 @@ function arrayText(value: unknown, limit = 6): string {
     .join(", ");
 }
 
+function normalizeRelativeWorkspacePath(...parts: string[]): string {
+  return path.posix.normalize(parts.filter(Boolean).join("/")).replace(/^(\.\.\/)+/, "");
+}
+
 interface ClusterExample {
   fingerprint: string;
   shortFingerprint: string;
@@ -165,6 +169,45 @@ export async function buildInventoryRenderModel(
         cropContextUrl,
       });
       if (examples.length >= 3) break;
+    }
+
+    if (examples.length === 0 && Array.isArray(cluster.representativeElementIds)) {
+      for (const elementId of cluster.representativeElementIds) {
+        if (typeof elementId !== "string") continue;
+        const element = elementsById.get(elementId);
+        if (!element) continue;
+
+        const pageId = typeof element.pageId === "string" ? element.pageId : null;
+        const fingerprint = typeof element.fingerprint === "string"
+          ? element.fingerprint
+          : typeof element.componentFingerprint === "string"
+          ? element.componentFingerprint
+          : `element:${elementId}`;
+        const rawCrop = typeof element.crop === "string" ? element.crop : undefined;
+        const rawCropContext = typeof element.cropContext === "string" ? element.cropContext : undefined;
+        const cropUrl = pageId && rawCrop
+          ? workspaceAssetUrl(baseUrl, projectId, normalizeRelativeWorkspacePath("pages", pageId, rawCrop))
+          : null;
+        const cropContextUrl = pageId && rawCropContext
+          ? workspaceAssetUrl(baseUrl, projectId, normalizeRelativeWorkspacePath("pages", pageId, rawCropContext))
+          : null;
+
+        examples.push({
+          fingerprint,
+          shortFingerprint: fingerprint.slice(0, 18),
+          instanceCount: 1,
+          pageCount: pageId ? 1 : 0,
+          textSamples: typeof element.text === "string" && element.text.trim()
+            ? [element.text.trim().slice(0, 120)]
+            : [],
+          elementId,
+          pageId,
+          bbox: Array.isArray(element.bbox) ? (element.bbox as [number, number, number, number]) : null,
+          cropUrl,
+          cropContextUrl,
+        });
+        if (examples.length >= 3) break;
+      }
     }
     clusterExamples.set(clusterId, examples);
   }
