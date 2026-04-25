@@ -22,7 +22,11 @@
     "validate:workspace": "tsx src/cli/validateWorkspace.ts",
     "validate:render-data": "tsx src/cli/validateRenderData.ts",
     "validate:fingerprints": "tsx src/cli/validateFingerprints.ts",
-    "discovery:basics": "tsx src/cli/validateDiscoveryBasics.ts"
+    "discovery:basics": "tsx src/cli/validateDiscoveryBasics.ts",
+    "discovery:validate": "tsx src/cli/validateDiscoveryPersistence.ts",
+    "discovery:recommendations": "tsx src/cli/validateRecommendations.ts",
+    "discovery:api": "tsx src/cli/validateDiscoveryApi.ts",
+    "discovery:approved": "tsx src/cli/validateApprovedCapture.ts"
   },
   "keywords": [],
   "author": "",

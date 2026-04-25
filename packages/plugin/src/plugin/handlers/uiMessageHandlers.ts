@@ -12,6 +12,10 @@ import {
   startCrawl,
   getJobStatus,
   openAuthSession,
+  startDiscovery,
+  getDiscoveryRun,
+  approveDiscoveryRun,
+  startApprovedCrawl,
 } from "../services/apiClient";
 import { handleShowFlow } from "./flowHandlers";
 import {
@@ -218,6 +222,20 @@ async function persistLastJobSubset(
   }
 }
 
+function countManifestPages(node: any): number {
+  if (!node) {
+    return 0;
+  }
+
+  let count = 1;
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      count += countManifestPages(child);
+    }
+  }
+  return count;
+}
+
 export async function handleGetStatus(
   jobId: string,
   screenshotWidth: number,
@@ -235,6 +253,11 @@ export async function handleGetStatus(
       jobResult.detectInteractiveElements !== undefined
         ? !!jobResult.detectInteractiveElements
         : detectInteractiveElements;
+    const renderInteractiveHighlights =
+      jobResult.renderInteractiveHighlights !== undefined
+        ? !!jobResult.renderInteractiveHighlights
+        : detectInteractiveFromJob;
+    const fullRefreshFromJob = jobResult.fullRefresh === true;
     const visitedPageIds = Array.isArray(jobResult.visitedPageIds)
       ? jobResult.visitedPageIds.filter(
           (value: unknown): value is string =>
@@ -348,6 +371,7 @@ export async function handleGetStatus(
           hasRenderedSitemap = false;
           return;
         }
+        const renderedPageCount = countManifestPages(manifestData.tree);
 
         await figma.clientStorage.setAsync("lastProjectId", projectId);
         await figma.clientStorage.setAsync("lastStartUrl", startUrl);
@@ -401,7 +425,7 @@ export async function handleGetStatus(
         await renderSitemap(
           manifestData,
           screenshotWidth,
-          detectInteractiveFromJob,
+          renderInteractiveHighlights,
           highlightAllElements,
           (stage: string, progress: number) => {
             figma.ui.postMessage({
@@ -414,13 +438,15 @@ export async function handleGetStatus(
               },
             });
           },
-          highlightElementFilters
+          highlightElementFilters,
+          fullRefreshFromJob
         );
 
         figma.ui.postMessage({
           type: "status-update",
           jobId,
           status: "completed",
+          capturedCount: renderedPageCount,
           detailedProgress: {
             stage: "Complete!",
             progress: 100,
@@ -949,6 +975,158 @@ async function handleGetLastManifest(): Promise<void> {
 
 
 
+async function handleStartDiscovery(msg: {
+  projectId: string;
+  startUrl: string;
+  seedUrls?: string[];
+  pageBudget?: number;
+  includeSubdomains?: boolean;
+  includeBlog?: boolean;
+  includeSupport?: boolean;
+}): Promise<void> {
+  try {
+    const started = await startDiscovery({
+      projectId: msg.projectId,
+      startUrl: msg.startUrl,
+      seedUrls: msg.seedUrls,
+      pageBudget: msg.pageBudget,
+      includeSubdomains: msg.includeSubdomains,
+      includeBlog: msg.includeBlog,
+      includeSupport: msg.includeSupport,
+    });
+
+    const fullRun = await getDiscoveryRun(started.discoveryRunId);
+
+    figma.ui.postMessage({
+      type: "discovery-result",
+      result: fullRun,
+    });
+  } catch (error) {
+    console.error("Discovery failed:", error);
+    figma.ui.postMessage({
+      type: "discovery-error",
+      error: error instanceof Error ? error.message : "Discovery failed",
+    });
+  }
+}
+
+async function handleSubmitDiscoveryApproval(msg: {
+  runId: string;
+  projectId: string;
+  approvedCandidateIds: string[];
+  manualUrls: string[];
+  excludedCandidateIds: string[];
+  screenshotWidth: number;
+  deviceScaleFactor: number;
+  fullRefresh: boolean;
+}): Promise<void> {
+  hasRenderedSitemap = false;
+
+  try {
+    const approval = await approveDiscoveryRun(msg.runId, {
+      approvedCandidateIds: msg.approvedCandidateIds,
+      manualUrls: msg.manualUrls,
+      excludedCandidateIds: msg.excludedCandidateIds,
+    });
+
+    if (!approval.approvedUrls || approval.approvedUrls.length === 0) {
+      figma.notify("No URLs approved for capture.", { error: true });
+      figma.ui.postMessage({
+        type: "discovery-error",
+        error: "No URLs were approved for capture.",
+      });
+      return;
+    }
+
+    const result = await startApprovedCrawl({
+      projectId: msg.projectId,
+      discoveryRunId: msg.runId,
+      approvedUrls: approval.approvedUrls,
+      fullRefresh: msg.fullRefresh,
+      screenshotWidth: msg.screenshotWidth,
+      deviceScaleFactor: msg.deviceScaleFactor,
+    });
+
+    figma.ui.postMessage({
+      type: "crawl-started",
+      jobId: result.jobId,
+    });
+  } catch (error) {
+    console.error("Failed to submit discovery approval:", error);
+    figma.notify("Error: Could not start approved capture crawl.", { error: true });
+    figma.ui.postMessage({
+      type: "discovery-error",
+      error: error instanceof Error ? error.message : "Failed to start capture crawl",
+    });
+  }
+}
+
+async function handleSubmitExactUrls(msg: {
+  projectId: string;
+  exactUrls: string[];
+  screenshotWidth: number;
+  deviceScaleFactor: number;
+  fullRefresh: boolean;
+}): Promise<void> {
+  hasRenderedSitemap = false;
+
+  if (!msg.exactUrls || msg.exactUrls.length === 0) {
+    figma.notify("Enter at least one URL to capture.", { error: true });
+    figma.ui.postMessage({
+      type: "discovery-error",
+      error: "Enter at least one URL to capture.",
+    });
+    return;
+  }
+
+  try {
+    // Run a minimal discovery to register these URLs as candidates
+    const started = await startDiscovery({
+      projectId: msg.projectId,
+      startUrl: msg.exactUrls[0],
+      seedUrls: msg.exactUrls,
+      maxCandidates: msg.exactUrls.length,
+    });
+
+    // Approve via manualUrls (adds them as approved candidates regardless of discovery result)
+    const approval = await approveDiscoveryRun(started.discoveryRunId, {
+      approvedCandidateIds: [],
+      manualUrls: msg.exactUrls,
+      excludedCandidateIds: [],
+    });
+
+    if (!approval.approvedUrls || approval.approvedUrls.length === 0) {
+      figma.notify("No valid URLs to capture.", { error: true });
+      figma.ui.postMessage({
+        type: "discovery-error",
+        error: "No valid URLs could be queued for capture.",
+      });
+      return;
+    }
+
+    const result = await startApprovedCrawl({
+      projectId: msg.projectId,
+      discoveryRunId: started.discoveryRunId,
+      approvedUrls: approval.approvedUrls,
+      fullRefresh: msg.fullRefresh,
+      screenshotWidth: msg.screenshotWidth,
+      deviceScaleFactor: msg.deviceScaleFactor,
+    });
+
+    figma.ui.postMessage({
+      type: "crawl-started",
+      jobId: result.jobId,
+    });
+  } catch (error) {
+    console.error("Failed to start exact URL crawl:", error);
+    figma.notify("Error: Could not start capture crawl.", { error: true });
+    figma.ui.postMessage({
+      type: "discovery-error",
+      error: error instanceof Error ? error.message : "Failed to start capture crawl",
+    });
+  }
+}
+
 /**
  * Main message router for UI messages
  */
@@ -1053,6 +1231,18 @@ export async function handleUIMessage(msg: any): Promise<void> {
       });
       break;
     }
+
+    case "start-discovery":
+      await handleStartDiscovery(msg);
+      break;
+
+    case "submit-discovery-approval":
+      await handleSubmitDiscoveryApproval(msg);
+      break;
+
+    case "submit-exact-urls":
+      await handleSubmitExactUrls(msg);
+      break;
 
     case "close":
       handleClose();

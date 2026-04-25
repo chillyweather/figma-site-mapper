@@ -517,7 +517,8 @@ export async function createScreenshotPages(
   detectInteractiveElements: boolean = true,
   highlightAllElements: boolean = false,
   highlightElementFilters?: any,
-  projectId?: string
+  projectId?: string,
+  removeStaleProjectPages: boolean = false
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
   console.log(
@@ -528,6 +529,39 @@ export async function createScreenshotPages(
   );
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
+  const originalPageId = originalPage.id;
+  let originalPageWasRemoved = false;
+
+  if (removeStaleProjectPages && projectId) {
+    const currentUrls = new Set(
+      pages
+        .map((page) => page.url)
+        .filter((url): url is string => typeof url === "string" && url.length > 0)
+    );
+
+    for (const pageNode of [...figma.root.children]) {
+      if (pageNode.type !== "PAGE") {
+        continue;
+      }
+
+      const pageProjectId = pageNode.getPluginData("PROJECT_ID");
+      const pageUrl = pageNode.getPluginData("URL");
+      if (pageProjectId === projectId && pageUrl && !currentUrls.has(pageUrl)) {
+        try {
+          if (pageNode.id === originalPageId) {
+            originalPageWasRemoved = true;
+          }
+          pageNode.remove();
+          console.log(`Removed stale generated page from canvas: ${pageUrl}`);
+        } catch (error) {
+          console.warn(
+            `Failed to remove stale generated page ${pageUrl}:`,
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      }
+    }
+  }
 
   // Load font for navigation frame - use Inter only
   await figma.loadFontAsync({ family: "Inter", style: "Regular" });
@@ -1200,7 +1234,11 @@ export async function createScreenshotPages(
     }
   }
 
-  figma.currentPage = originalPage;
+  if (!originalPageWasRemoved) {
+    figma.currentPage = originalPage;
+  } else if (figma.root.children.length > 0) {
+    figma.currentPage = figma.root.children[0];
+  }
 
   console.log(`Created ${pageIdMap.size} screenshot pages`);
 

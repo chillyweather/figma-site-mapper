@@ -1,6 +1,6 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
-import type { InventoryDecisions, InventoryOverview } from "../../types";
+import type { InventoryDecisions, InventoryOverview, DiscoveryResult } from "../../types";
 import type { InventoryRenderData } from "@sitemapper/shared";
 
 interface PageResponseItem {
@@ -418,6 +418,123 @@ export async function fetchInventoryRenderData(
   }
 
   return response.json();
+}
+
+export async function startDiscovery(params: {
+  projectId: string;
+  startUrl: string;
+  seedUrls?: string[];
+  maxCandidates?: number;
+  pageBudget?: number;
+  includeSubdomains?: boolean;
+  includeBlog?: boolean;
+  includeSupport?: boolean;
+}): Promise<{ discoveryRunId: string; status: string }> {
+  const response = await fetch(`${BACKEND_URL}/discovery/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") message = data.error;
+    } catch { /* keep fallback */ }
+    throw new Error(`Failed to start discovery: ${message}`);
+  }
+
+  return response.json();
+}
+
+export async function getDiscoveryRun(runId: string): Promise<DiscoveryResult> {
+  const response = await fetch(
+    `${BACKEND_URL}/discovery/${encodeURIComponent(runId)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get discovery run: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+  return {
+    discoveryRunId: String(data.discoveryRunId ?? runId),
+    projectId: String(data.projectId ?? ""),
+    status: String(data.status ?? ""),
+    candidates,
+    recommended: candidates.filter((c: any) => c.isRecommended),
+    summary: data.summary ?? { totalCandidates: 0, recommendedCount: 0, byPageType: {}, byHost: {} },
+  };
+}
+
+export async function approveDiscoveryRun(
+  runId: string,
+  params: {
+    approvedCandidateIds?: string[];
+    manualUrls?: string[];
+    excludedCandidateIds?: string[];
+  }
+): Promise<{ ok: boolean; approvedUrls: string[] }> {
+  const response = await fetch(
+    `${BACKEND_URL}/discovery/${encodeURIComponent(runId)}/approval`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    }
+  );
+
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") message = data.error;
+    } catch { /* keep fallback */ }
+    throw new Error(`Failed to approve discovery run: ${message}`);
+  }
+
+  return response.json();
+}
+
+export async function startApprovedCrawl(params: {
+  projectId: string;
+  discoveryRunId: string;
+  approvedUrls: string[];
+  fullRefresh?: boolean;
+  screenshotWidth?: number;
+  deviceScaleFactor?: number;
+  styleExtraction?: Record<string, unknown>;
+}): Promise<{ jobId: string }> {
+  const response = await fetch(`${BACKEND_URL}/crawl/approved`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      projectId: params.projectId,
+      discoveryRunId: params.discoveryRunId,
+      approvedUrls: params.approvedUrls,
+      fullRefresh: params.fullRefresh ?? true,
+      screenshotWidth: params.screenshotWidth ?? 1440,
+      deviceScaleFactor: params.deviceScaleFactor ?? 1,
+      styleExtraction: params.styleExtraction,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") message = data.error;
+    } catch { /* keep fallback */ }
+    throw new Error(`Failed to start approved crawl: ${message}`);
+  }
+
+  const data = await response.json();
+  if (!data || typeof data.jobId !== "string") {
+    throw new Error("Backend did not return a crawl job ID");
+  }
+  return { jobId: data.jobId };
 }
 
 export async function prepareInventory(

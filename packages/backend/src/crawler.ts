@@ -1034,7 +1034,8 @@ export async function runCrawler(
     includeComputedStyles: boolean;
     captureOnlyVisibleElements?: boolean;
   },
-  crawlRunId?: number
+  crawlRunId?: number,
+  approvedUrls?: string[]
 ): Promise<{
   visitedUrls: string[];
   visitedPageIds: string[];
@@ -1106,6 +1107,17 @@ export async function runCrawler(
       console.error(`❌ Authentication setup failed:`, error);
       authSuccess = false;
     }
+  }
+
+  const approvedUrlSeeds = approvedUrls && approvedUrls.length > 0
+    ? approvedUrls.map((u) => normalizeUrl(u))
+    : null;
+  const approvedUrlSet = approvedUrlSeeds
+    ? new Set(approvedUrlSeeds)
+    : null;
+
+  if (approvedUrlSet) {
+    console.log(`📋 Approved URL allowlist active (${approvedUrlSet.size} URLs)`);
   }
 
   const sectionUrlMap = new Map<string, string[]>();
@@ -1234,6 +1246,12 @@ export async function runCrawler(
         const finalUrl = normalizeUrl(page.url());
         if (finalUrl !== request.url) {
           log.info(`Redirect: ${request.url} -> ${finalUrl}`);
+        }
+
+        // Allowlist filter
+        if (approvedUrlSet && !approvedUrlSet.has(finalUrl)) {
+          log.info(`Skipping ${finalUrl} - not in approved URL allowlist`);
+          return;
         }
 
         const currentDepth = calculateUrlDepth(finalUrl);
@@ -1795,6 +1813,10 @@ export async function runCrawler(
                   /\#.*$/, /\?.*$/,
                 ];
                 if (blockedPatterns.some((p) => p.test(url.pathname))) return false;
+                if (approvedUrlSet) {
+                  const norm = normalizeUrl(request.url);
+                  if (!approvedUrlSet.has(norm)) return false;
+                }
                 return request;
               },
             });
@@ -1873,7 +1895,7 @@ export async function runCrawler(
 
   totalPages = maxRequestsPerCrawl || 100;
   await updateProgress("starting", 0, totalPages, canonicalStartUrl);
-  await crawler.run([canonicalStartUrl]);
+  await crawler.run(approvedUrlSeeds ?? [canonicalStartUrl]);
 
   // Full refresh cleanup — remove pages not visited in this job
   if (projectNumId !== null && fullRefresh) {
@@ -1892,7 +1914,9 @@ export async function runCrawler(
           const staleIds = stalePageRows.map((r) => r.id);
           console.log(`🧹 Full refresh: removing ${staleIds.length} stale page(s)`);
           db.delete(elements).where(and(eq(elements.projectId, projectNumId), notInArray(elements.pageId, keepIds))).run();
-          db.delete(pages).where(notInArray(pages.id, keepIds)).run();
+          db.delete(pages)
+            .where(and(eq(pages.projectId, projectNumId), notInArray(pages.id, keepIds)))
+            .run();
         } else {
           console.log("🧹 Full refresh enabled but no stale pages found.");
         }

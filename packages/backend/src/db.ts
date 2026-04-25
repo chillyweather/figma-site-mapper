@@ -109,6 +109,51 @@ sqlite.exec(`
     started_at INTEGER NOT NULL,
     completed_at INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS discovery_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    start_url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    settings_json TEXT NOT NULL DEFAULT '{}',
+    candidate_count INTEGER NOT NULL DEFAULT 0,
+    recommended_count INTEGER NOT NULL DEFAULT 0,
+    approved_count INTEGER NOT NULL DEFAULT 0,
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS discovery_candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discovery_run_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    normalized_url TEXT NOT NULL,
+    host TEXT NOT NULL,
+    path TEXT NOT NULL,
+    source TEXT NOT NULL,
+    source_url TEXT,
+    page_type TEXT NOT NULL,
+    pattern_key TEXT NOT NULL,
+    score INTEGER NOT NULL DEFAULT 0,
+    reasons_json TEXT NOT NULL DEFAULT '[]',
+    is_recommended INTEGER NOT NULL DEFAULT 0,
+    is_approved INTEGER NOT NULL DEFAULT 0,
+    is_excluded INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS discovery_candidates_run_norm_idx
+    ON discovery_candidates(discovery_run_id, normalized_url);
+
+  CREATE INDEX IF NOT EXISTS discovery_candidates_project_norm_idx
+    ON discovery_candidates(project_id, normalized_url);
+
+  CREATE INDEX IF NOT EXISTS discovery_candidates_run_type_idx
+    ON discovery_candidates(discovery_run_id, page_type);
+
+  CREATE INDEX IF NOT EXISTS discovery_candidates_run_recommended_idx
+    ON discovery_candidates(discovery_run_id, is_recommended);
 `);
 
 function ensureColumn(tableName: string, columnName: string, columnDefinition: string): void {
@@ -143,6 +188,8 @@ ensureColumn("elements", "crop_error", "crop_error TEXT");
 ensureColumn("elements", "is_global_chrome", "is_global_chrome INTEGER DEFAULT 0");
 ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TEXT");
 ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
+ensureColumn("crawl_runs", "discovery_run_id", "discovery_run_id INTEGER");
+ensureColumn("crawl_runs", "approved_urls_json", "approved_urls_json TEXT");
 
 export const db = drizzle(sqlite, { schema });
 

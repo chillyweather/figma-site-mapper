@@ -60,11 +60,14 @@ const processor = async (job: Job) => {
     sampleSize,
     showBrowser,
     detectInteractiveElements,
+    renderInteractiveHighlights,
     captureOnlyVisibleElements,
     highlightAllElements,
     projectId,
     auth,
     styleExtraction,
+    approvedUrls,
+    discoveryRunId,
   } = job.data;
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
   console.log(
@@ -99,10 +102,13 @@ const processor = async (job: Job) => {
             defaultLanguageOnly,
             sampleSize,
             detectInteractiveElements,
+            renderInteractiveHighlights,
             captureOnlyVisibleElements,
             highlightAllElements,
             fullRefresh,
           }),
+          discoveryRunId: discoveryRunId ? parseInt(discoveryRunId, 10) : null,
+          approvedUrlsJson: approvedUrls && Array.isArray(approvedUrls) ? JSON.stringify(approvedUrls) : null,
           status: "running",
           startedAt: new Date(),
         })
@@ -130,7 +136,8 @@ const processor = async (job: Job) => {
       projectId,
       auth,
       styleExtraction,
-      crawlRunId
+      crawlRunId,
+      approvedUrls
     );
 
     if (crawlRunId) {

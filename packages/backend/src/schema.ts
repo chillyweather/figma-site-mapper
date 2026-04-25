@@ -33,6 +33,8 @@ export const crawlRuns = sqliteTable("crawl_runs", {
   pageCount: integer("page_count").notNull().default(0),
   elementCount: integer("element_count").notNull().default(0),
   status: text("status").notNull().default("completed"),
+  discoveryRunId: integer("discovery_run_id"),
+  approvedUrlsJson: text("approved_urls_json"),
   startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
   completedAt: integer("completed_at", { mode: "timestamp_ms" }),
 });
@@ -48,6 +50,39 @@ export const inventoryBuilds = sqliteTable("inventory_builds", {
   status: text("status").notNull().default("completed"),
   startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
   completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+});
+
+export const discoveryRuns = sqliteTable("discovery_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  startUrl: text("start_url").notNull(),
+  status: text("status").notNull().default("running"),
+  settingsJson: text("settings_json").notNull().default("{}"),
+  candidateCount: integer("candidate_count").notNull().default(0),
+  recommendedCount: integer("recommended_count").notNull().default(0),
+  approvedCount: integer("approved_count").notNull().default(0),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+});
+
+export const discoveryCandidates = sqliteTable("discovery_candidates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  discoveryRunId: integer("discovery_run_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  url: text("url").notNull(),
+  normalizedUrl: text("normalized_url").notNull(),
+  host: text("host").notNull(),
+  path: text("path").notNull(),
+  source: text("source").notNull(),
+  sourceUrl: text("source_url"),
+  pageType: text("page_type").notNull(),
+  patternKey: text("pattern_key").notNull(),
+  score: integer("score").notNull().default(0),
+  reasonsJson: text("reasons_json").notNull().default("[]"),
+  isRecommended: integer("is_recommended", { mode: "boolean" }).notNull().default(false),
+  isApproved: integer("is_approved", { mode: "boolean" }).notNull().default(false),
+  isExcluded: integer("is_excluded", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const elements = sqliteTable("elements", {
@@ -94,3 +129,5 @@ export type Page = typeof pages.$inferSelect;
 export type Element = typeof elements.$inferSelect;
 export type CrawlRun = typeof crawlRuns.$inferSelect;
 export type InventoryBuild = typeof inventoryBuilds.$inferSelect;
+export type DiscoveryRun = typeof discoveryRuns.$inferSelect;
+export type DiscoveryCandidate = typeof discoveryCandidates.$inferSelect;

@@ -387,3 +387,46 @@ export interface FocusedTextareaProps {
   className?: string;
   style?: React.CSSProperties;
 }
+
+// ── Discovery flow types ────────────────────────────────────────────
+
+export type CrawlMode = "recommended" | "exact" | "legacy";
+
+export type DiscoveryPhase =
+  | "idle"
+  | "discovering"
+  | "reviewing"
+  | "capturing"
+  | "complete"
+  | "error";
+
+export interface DiscoveryCandidate {
+  id: string;
+  url: string;
+  normalizedUrl: string;
+  host: string;
+  pageType: string;
+  patternKey: string;
+  score: number;
+  reasons: string[];
+  source: string;
+  isRecommended: boolean;
+  isApproved: boolean;
+  isExcluded: boolean;
+}
+
+export interface DiscoveryRunSummary {
+  totalCandidates: number;
+  recommendedCount: number;
+  byPageType: Record<string, number>;
+  byHost: Record<string, number>;
+}
+
+export interface DiscoveryResult {
+  discoveryRunId: string;
+  projectId: string;
+  status: string;
+  candidates: DiscoveryCandidate[];
+  recommended: DiscoveryCandidate[];
+  summary: DiscoveryRunSummary;
+}

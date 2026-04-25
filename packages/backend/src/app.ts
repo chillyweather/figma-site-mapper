@@ -6,7 +6,10 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { eq, and, or, inArray, desc } from "drizzle-orm";
 import { db } from "./db.js";
-import { projects, pages, elements, crawlRuns } from "./schema.js";
+import { projects, pages, elements, crawlRuns, discoveryRuns, discoveryCandidates } from "./schema.js";
+import { runDiscovery } from "./services/discovery/discoveryRunner.js";
+import { normalizeUrl } from "./services/discovery/urlNormalize.js";
+import { classifyPage } from "./services/discovery/pageClassifier.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
@@ -309,6 +312,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       result: {
         projectId: jobData.projectId ?? null,
         detectInteractiveElements: jobData.detectInteractiveElements !== false,
+        renderInteractiveHighlights: jobData.renderInteractiveHighlights !== false,
         startUrl: jobData.url ?? null,
         fullRefresh: jobData.fullRefresh === true,
         visitedUrls: Array.isArray(jobData.visitedUrls) ? jobData.visitedUrls : [],
@@ -455,6 +459,96 @@ export async function buildServer(): Promise<FastifyInstance> {
     });
 
     return { message: "Recrawl job queued", jobId: job.id };
+  });
+
+  server.post("/crawl/approved", async (request, reply) => {
+    const body = request.body as {
+      projectId?: string;
+      discoveryRunId?: string;
+      approvedUrls?: string[];
+      fullRefresh?: boolean;
+      styleExtraction?: Record<string, unknown>;
+      screenshotWidth?: number;
+      deviceScaleFactor?: number;
+    };
+
+    const { projectId, discoveryRunId, approvedUrls } = body;
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    if (!Array.isArray(approvedUrls) || approvedUrls.length === 0) {
+      return reply.status(400).send({ error: "approvedUrls array is required" });
+    }
+
+    if (!discoveryRunId || !isValidId(discoveryRunId)) {
+      return reply.status(400).send({ error: "discoveryRunId is required" });
+    }
+
+    const run = db
+      .select()
+      .from(discoveryRuns)
+      .where(
+        and(
+          eq(discoveryRuns.id, toId(discoveryRunId)),
+          eq(discoveryRuns.projectId, toId(projectId))
+        )
+      )
+      .get();
+
+    if (!run) return reply.status(404).send({ error: "Discovery run not found" });
+
+    const normalizedApprovedUrls = approvedUrls
+      .map((url) => normalizeUrl(url)?.url)
+      .filter((url): url is string => Boolean(url));
+    if (normalizedApprovedUrls.length === 0) {
+      return reply.status(400).send({ error: "No valid approvedUrls provided" });
+    }
+
+    const runCandidates = db
+      .select({ normalizedUrl: discoveryCandidates.normalizedUrl })
+      .from(discoveryCandidates)
+      .where(eq(discoveryCandidates.discoveryRunId, run.id))
+      .all();
+    const runCandidateUrls = new Set(runCandidates.map((candidate) => candidate.normalizedUrl));
+    const unknownApprovedUrls = normalizedApprovedUrls.filter((url) => !runCandidateUrls.has(url));
+    if (unknownApprovedUrls.length > 0) {
+      return reply.status(400).send({
+        error: "approvedUrls must belong to the discovery run",
+        unknownApprovedUrls,
+      });
+    }
+
+    const startUrl = normalizedApprovedUrls[0];
+    const publicUrl = requestBaseUrl(request);
+
+    const job = await crawlQueue.add("crawl-approved", {
+      url: startUrl,
+      publicUrl,
+      maxRequestsPerCrawl: normalizedApprovedUrls.length,
+      deviceScaleFactor: body.deviceScaleFactor || 1,
+      requestDelay: 1000,
+      maxDepth: 0,
+      defaultLanguageOnly: false,
+      sampleSize: 0,
+      showBrowser: false,
+      detectInteractiveElements: true,
+      renderInteractiveHighlights: false,
+      captureOnlyVisibleElements: true,
+      highlightAllElements: false,
+      fullRefresh: body.fullRefresh === true,
+      projectId,
+      styleExtraction: body.styleExtraction,
+      approvedUrls: normalizedApprovedUrls,
+      discoveryRunId,
+    });
+
+    return {
+      message: "Approved capture crawl queued",
+      jobId: job.id,
+      approvedCount: normalizedApprovedUrls.length,
+    };
   });
 
   server.post("/auth-session", async (request, reply) => {
@@ -742,6 +836,250 @@ export async function buildServer(): Promise<FastifyInstance> {
       request.log.error(`Failed to build inventory tokens: ${error instanceof Error ? error.message : String(error)}`);
       return reply.status(500).send({ error: "Failed to build inventory tokens" });
     }
+  });
+
+  // ── Discovery ─────────────────────────────────────────────────────────────
+
+  server.post("/discovery/start", async (request, reply) => {
+    const body = request.body as {
+      projectId?: string;
+      startUrl?: string;
+      seedUrls?: string[];
+      maxCandidates?: number;
+      pageBudget?: number;
+      includeSubdomains?: boolean;
+      includeBlog?: boolean;
+      includeSupport?: boolean;
+    };
+
+    const { projectId, startUrl } = body;
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!startUrl) return reply.status(400).send({ error: "startUrl is required" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    try {
+      const result = await runDiscovery({
+        projectId,
+        startUrl,
+        seedUrls: body.seedUrls,
+        maxCandidates: body.maxCandidates,
+        pageBudget: body.pageBudget,
+        includeSubdomains: body.includeSubdomains,
+        includeBlog: body.includeBlog,
+        includeSupport: body.includeSupport,
+      });
+
+      return {
+        discoveryRunId: result.discoveryRunId,
+        status: result.status,
+        summary: result.summary,
+        recommended: result.recommended.map((c) => ({
+          id: String(c.id ?? 0),
+          url: c.url,
+          normalizedUrl: c.normalizedUrl,
+          host: c.host,
+          pageType: c.pageType,
+          patternKey: c.patternKey,
+          score: c.score,
+          reasons: c.reasons,
+          source: c.source,
+        })),
+      };
+    } catch (error) {
+      request.log.error(`Discovery start failed: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Discovery failed" });
+    }
+  });
+
+  server.get("/discovery/:runId", async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    if (!isValidId(runId)) return reply.status(400).send({ error: "Invalid runId" });
+
+    const run = db
+      .select()
+      .from(discoveryRuns)
+      .where(eq(discoveryRuns.id, toId(runId)))
+      .get();
+
+    if (!run) return reply.status(404).send({ error: "Discovery run not found" });
+
+    const candidates = db
+      .select()
+      .from(discoveryCandidates)
+      .where(eq(discoveryCandidates.discoveryRunId, run.id))
+      .all();
+
+    return {
+      discoveryRunId: String(run.id),
+      projectId: String(run.projectId),
+      status: run.status,
+      startUrl: run.startUrl,
+      summary: {
+        totalCandidates: candidates.length,
+        recommendedCount: candidates.filter((c) => c.isRecommended).length,
+        approvedCount: candidates.filter((c) => c.isApproved).length,
+        byPageType: candidates.reduce((acc, c) => {
+          acc[c.pageType] = (acc[c.pageType] ?? 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        byHost: candidates.reduce((acc, c) => {
+          acc[c.host] = (acc[c.host] ?? 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      },
+      candidates: candidates.map((c) => ({
+        id: String(c.id),
+        url: c.url,
+        normalizedUrl: c.normalizedUrl,
+        host: c.host,
+        pageType: c.pageType,
+        patternKey: c.patternKey,
+        score: c.score,
+        reasons: JSON.parse(c.reasonsJson) as string[],
+        source: c.source,
+        isRecommended: Boolean(c.isRecommended),
+        isApproved: Boolean(c.isApproved),
+        isExcluded: Boolean(c.isExcluded),
+      })),
+    };
+  });
+
+  server.post("/discovery/:runId/approval", async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    const body = request.body as {
+      approvedCandidateIds?: string[];
+      manualUrls?: string[];
+      excludedCandidateIds?: string[];
+    };
+
+    if (!isValidId(runId)) return reply.status(400).send({ error: "Invalid runId" });
+
+    const run = db
+      .select()
+      .from(discoveryRuns)
+      .where(eq(discoveryRuns.id, toId(runId)))
+      .get();
+
+    if (!run) return reply.status(404).send({ error: "Discovery run not found" });
+
+    const approvedIds = (body.approvedCandidateIds ?? [])
+      .filter(isValidId)
+      .map(toId);
+    const excludedIds = (body.excludedCandidateIds ?? [])
+      .filter(isValidId)
+      .map(toId);
+
+    // Treat each approval submission as the current selection, not an additive history.
+    db.update(discoveryCandidates)
+      .set({ isApproved: false })
+      .where(eq(discoveryCandidates.discoveryRunId, run.id))
+      .run();
+
+    // Mark approved
+    for (const cid of approvedIds) {
+      db.update(discoveryCandidates)
+        .set({ isApproved: true })
+        .where(
+          and(
+            eq(discoveryCandidates.id, cid),
+            eq(discoveryCandidates.discoveryRunId, run.id)
+          )
+        )
+        .run();
+    }
+
+    // Mark excluded
+    for (const cid of excludedIds) {
+      db.update(discoveryCandidates)
+        .set({ isExcluded: true })
+        .where(
+          and(
+            eq(discoveryCandidates.id, cid),
+            eq(discoveryCandidates.discoveryRunId, run.id)
+          )
+        )
+        .run();
+    }
+
+    // Add manual URLs as new approved candidates
+    const manualUrls = (body.manualUrls ?? []).filter((u) => typeof u === "string");
+    const now = new Date();
+    for (const rawUrl of manualUrls) {
+      const norm = normalizeUrl(rawUrl);
+      if (!norm) continue;
+      const classification = classifyPage(norm.path);
+      try {
+        db.insert(discoveryCandidates)
+          .values({
+            discoveryRunId: run.id,
+            projectId: run.projectId,
+            url: rawUrl,
+            normalizedUrl: norm.url,
+            host: norm.host,
+            path: norm.path,
+            source: "manual",
+            pageType: classification.pageType,
+            patternKey: classification.patternKey,
+            score: 0,
+            reasonsJson: JSON.stringify(["manual"]),
+            isRecommended: false,
+            isApproved: true,
+            isExcluded: false,
+            createdAt: now,
+          })
+          .run();
+      } catch (err) {
+        // Unique constraint on (runId, normalizedUrl) — manual URL may already exist
+        if (err && typeof err === "object" && (err as any).message?.includes("UNIQUE")) {
+          // Update existing to approved
+          db.update(discoveryCandidates)
+            .set({ isApproved: true })
+            .where(
+              and(
+                eq(discoveryCandidates.discoveryRunId, run.id),
+                eq(discoveryCandidates.normalizedUrl, norm.url)
+              )
+            )
+            .run();
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Update run approved count
+    const approvedCount = db
+      .select({ count: discoveryCandidates.id })
+      .from(discoveryCandidates)
+      .where(
+        and(
+          eq(discoveryCandidates.discoveryRunId, run.id),
+          eq(discoveryCandidates.isApproved, true)
+        )
+      )
+      .all().length;
+
+    db.update(discoveryRuns)
+      .set({ approvedCount })
+      .where(eq(discoveryRuns.id, run.id))
+      .run();
+
+    const approvedRows = db
+      .select({ url: discoveryCandidates.normalizedUrl })
+      .from(discoveryCandidates)
+      .where(
+        and(
+          eq(discoveryCandidates.discoveryRunId, run.id),
+          eq(discoveryCandidates.isApproved, true)
+        )
+      )
+      .all();
+
+    return {
+      ok: true,
+      approvedUrls: approvedRows.map((r) => r.url),
+    };
   });
 
   return server;
