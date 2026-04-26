@@ -12,34 +12,33 @@ import {
   parseScreenshotWidth,
   parseDeviceScaleFactor,
 } from "../utils/validation";
+import { STYLE_PRESETS } from "../utils/stylePresets";
 import type {
   CrawlMode,
   DiscoveryPhase,
   DiscoveryResult,
   DiscoveryCandidate,
-  PluginSettings,
 } from "../types";
 
 export type { CrawlMode };
 
-function buildStyleExtractionSettings(settings: PluginSettings): Record<string, unknown> | undefined {
-  if (!settings.extractStyles) {
-    return undefined;
-  }
-
+function buildStyleExtractionSettings(settings: {
+  captureOnlyVisibleElements: boolean;
+}): Record<string, unknown> {
+  const smart = STYLE_PRESETS.smart;
   return {
     enabled: true,
-    preset: settings.styleExtractionPreset,
-    extractInteractiveElements: settings.extractInteractive,
-    extractStructuralElements: settings.extractStructural,
-    extractTextElements: settings.extractContentBlocks,
-    extractFormElements: settings.extractFormElements,
-    extractMediaElements: settings.extractCustomComponents,
-    extractColors: settings.extractColors,
-    extractTypography: settings.extractTypography,
-    extractSpacing: settings.extractSpacing,
-    extractLayout: settings.extractLayout,
-    extractBorders: settings.extractBorders,
+    preset: "smart",
+    extractInteractiveElements: smart.extractInteractive,
+    extractStructuralElements: smart.extractStructural,
+    extractTextElements: smart.extractContentBlocks,
+    extractFormElements: smart.extractFormElements,
+    extractMediaElements: smart.extractCustomComponents,
+    extractColors: smart.extractColors,
+    extractTypography: smart.extractTypography,
+    extractSpacing: smart.extractSpacing,
+    extractLayout: smart.extractLayout,
+    extractBorders: smart.extractBorders,
     includeSelectors: true,
     includeComputedStyles: true,
     captureOnlyVisibleElements: settings.captureOnlyVisibleElements,

@@ -7,6 +7,7 @@
 
 import { renderSitemap } from "../../figmaRendering/renderSitemap";
 import { DEFAULT_SETTINGS } from "../../constants";
+import { STYLE_PRESETS } from "../../utils/stylePresets";
 
 import {
   startCrawl,
@@ -597,20 +598,6 @@ export async function handleStartCrawl(config: {
       defaultLanguageOnly,
       detectInteractiveElements,
       captureOnlyVisibleElements,
-      extractStyles,
-      styleExtractionPreset,
-      extractInteractiveElements,
-      extractStructuralElements,
-      extractTextElements,
-      extractFormElements,
-      extractMediaElements,
-      extractColors,
-      extractTypography,
-      extractSpacing,
-      extractLayout,
-      extractBorders,
-      includeSelectors,
-      includeComputedStyles,
       fullRefresh,
       cookieBannerHandling,
     } = config;
@@ -658,25 +645,23 @@ export async function handleStartCrawl(config: {
       };
     }
 
-    // Build style extraction settings if enabled
-    const styleExtraction = extractStyles
-      ? {
-          enabled: true,
-          preset: styleExtractionPreset,
-          extractInteractiveElements,
-          extractStructuralElements,
-          extractTextElements,
-          extractFormElements,
-          extractMediaElements,
-          extractColors,
-          extractTypography,
-          extractSpacing,
-          extractLayout,
-          extractBorders,
-          includeSelectors,
-          includeComputedStyles,
-        }
-      : undefined;
+    const smartStyleExtraction = STYLE_PRESETS.smart;
+    const styleExtraction = {
+      enabled: true,
+      preset: "smart",
+      extractInteractiveElements: smartStyleExtraction.extractInteractive,
+      extractStructuralElements: smartStyleExtraction.extractStructural,
+      extractTextElements: smartStyleExtraction.extractContentBlocks,
+      extractFormElements: smartStyleExtraction.extractFormElements,
+      extractMediaElements: smartStyleExtraction.extractCustomComponents,
+      extractColors: smartStyleExtraction.extractColors,
+      extractTypography: smartStyleExtraction.extractTypography,
+      extractSpacing: smartStyleExtraction.extractSpacing,
+      extractLayout: smartStyleExtraction.extractLayout,
+      extractBorders: smartStyleExtraction.extractBorders,
+      includeSelectors: true,
+      includeComputedStyles: true,
+    };
 
     const result = await startCrawl({
       url,

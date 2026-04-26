@@ -1,5 +1,4 @@
 import React from "react";
-import { IconCheck, IconKey, IconX } from "@tabler/icons-react";
 import { CrawlingTabProps } from "../types/index";
 import { FocusedInput } from "./common/FocusedInput";
 import { CrawlProgress } from "./CrawlProgress";
@@ -43,7 +42,7 @@ function PageTypeBadge({ type }: { type: string }) {
 
 // ── Mode selector ─────────────────────────────────────────────────
 
-type CrawlMode = "recommended" | "exact" | "legacy";
+type CrawlMode = "recommended" | "exact";
 
 function ModeSelector({
   mode,
@@ -57,7 +56,6 @@ function ModeSelector({
   const modes: { value: CrawlMode; label: string }[] = [
     { value: "recommended", label: "Recommended" },
     { value: "exact", label: "Exact URLs" },
-    { value: "legacy", label: "Legacy" },
   ];
 
   return (
@@ -246,15 +244,10 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
   handleUrlChange,
   isLoading,
   jobId,
-  handleSubmit,
-  handleRenderSnapshot,
   status,
   crawlProgress,
   projectSelected,
   isRenderingSnapshot,
-  authStatus,
-  authMethod,
-  onAuthorize,
 }) => {
   const discovery = useDiscovery();
   const { crawlMode, setCrawlMode, discoveryPhase } = discovery;
@@ -268,53 +261,6 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
     discoveryPhase === "capturing";
 
   const disableActions = isBusy || !projectSelected;
-
-  // ── Legacy crawl mode ────────────────────────────────────────
-
-  const trimmedUrl = url.trim();
-  const showAuthorize = authMethod === "manual";
-  const authorizeDisabled = disableActions || !trimmedUrl;
-
-  const authorizeLabel = (() => {
-    if (authStatus === "authenticating") return "Browser Open – Complete auth...";
-    if (authStatus === "success") return "Reauthorize";
-    if (authStatus === "failed") return "Retry Authorization";
-    return "Authorize";
-  })();
-
-  const renderAuthStatus = () => {
-    if (authStatus === "authenticating") {
-      return (
-        <div className="auth-status auth-status-authenticating">
-          <IconKey size={12} />
-          Authentication browser is open — complete login/CAPTCHA, then close the window.
-        </div>
-      );
-    }
-    if (authStatus === "success") {
-      return (
-        <div className="auth-status auth-status-success">
-          <IconCheck size={12} /> Authentication successful — cookies saved for this domain.
-        </div>
-      );
-    }
-    if (authStatus === "failed") {
-      return (
-        <div className="auth-status auth-status-failed">
-          <IconX size={12} /> Authentication failed — try again or update your credentials.
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const manualReminder =
-    authMethod === "manual" && authStatus !== "success" ? (
-      <div className="form-hint-small">
-        Manual auth is selected. Run <strong>Authorize</strong> before starting a crawl so the
-        backend can reuse your session cookies.
-      </div>
-    ) : null;
 
   // ── Start URL shared field ────────────────────────────────────
 
@@ -373,67 +319,6 @@ export const CrawlingTab: React.FC<CrawlingTabProps> = ({
           status={status}
           disableActions={disableActions}
         />
-      )}
-
-      {/* ── LEGACY CRAWL MODE ── */}
-      {crawlMode === "legacy" && (
-        <div id="crawl-form" style={{ marginBottom: "20px" }}>
-          {renderUrlField(disableActions)}
-
-          {showAuthorize && (
-            <div className="form-group">
-              <button
-                id="authorize-button"
-                type="button"
-                onClick={onAuthorize}
-                disabled={authorizeDisabled}
-                className={`button-secondary ${authorizeDisabled ? "button-flow-disabled" : ""}`}
-              >
-                {authorizeLabel}
-              </button>
-              <div className="form-hint">
-                Opens a browser for login or CAPTCHA. Close that browser when finished so cookies
-                can be captured.
-              </div>
-              {renderAuthStatus()}
-              {manualReminder}
-            </div>
-          )}
-
-          <button
-            id="start-crawl-button"
-            onClick={handleSubmit}
-            disabled={disableActions || !trimmedUrl}
-            className={`button-primary ${(!trimmedUrl || disableActions) ? "button-flow-disabled" : ""}`}
-          >
-            {isLoading
-              ? "Starting..."
-              : jobId
-                ? "Crawl in Progress"
-                : isRenderingSnapshot
-                  ? "Rendering Snapshot..."
-                  : !projectSelected
-                    ? "Select a Project"
-                    : "Start Crawl"}
-          </button>
-
-          <button
-            id="render-snapshot-button"
-            onClick={handleRenderSnapshot}
-            disabled={disableActions}
-            className={`button-secondary ${disableActions ? "button-flow-disabled" : ""}`}
-          >
-            {isRenderingSnapshot ? "Rendering Screenshot Pages..." : "Render Screenshot Pages"}
-          </button>
-
-          <CrawlProgress progress={crawlProgress} />
-
-          {status && (
-            <div id="crawl-status-display" className="status-display" style={{ marginTop: "8px" }}>
-              {status}
-            </div>
-          )}
-        </div>
       )}
     </div>
   );

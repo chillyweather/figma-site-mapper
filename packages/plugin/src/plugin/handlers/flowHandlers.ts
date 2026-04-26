@@ -12,6 +12,7 @@ import { FlowLink, ManifestData } from "../types";
 import { getJobStatus, getPage, recrawlPage } from "../services/apiClient";
 import { POLLING_CONFIG } from "../constants";
 import { DEFAULT_SETTINGS } from "../../constants";
+import { STYLE_PRESETS } from "../../utils/stylePresets";
 import { renderTargetPage } from "../services/targetPageRenderer";
 import { loadDomainCookies } from "./uiMessageHandlers";
 import {
@@ -1048,6 +1049,7 @@ async function fetchAndRenderTargetPage(
       );
     }
 
+    const smartStyleExtraction = STYLE_PRESETS.smart;
     const result = await recrawlPage({
       url,
       projectId,
@@ -1056,24 +1058,22 @@ async function fetchAndRenderTargetPage(
       requestDelay: 1000,
       auth,
       cookieBannerHandling: settings.cookieBannerHandling ?? "auto",
-      styleExtraction: settings.extractStyles
-        ? {
-            enabled: true,
-            preset: settings.styleExtractionPreset,
-            extractInteractiveElements: settings.extractInteractive,
-            extractStructuralElements: settings.extractStructural,
-            extractTextElements: settings.extractContentBlocks,
-            extractFormElements: settings.extractFormElements,
-            extractMediaElements: settings.extractCustomComponents,
-            extractColors: settings.extractColors,
-            extractTypography: settings.extractTypography,
-            extractSpacing: settings.extractSpacing,
-            extractLayout: settings.extractLayout,
-            extractBorders: settings.extractBorders,
-            includeSelectors: settings.extractCSSVariables,
-            includeComputedStyles: settings.extractLayout,
-          }
-        : undefined,
+      styleExtraction: {
+        enabled: true,
+        preset: "smart",
+        extractInteractiveElements: smartStyleExtraction.extractInteractive,
+        extractStructuralElements: smartStyleExtraction.extractStructural,
+        extractTextElements: smartStyleExtraction.extractContentBlocks,
+        extractFormElements: smartStyleExtraction.extractFormElements,
+        extractMediaElements: smartStyleExtraction.extractCustomComponents,
+        extractColors: smartStyleExtraction.extractColors,
+        extractTypography: smartStyleExtraction.extractTypography,
+        extractSpacing: smartStyleExtraction.extractSpacing,
+        extractLayout: smartStyleExtraction.extractLayout,
+        extractBorders: smartStyleExtraction.extractBorders,
+        includeSelectors: true,
+        includeComputedStyles: true,
+      },
     });
 
     const jobId = result.jobId;

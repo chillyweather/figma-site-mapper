@@ -21,6 +21,7 @@ import {
   parseSampleSize,
   parseAuthData,
 } from "../utils/validation";
+import { STYLE_PRESETS } from "../utils/stylePresets";
 
 export function useCrawl() {
   const { settings } = useSettings();
@@ -62,6 +63,8 @@ export function useCrawl() {
         setIsLoading(true);
         setStatus("Starting crawl...");
 
+        const smartStyleExtraction = STYLE_PRESETS.smart;
+
         // Send message to plugin to start crawl (plugin will handle API call)
         parent.postMessage(
           {
@@ -86,20 +89,20 @@ export function useCrawl() {
               highlightElementFilters: settings.highlightElementFilters,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,
               auth: authData,
-              extractStyles: settings.extractStyles,
-              styleExtractionPreset: settings.styleExtractionPreset,
+              extractStyles: true,
+              styleExtractionPreset: "smart",
               // Map frontend field names to backend field names
-              extractInteractiveElements: settings.extractInteractive,
-              extractStructuralElements: settings.extractStructural,
-              extractTextElements: settings.extractContentBlocks,
-              extractFormElements: settings.extractFormElements,
-              extractMediaElements: settings.extractCustomComponents,
-              extractColors: settings.extractColors,
-              extractTypography: settings.extractTypography,
-              extractSpacing: settings.extractSpacing,
-              extractLayout: settings.extractLayout,
-              extractBorders: settings.extractBorders,
-              includeSelectors: settings.detectPatterns, // using detectPatterns as includeSelectors
+              extractInteractiveElements: smartStyleExtraction.extractInteractive,
+              extractStructuralElements: smartStyleExtraction.extractStructural,
+              extractTextElements: smartStyleExtraction.extractContentBlocks,
+              extractFormElements: smartStyleExtraction.extractFormElements,
+              extractMediaElements: smartStyleExtraction.extractCustomComponents,
+              extractColors: smartStyleExtraction.extractColors,
+              extractTypography: smartStyleExtraction.extractTypography,
+              extractSpacing: smartStyleExtraction.extractSpacing,
+              extractLayout: smartStyleExtraction.extractLayout,
+              extractBorders: smartStyleExtraction.extractBorders,
+              includeSelectors: true,
               includeComputedStyles: true, // always include computed styles when enabled
               projectId: activeProjectId,
             },

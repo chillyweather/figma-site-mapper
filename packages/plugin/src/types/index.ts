@@ -216,10 +216,6 @@ export interface SettingsViewProps {
   handleRequestDelayChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   maxRequests: string;
   handleMaxRequestsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  maxDepth: string;
-  handleMaxDepthChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  sampleSize: string;
-  handleSampleSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   defaultLanguageOnly: boolean;
   fullRefresh: boolean;
   handleDefaultLanguageOnlyChange: (
@@ -238,52 +234,6 @@ export interface SettingsViewProps {
   isLoading: boolean;
   jobId: string | null;
   switchToMain: () => void;
-  // Style Extraction props
-  extractStyles: boolean;
-  handleExtractStylesChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  styleExtractionPreset: "smart" | "minimal" | "complete" | "custom";
-  handleStyleExtractionPresetChange: (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => void;
-  // Custom extraction options (visible when preset is "custom")
-  extractInteractive: boolean;
-  handleExtractInteractiveChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractStructural: boolean;
-  handleExtractStructuralChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractContentBlocks: boolean;
-  handleExtractContentBlocksChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractFormElements: boolean;
-  handleExtractFormElementsChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractCustomComponents: boolean;
-  handleExtractCustomComponentsChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractColors: boolean;
-  handleExtractColorsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  extractTypography: boolean;
-  handleExtractTypographyChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  extractSpacing: boolean;
-  handleExtractSpacingChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  extractBorders: boolean;
-  handleExtractBordersChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  extractLayout: boolean;
-  handleExtractLayoutChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  extractCSSVariables: boolean;
-  handleExtractCSSVariablesChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
-  detectPatterns: boolean;
-  handleDetectPatternsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   // Project-related props
   projects: Project[];
   activeProjectId: string | null;
@@ -303,14 +253,9 @@ export interface MainViewProps {
   handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
   jobId: string | null;
-  handleSubmit: (e: React.FormEvent) => void;
   status: string;
   switchToSettings: () => void;
   crawlProgress: CrawlProgress;
-  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
-  authMethod: "none" | "manual" | "credentials" | "cookies";
-  onAuthorize: () => void;
-  handleRenderSnapshot: () => void;
   isRenderingSnapshot: boolean;
 }
 
@@ -319,15 +264,10 @@ export interface CrawlingTabProps {
   handleUrlChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isLoading: boolean;
   jobId: string | null;
-  handleSubmit: (e: React.FormEvent) => void;
-  handleRenderSnapshot: () => void;
   status: string;
   crawlProgress: CrawlProgress;
   projectSelected: boolean;
   isRenderingSnapshot: boolean;
-  authStatus: "idle" | "authenticating" | "success" | "failed" | null;
-  authMethod: "none" | "manual" | "credentials" | "cookies";
-  onAuthorize: () => void;
 }
 
 export interface MarkupTabProps {
@@ -395,7 +335,7 @@ export interface FocusedTextareaProps {
 
 // ── Discovery flow types ────────────────────────────────────────────
 
-export type CrawlMode = "recommended" | "exact" | "legacy";
+export type CrawlMode = "recommended" | "exact";
 
 export type DiscoveryPhase =
   | "idle"

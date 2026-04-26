@@ -3,15 +3,9 @@ import {
   IconKey,
   IconCheck,
   IconX,
-  IconInfoCircle,
 } from "@tabler/icons-react";
 import { SettingsViewProps } from "../types/index";
 import { FocusedInput } from "./common/FocusedInput";
-import {
-  estimateDataSize,
-  getPresetConfig,
-  STYLE_PRESETS,
-} from "../utils/stylePresets";
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   url,
@@ -25,10 +19,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleRequestDelayChange,
   maxRequests,
   handleMaxRequestsChange,
-  maxDepth,
-  handleMaxDepthChange,
-  sampleSize,
-  handleSampleSizeChange,
   defaultLanguageOnly,
   handleDefaultLanguageOnlyChange,
   fullRefresh,
@@ -43,34 +33,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   isLoading,
   jobId,
   switchToMain,
-  extractStyles,
-  handleExtractStylesChange,
-  styleExtractionPreset,
-  handleStyleExtractionPresetChange,
-  extractInteractive,
-  handleExtractInteractiveChange,
-  extractStructural,
-  handleExtractStructuralChange,
-  extractContentBlocks,
-  handleExtractContentBlocksChange,
-  extractFormElements,
-  handleExtractFormElementsChange,
-  extractCustomComponents,
-  handleExtractCustomComponentsChange,
-  extractColors,
-  handleExtractColorsChange,
-  extractTypography,
-  handleExtractTypographyChange,
-  extractSpacing,
-  handleExtractSpacingChange,
-  extractBorders,
-  handleExtractBordersChange,
-  extractLayout,
-  handleExtractLayoutChange,
-  extractCSSVariables,
-  handleExtractCSSVariablesChange,
-  detectPatterns,
-  handleDetectPatternsChange,
   // Project-related props
   projects,
   activeProjectId,
@@ -324,34 +286,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="settings-description">
         Leave empty, 0, or ≥999 for unlimited requests
       </div>
-      <FocusedInput
-        key="max-depth-input"
-        type="number"
-        value={maxDepth}
-        onChange={handleMaxDepthChange}
-        placeholder="Max crawl depth (0)"
-        disabled={isLoading || !!jobId}
-        className="form-input"
-        min="0"
-        max="10"
-      />
-      <div className="settings-description">
-        How many levels deep to crawl (0 or empty = no limit, 1-10)
-      </div>
-      <FocusedInput
-        key="sample-size-input"
-        type="number"
-        value={sampleSize}
-        onChange={handleSampleSizeChange}
-        placeholder="Pages per section (0)"
-        disabled={isLoading || !!jobId}
-        className="form-input"
-        min="0"
-        max="20"
-      />
-      <div className="settings-description">
-        Max pages to crawl per section (0 or empty = no limit, 1-20)
-      </div>
       <label className="settings-label">
         <input
           id="default-language-only-checkbox"
@@ -488,227 +422,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
     </div>
 
-    {/* Style Extraction Section */}
-    <div id="style-extraction-section" className="settings-section" style={{ marginTop: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-        <label className="settings-label">
-          <input
-            type="checkbox"
-            checked={extractStyles}
-            onChange={handleExtractStylesChange}
-            disabled={isLoading || !!jobId}
-          />
-          Extract DOM & Style Data
-        </label>
-        <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-          <IconInfoCircle
-            size={14}
-            style={{ color: "#666", cursor: "help" }}
-            title="Extracts structural and styling information from pages for design token generation and component analysis"
-          />
-        </div>
-      </div>
-
-      {extractStyles && (
-        <div className="settings-group">
-          {/* Preset Selector */}
-          <div style={{ marginBottom: "12px" }}>
-            <label className="form-label">
-              Extraction Preset
-            </label>
-            <select
-              value={styleExtractionPreset}
-              onChange={handleStyleExtractionPresetChange}
-              disabled={isLoading || !!jobId}
-              className="form-select"
-            >
-              <option value="smart">Smart (Recommended)</option>
-              <option value="minimal">Minimal (Smallest)</option>
-              <option value="complete">Complete (Largest)</option>
-              <option value="custom">Custom...</option>
-            </select>
-            <div className="settings-description">
-              {styleExtractionPreset === "smart" &&
-                "Interactive + structural + styled elements"}
-              {styleExtractionPreset === "minimal" &&
-                "Interactive elements only"}
-              {styleExtractionPreset === "complete" && "All visible elements"}
-              {styleExtractionPreset === "custom" && "Configure options below"}
-            </div>
-          </div>
-
-          {/* Custom Options */}
-          {styleExtractionPreset === "custom" && (
-            <div style={{ marginTop: "12px" }}>
-              {/* Element Types */}
-              <div style={{ marginBottom: "12px" }}>
-                <div className="settings-group-title">
-                  Element Types
-                </div>
-                <div className="settings-checkbox-list">
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractInteractive}
-                      onChange={handleExtractInteractiveChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Interactive elements (buttons, links, inputs)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractStructural}
-                      onChange={handleExtractStructuralChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Structural components (header, nav, footer)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractContentBlocks}
-                      onChange={handleExtractContentBlocksChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Content blocks (cards, articles, lists)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractFormElements}
-                      onChange={handleExtractFormElementsChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Form elements (forms, labels, fieldsets)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractCustomComponents}
-                      onChange={handleExtractCustomComponentsChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Custom components (experimental)
-                  </label>
-                </div>
-              </div>
-
-              {/* Style Properties */}
-              <div style={{ marginBottom: "12px" }}>
-                <div className="settings-group-title">
-                  Style Properties
-                </div>
-                <div className="settings-checkbox-list">
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractColors}
-                      onChange={handleExtractColorsChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Colors & backgrounds
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractTypography}
-                      onChange={handleExtractTypographyChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Typography (font, size, weight)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractSpacing}
-                      onChange={handleExtractSpacingChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Spacing (margin, padding)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractBorders}
-                      onChange={handleExtractBordersChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Borders & effects (shadows, radius)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractLayout}
-                      onChange={handleExtractLayoutChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Layout properties (display, flex, grid)
-                  </label>
-                </div>
-              </div>
-
-              {/* Additional Options */}
-              <div>
-                <div className="settings-group-title">
-                  Additional Options
-                </div>
-                <div className="settings-checkbox-list">
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={extractCSSVariables}
-                      onChange={handleExtractCSSVariablesChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Extract CSS variables (custom properties)
-                  </label>
-                  <label className="settings-label">
-                    <input
-                      type="checkbox"
-                      checked={detectPatterns}
-                      onChange={handleDetectPatternsChange}
-                      disabled={isLoading || !!jobId}
-                    />
-                    Detect design patterns (auto-identify components)
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-          {/* Data Size Estimate */}
-          <div className="status-display status-info" style={{ marginTop: "12px", fontSize: "10px" }}>
-            <IconInfoCircle size={12} />
-            <span>
-              Estimated data:{" "}
-              {estimateDataSize(
-                styleExtractionPreset === "custom"
-                  ? {
-                      extractInteractive,
-                      extractStructural,
-                      extractContentBlocks,
-                      extractFormElements,
-                      extractCustomComponents,
-                      extractColors,
-                      extractTypography,
-                      extractSpacing,
-                      extractBorders,
-                      extractLayout,
-                      extractCSSVariables,
-                      detectPatterns,
-                    }
-                  : getPresetConfig(styleExtractionPreset as any) ||
-                      STYLE_PRESETS.smart,
-                parseInt(maxRequests) || 10
-              )}{" "}
-              for {maxRequests || 10} pages
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
 </div>
   );
 };

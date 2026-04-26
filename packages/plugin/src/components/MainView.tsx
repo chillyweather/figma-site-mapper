@@ -11,14 +11,9 @@ export const MainView: React.FC<MainViewProps> = ({
   handleUrlChange,
   isLoading,
   jobId,
-  handleSubmit,
   status,
   switchToSettings,
   crawlProgress,
-  authStatus,
-  authMethod,
-  onAuthorize,
-  handleRenderSnapshot,
   isRenderingSnapshot,
 }) => {
   const [activeTab, setActiveTab] = useState<"crawling" | "inventory">(
@@ -85,15 +80,10 @@ export const MainView: React.FC<MainViewProps> = ({
               handleUrlChange={handleUrlChange}
               isLoading={isLoading}
               jobId={jobId}
-              handleSubmit={handleSubmit}
-              handleRenderSnapshot={handleRenderSnapshot}
               status={status}
               crawlProgress={crawlProgress}
               projectSelected={projectSelected}
               isRenderingSnapshot={isRenderingSnapshot}
-              authStatus={authStatus}
-              authMethod={authMethod}
-              onAuthorize={onAuthorize}
             />
           )}
 
