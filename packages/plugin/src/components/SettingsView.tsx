@@ -37,6 +37,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleShowBrowserChange,
   authMethod,
   handleAuthMethodChange,
+  cookieBannerHandling,
+  handleCookieBannerHandlingChange,
   authStatus,
   isLoading,
   jobId,
@@ -462,6 +464,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+
+    <div id="cookie-banner-section" className="settings-section">
+      <label className="form-label">
+        Cookie Banners
+      </label>
+      <select
+        id="cookie-banner-handling-select"
+        value={cookieBannerHandling}
+        onChange={handleCookieBannerHandlingChange}
+        disabled={isLoading || !!jobId}
+        className="form-select"
+        style={{ marginBottom: "8px" }}
+      >
+        <option value="auto">Auto accept or hide common banners</option>
+        <option value="hide">Hide common banners only</option>
+        <option value="off">Leave banners visible</option>
+      </select>
+      <div className="settings-description">
+        Applied before screenshots are captured. Use manual authorization first for sites
+        that require a real consent cookie.
+      </div>
     </div>
 
     {/* Style Extraction Section */}

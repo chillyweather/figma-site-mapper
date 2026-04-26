@@ -62,6 +62,7 @@ interface RecrawlParams {
   delay?: number;
   requestDelay?: number;
   auth?: CrawlParams["auth"];
+  cookieBannerHandling?: CrawlParams["cookieBannerHandling"];
   styleExtraction?: CrawlParams["styleExtraction"];
 }
 
@@ -89,6 +90,7 @@ export async function startCrawl(
       defaultLanguageOnly: params.defaultLanguageOnly !== false,
       fullRefresh: params.fullRefresh === true,
       detectInteractiveElements: params.detectInteractiveElements !== false,
+      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
       styleExtraction: params.styleExtraction,
       captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
       projectId: params.projectId,
@@ -133,6 +135,7 @@ export async function recrawlPage(
       delay: params.delay || 0,
       requestDelay: params.requestDelay || 1000,
       auth: params.auth,
+      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
       styleExtraction: params.styleExtraction,
     }),
   });
@@ -505,6 +508,8 @@ export async function startApprovedCrawl(params: {
   fullRefresh?: boolean;
   screenshotWidth?: number;
   deviceScaleFactor?: number;
+  auth?: CrawlParams["auth"];
+  cookieBannerHandling?: CrawlParams["cookieBannerHandling"];
   styleExtraction?: Record<string, unknown>;
 }): Promise<{ jobId: string }> {
   const response = await fetch(`${BACKEND_URL}/crawl/approved`, {
@@ -517,6 +522,8 @@ export async function startApprovedCrawl(params: {
       fullRefresh: params.fullRefresh ?? true,
       screenshotWidth: params.screenshotWidth ?? 1440,
       deviceScaleFactor: params.deviceScaleFactor ?? 1,
+      auth: params.auth,
+      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
       styleExtraction: params.styleExtraction,
     }),
   });

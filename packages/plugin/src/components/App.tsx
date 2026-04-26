@@ -153,6 +153,16 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleCookieBannerHandlingChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      updateSetting(
+        "cookieBannerHandling",
+        e.target.value as "auto" | "hide" | "off"
+      );
+    },
+    [updateSetting]
+  );
+
   // Style Extraction handlers
   const handleExtractStylesChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,6 +303,8 @@ export const App: React.FC = () => {
       handleShowBrowserChange={handleShowBrowserChange}
       authMethod={settings.authMethod}
       handleAuthMethodChange={handleAuthMethodChange}
+      cookieBannerHandling={settings.cookieBannerHandling}
+      handleCookieBannerHandlingChange={handleCookieBannerHandlingChange}
       authStatus={authStatus}
       isLoading={isLoading}
       jobId={jobId}

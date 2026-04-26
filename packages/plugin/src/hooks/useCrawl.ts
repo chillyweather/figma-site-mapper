@@ -81,6 +81,7 @@ export function useCrawl() {
               sampleSize: parseSampleSize(settings.sampleSize),
               showBrowser: settings.showBrowser,
               detectInteractiveElements: true,
+              cookieBannerHandling: settings.cookieBannerHandling,
               highlightAllElements: false,
               highlightElementFilters: settings.highlightElementFilters,
               captureOnlyVisibleElements: settings.captureOnlyVisibleElements,

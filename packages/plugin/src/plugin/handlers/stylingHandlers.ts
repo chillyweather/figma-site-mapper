@@ -149,6 +149,7 @@ export async function handleShowStylingElements(): Promise<void> {
       sampleSize: 1,
       showBrowser: showBrowser,
       detectInteractiveElements: true,
+      cookieBannerHandling: settings.cookieBannerHandling ?? "auto",
       captureOnlyVisibleElements: true,
       fullRefresh: false,
       auth: auth,

@@ -191,6 +191,21 @@ export async function loadDomainCookies(
   }
 }
 
+async function loadStoredCookieAuthForUrl(url: string): Promise<{
+  method: "cookies";
+  cookies: Array<{ name: string; value: string; domain: string }>;
+} | null> {
+  const domain = extractDomain(url);
+  const storedCookies = domain ? await loadDomainCookies(domain) : null;
+  if (!storedCookies || storedCookies.length === 0) {
+    return null;
+  }
+  return {
+    method: "cookies",
+    cookies: storedCookies,
+  };
+}
+
 type LastJobSubsetMetadata = {
   jobId: string;
   projectId: string;
@@ -521,7 +536,8 @@ export async function handleGetStatus(
 export async function handleStartCrawl(config: {
   url: string;
   maxRequestsPerCrawl: number;
-  width: number;
+  width?: number;
+  screenshotWidth?: number;
   maxDepth: number;
   sampleSize: number;
   showBrowser: boolean;
@@ -547,6 +563,7 @@ export async function handleStartCrawl(config: {
   includeSelectors: boolean;
   includeComputedStyles: boolean;
   fullRefresh: boolean;
+  cookieBannerHandling?: "auto" | "hide" | "off";
   projectId?: string | null;
 }): Promise<void> {
   const resolvedProjectId = config.projectId || await getActiveProjectId();
@@ -568,7 +585,8 @@ export async function handleStartCrawl(config: {
     const {
       url,
       maxRequestsPerCrawl,
-      width,
+      width: configuredWidth,
+      screenshotWidth,
       maxDepth,
       sampleSize,
       showBrowser,
@@ -594,7 +612,10 @@ export async function handleStartCrawl(config: {
       includeSelectors,
       includeComputedStyles,
       fullRefresh,
+      cookieBannerHandling,
     } = config;
+
+    const width = configuredWidth ?? screenshotWidth ?? parseInt(DEFAULT_SETTINGS.screenshotWidth, 10);
 
     // Resolve stored cookies for this domain (used for manual auth or auto-injection)
     const domain = extractDomain(url);
@@ -669,6 +690,7 @@ export async function handleStartCrawl(config: {
       sampleSize,
       showBrowser,
       detectInteractiveElements,
+      cookieBannerHandling,
       fullRefresh,
       captureOnlyVisibleElements,
       auth: authData,
@@ -1042,6 +1064,7 @@ async function handleSubmitDiscoveryApproval(msg: {
   screenshotWidth: number;
   deviceScaleFactor: number;
   fullRefresh: boolean;
+  cookieBannerHandling?: "auto" | "hide" | "off";
   styleExtraction?: Record<string, unknown>;
 }): Promise<void> {
   hasRenderedSitemap = false;
@@ -1069,6 +1092,8 @@ async function handleSubmitDiscoveryApproval(msg: {
       fullRefresh: msg.fullRefresh,
       screenshotWidth: msg.screenshotWidth,
       deviceScaleFactor: msg.deviceScaleFactor,
+      auth: (await loadStoredCookieAuthForUrl(approval.approvedUrls[0]!)) ?? undefined,
+      cookieBannerHandling: msg.cookieBannerHandling ?? "auto",
       styleExtraction: msg.styleExtraction,
     });
 
@@ -1092,6 +1117,7 @@ async function handleSubmitExactUrls(msg: {
   screenshotWidth: number;
   deviceScaleFactor: number;
   fullRefresh: boolean;
+  cookieBannerHandling?: "auto" | "hide" | "off";
   styleExtraction?: Record<string, unknown>;
 }): Promise<void> {
   hasRenderedSitemap = false;
@@ -1137,6 +1163,8 @@ async function handleSubmitExactUrls(msg: {
       fullRefresh: msg.fullRefresh,
       screenshotWidth: msg.screenshotWidth,
       deviceScaleFactor: msg.deviceScaleFactor,
+      auth: (await loadStoredCookieAuthForUrl(approval.approvedUrls[0]!)) ?? undefined,
+      cookieBannerHandling: msg.cookieBannerHandling ?? "auto",
       styleExtraction: msg.styleExtraction,
     });
 

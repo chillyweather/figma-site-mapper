@@ -61,6 +61,7 @@ const processor = async (job: Job) => {
     showBrowser,
     detectInteractiveElements,
     renderInteractiveHighlights,
+    cookieBannerHandling,
     captureOnlyVisibleElements,
     highlightAllElements,
     projectId,
@@ -103,6 +104,7 @@ const processor = async (job: Job) => {
             sampleSize,
             detectInteractiveElements,
             renderInteractiveHighlights,
+            cookieBannerHandling,
             captureOnlyVisibleElements,
             highlightAllElements,
             fullRefresh,
@@ -137,7 +139,8 @@ const processor = async (job: Job) => {
       auth,
       styleExtraction,
       crawlRunId,
-      approvedUrls
+      approvedUrls,
+      cookieBannerHandling
     );
 
     if (crawlRunId) {

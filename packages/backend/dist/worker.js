@@ -43,7 +43,7 @@ const processor = async (job) => {
             throw error;
         }
     }
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, renderInteractiveHighlights, captureOnlyVisibleElements, highlightAllElements, projectId, auth, styleExtraction, approvedUrls, discoveryRunId, } = job.data;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, renderInteractiveHighlights, cookieBannerHandling, captureOnlyVisibleElements, highlightAllElements, projectId, auth, styleExtraction, approvedUrls, discoveryRunId, } = job.data;
     console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
     console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`);
     console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
@@ -73,6 +73,7 @@ const processor = async (job) => {
                     sampleSize,
                     detectInteractiveElements,
                     renderInteractiveHighlights,
+                    cookieBannerHandling,
                     captureOnlyVisibleElements,
                     highlightAllElements,
                     fullRefresh,
@@ -86,7 +87,7 @@ const processor = async (job) => {
                 .all();
             crawlRunId = row?.id;
         }
-        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls);
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling);
         if (crawlRunId) {
             db.update(crawlRuns)
                 .set({

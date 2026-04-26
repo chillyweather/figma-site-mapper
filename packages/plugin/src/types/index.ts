@@ -19,6 +19,7 @@ export interface PluginSettings {
   username: string;
   password: string;
   cookies: string;
+  cookieBannerHandling: "auto" | "hide" | "off";
   // Style Extraction Settings
   extractStyles: boolean;
   styleExtractionPreset: "smart" | "minimal" | "complete" | "custom";
@@ -229,6 +230,10 @@ export interface SettingsViewProps {
   handleShowBrowserChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   authMethod: "none" | "manual" | "credentials" | "cookies";
   handleAuthMethodChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  cookieBannerHandling: "auto" | "hide" | "off";
+  handleCookieBannerHandlingChange: (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => void;
   authStatus: "idle" | "authenticating" | "success" | "failed" | null;
   isLoading: boolean;
   jobId: string | null;

@@ -370,7 +370,7 @@ export async function buildServer() {
     });
     // ── Crawl ─────────────────────────────────────────────────────────────────
     server.post("/crawl", async (request, reply) => {
-        const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, fullRefresh, captureOnlyVisibleElements, } = request.body;
+        const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements, projectId, auth, styleExtraction, fullRefresh, captureOnlyVisibleElements, cookieBannerHandling, } = request.body;
         if (!url || !publicUrl) {
             return reply.status(400).send({ error: "URL and publicUrl are required" });
         }
@@ -399,6 +399,7 @@ export async function buildServer() {
             sampleSize,
             showBrowser,
             detectInteractiveElements: detectInteractiveElements !== false,
+            cookieBannerHandling: cookieBannerHandling ?? "auto",
             captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
             highlightAllElements: highlightAllElements || false,
             projectId,
@@ -409,7 +410,7 @@ export async function buildServer() {
         return { message: "Crawl job successfully queued.", jobId: job.id };
     });
     server.post("/recrawl-page", async (request, reply) => {
-        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, captureOnlyVisibleElements, } = request.body;
+        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, captureOnlyVisibleElements, cookieBannerHandling, } = request.body;
         if (!url || !publicUrl) {
             return reply.status(400).send({ error: "URL and publicUrl are required" });
         }
@@ -438,6 +439,7 @@ export async function buildServer() {
             sampleSize: 0,
             showBrowser: false,
             detectInteractiveElements: true,
+            cookieBannerHandling: cookieBannerHandling ?? "auto",
             captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
             highlightAllElements: false,
             projectId,
@@ -501,11 +503,13 @@ export async function buildServer() {
             sampleSize: 0,
             showBrowser: false,
             detectInteractiveElements: true,
+            cookieBannerHandling: body.cookieBannerHandling ?? "auto",
             renderInteractiveHighlights: false,
             captureOnlyVisibleElements: true,
             highlightAllElements: false,
             fullRefresh: body.fullRefresh === true,
             projectId,
+            auth: body.auth,
             styleExtraction: body.styleExtraction ?? defaultInventoryStyleExtraction(),
             approvedUrls: normalizedApprovedUrls,
             discoveryRunId,

@@ -49,6 +49,7 @@ export interface CrawlStartMessage {
   sampleSize: number;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
+  cookieBannerHandling?: "auto" | "hide" | "off";
   captureOnlyVisibleElements: boolean;
   auth: AuthData | null;
   styleExtraction?: StyleExtractionSettings;

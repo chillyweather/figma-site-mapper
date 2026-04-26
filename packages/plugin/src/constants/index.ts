@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   username: "",
   password: "",
   cookies: "",
+  cookieBannerHandling: "auto",
   // Inventory workflow needs DOM/style data by default.
   extractStyles: true,
   styleExtractionPreset: "smart",

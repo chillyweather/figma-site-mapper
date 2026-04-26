@@ -1055,6 +1055,7 @@ async function fetchAndRenderTargetPage(
       delay: 0,
       requestDelay: 1000,
       auth,
+      cookieBannerHandling: settings.cookieBannerHandling ?? "auto",
       styleExtraction: settings.extractStyles
         ? {
             enabled: true,

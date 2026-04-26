@@ -427,6 +427,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements,
       highlightAllElements, projectId, auth, styleExtraction, fullRefresh,
       captureOnlyVisibleElements,
+      cookieBannerHandling,
     } = request.body as any;
 
     if (!url || !publicUrl) {
@@ -460,6 +461,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       sampleSize,
       showBrowser,
       detectInteractiveElements: detectInteractiveElements !== false,
+      cookieBannerHandling: cookieBannerHandling ?? "auto",
       captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
       highlightAllElements: highlightAllElements || false,
       projectId,
@@ -475,6 +477,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     const {
       url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction,
       captureOnlyVisibleElements,
+      cookieBannerHandling,
     } = request.body as any;
 
     if (!url || !publicUrl) {
@@ -508,6 +511,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       sampleSize: 0,
       showBrowser: false,
       detectInteractiveElements: true,
+      cookieBannerHandling: cookieBannerHandling ?? "auto",
       captureOnlyVisibleElements: captureOnlyVisibleElements !== false,
       highlightAllElements: false,
       projectId,
@@ -527,6 +531,8 @@ export async function buildServer(): Promise<FastifyInstance> {
       styleExtraction?: Record<string, unknown>;
       screenshotWidth?: number;
       deviceScaleFactor?: number;
+      auth?: unknown;
+      cookieBannerHandling?: "auto" | "hide" | "off";
     };
 
     const { projectId, discoveryRunId, approvedUrls } = body;
@@ -592,11 +598,13 @@ export async function buildServer(): Promise<FastifyInstance> {
       sampleSize: 0,
       showBrowser: false,
       detectInteractiveElements: true,
+      cookieBannerHandling: body.cookieBannerHandling ?? "auto",
       renderInteractiveHighlights: false,
       captureOnlyVisibleElements: true,
       highlightAllElements: false,
       fullRefresh: body.fullRefresh === true,
       projectId,
+      auth: body.auth,
       styleExtraction: body.styleExtraction ?? defaultInventoryStyleExtraction(),
       approvedUrls: normalizedApprovedUrls,
       discoveryRunId,

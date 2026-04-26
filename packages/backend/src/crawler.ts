@@ -1,4 +1,5 @@
 import { PlaywrightCrawler, Configuration } from "crawlee";
+import type { Page } from "playwright";
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
@@ -117,6 +118,8 @@ interface PageData {
   styleData?: StyleData;
   crawlOrder?: number;
 }
+
+type CookieBannerHandling = "auto" | "hide" | "off";
 
 // Language detection patterns
 const LANGUAGE_PATTERNS = [
@@ -993,6 +996,247 @@ async function generateAnnotatedScreenshot(
   return `${publicUrl}/screenshots/${annotatedFileName}`;
 }
 
+async function handleCookieConsentBanner(
+  page: Page,
+  mode: CookieBannerHandling,
+  log: { info: (message: string) => void },
+  url: string
+): Promise<void> {
+  if (mode === "off") {
+    return;
+  }
+
+  try {
+    await page.evaluate("globalThis.__name = function(fn) { return fn; };");
+
+    let clicked = false;
+
+    if (mode === "auto") {
+      clicked = await page.evaluate(() => {
+        const visible = (el: Element): boolean => {
+          const htmlEl = el as HTMLElement;
+          const rect = htmlEl.getBoundingClientRect();
+          const style = window.getComputedStyle(htmlEl);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            Number(style.opacity || "1") > 0
+          );
+        };
+
+        const clickElement = (el: Element | null): boolean => {
+          if (!el || !visible(el)) return false;
+          (el as HTMLElement).click();
+          return true;
+        };
+
+        const selectors = [
+          "#onetrust-accept-btn-handler",
+          "#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll",
+          "#CybotCookiebotDialogBodyButtonAccept",
+          "#didomi-notice-agree-button",
+          "#didomi-notice-agree-button > span",
+          "button[data-testid='uc-accept-all-button']",
+          "button[data-testid='accept-all']",
+          "button[data-testid='cookie-accept-all']",
+          "button[id*='accept' i]",
+          "button[class*='accept' i]",
+          "button[id*='agree' i]",
+          "button[class*='agree' i]",
+          "[role='button'][id*='accept' i]",
+          "[role='button'][class*='accept' i]",
+          "input[type='button'][value*='Accept' i]",
+          "input[type='submit'][value*='Accept' i]",
+        ];
+
+        for (const selector of selectors) {
+          if (clickElement(document.querySelector(selector))) return true;
+        }
+
+        const acceptPatterns = [
+          /^accept$/i,
+          /^accept all$/i,
+          /^allow all$/i,
+          /^agree$/i,
+          /^i agree$/i,
+          /^i accept$/i,
+          /^accept cookies$/i,
+          /^accept all cookies$/i,
+          /^allow cookies$/i,
+          /^got it$/i,
+          /^ok$/i,
+          /^okay$/i,
+          /^continue$/i,
+        ];
+        const rejectPattern = /(reject|decline|deny|necessary|manage|settings|preferences|customize)/i;
+        const hasConsentContext = (el: Element): boolean => {
+          let current: Element | null = el;
+          let depth = 0;
+          while (current && depth < 5) {
+            const htmlEl = current as HTMLElement;
+            const idAndClass = `${htmlEl.id || ""} ${htmlEl.className || ""}`.toLowerCase();
+            const role = (htmlEl.getAttribute("role") || "").toLowerCase();
+            const aria = `${htmlEl.getAttribute("aria-label") || ""} ${htmlEl.getAttribute("aria-describedby") || ""}`.toLowerCase();
+            const text = (htmlEl.innerText || htmlEl.textContent || "").toLowerCase();
+            if (
+              idAndClass.includes("cookie") ||
+              idAndClass.includes("consent") ||
+              idAndClass.includes("gdpr") ||
+              aria.includes("cookie") ||
+              aria.includes("consent") ||
+              ((role === "dialog" || role === "alertdialog") &&
+                (text.includes("cookie") ||
+                  text.includes("consent") ||
+                  text.includes("privacy")))
+            ) {
+              return true;
+            }
+            current = current.parentElement;
+            depth += 1;
+          }
+          return false;
+        };
+        const candidates = Array.from(
+          document.querySelectorAll(
+            "button,[role='button'],input[type='button'],input[type='submit'],a"
+          )
+        );
+
+        for (const candidate of candidates) {
+          if (!visible(candidate)) continue;
+          if (!hasConsentContext(candidate)) continue;
+          const text =
+            candidate instanceof HTMLInputElement
+              ? candidate.value.trim()
+              : (candidate.textContent || "").replace(/\s+/g, " ").trim();
+          if (!text || rejectPattern.test(text)) continue;
+          if (acceptPatterns.some((pattern) => pattern.test(text))) {
+            (candidate as HTMLElement).click();
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      if (clicked) {
+        log.info(`Accepted cookie consent banner on ${url}`);
+        await page.waitForTimeout(1000);
+      }
+    }
+
+    const hiddenCount = await page.evaluate(() => {
+      const providerSelectors = [
+        "#onetrust-banner-sdk",
+        "#onetrust-consent-sdk",
+        "#CybotCookiebotDialog",
+        "#CybotCookiebotDialogBodyUnderlay",
+        "#didomi-host",
+        ".didomi-popup-container",
+        ".didomi-popup-backdrop",
+        ".osano-cm-window",
+        ".osano-cm-dialog",
+        ".truste_box_overlay",
+        ".truste_overlay",
+        ".cc-window",
+        ".cc-banner",
+        ".cc-floating",
+        ".cookie-consent",
+        ".cookieConsent",
+        ".cookie-banner",
+        ".cookieBanner",
+        ".cookies-banner",
+        ".privacy-banner",
+      ];
+      const broadSelectors = [
+        "[aria-label*='cookie' i]",
+        "[aria-label*='consent' i]",
+        "[id*='cookie' i]",
+        "[class*='cookie' i]",
+        "[id*='consent' i]",
+        "[class*='consent' i]",
+        "[id*='gdpr' i]",
+        "[class*='gdpr' i]",
+      ];
+
+      const isOverlayLike = (el: Element): boolean => {
+        const htmlEl = el as HTMLElement;
+        const rect = htmlEl.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return false;
+        const style = window.getComputedStyle(htmlEl);
+        const role = (htmlEl.getAttribute("role") || "").toLowerCase();
+        const ariaModal = htmlEl.getAttribute("aria-modal") === "true";
+        const coversMuchOfViewport =
+          rect.width >= window.innerWidth * 0.35 ||
+          rect.height >= window.innerHeight * 0.12;
+        return (
+          ["fixed", "sticky"].includes(style.position) ||
+          role === "dialog" ||
+          role === "alertdialog" ||
+          ariaModal ||
+          coversMuchOfViewport
+        );
+      };
+
+      const shouldHideByText = (el: Element): boolean => {
+        if (!isOverlayLike(el)) return false;
+        const htmlEl = el as HTMLElement;
+        const text = (htmlEl.innerText || htmlEl.textContent || "").toLowerCase();
+        return (
+          text.includes("cookie") ||
+          text.includes("cookies") ||
+          text.includes("privacy preferences") ||
+          text.includes("consent")
+        );
+      };
+
+      const nodes = new Set<Element>();
+      for (const selector of providerSelectors) {
+        document.querySelectorAll(selector).forEach((node) => nodes.add(node));
+      }
+      for (const selector of broadSelectors) {
+        document.querySelectorAll(selector).forEach((node) => {
+          if (isOverlayLike(node)) nodes.add(node);
+        });
+      }
+      document.querySelectorAll("body *").forEach((node) => {
+        if (shouldHideByText(node)) nodes.add(node);
+      });
+
+      let hidden = 0;
+      nodes.forEach((node) => {
+        const htmlEl = node as HTMLElement;
+        if (htmlEl.dataset.sitemapperHiddenCookieBanner === "true") return;
+        htmlEl.dataset.sitemapperHiddenCookieBanner = "true";
+        htmlEl.style.setProperty("display", "none", "important");
+        htmlEl.style.setProperty("visibility", "hidden", "important");
+        hidden += 1;
+      });
+
+      document.documentElement.style.removeProperty("overflow");
+      document.body.style.removeProperty("overflow");
+      document.body.style.removeProperty("position");
+
+      return hidden;
+    });
+
+    if (hiddenCount > 0) {
+      log.info(`Hid ${hiddenCount} cookie consent/banner node(s) on ${url}`);
+      await page.waitForTimeout(300);
+    } else if (!clicked) {
+      log.info(`No cookie consent banner detected on ${url}`);
+    }
+  } catch (error) {
+    log.info(
+      `Cookie banner handling failed for ${url}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
 export async function runCrawler(
   startUrl: string,
   publicUrl: string,
@@ -1015,7 +1259,7 @@ export async function runCrawler(
     loginUrl?: string;
     username?: string;
     password?: string;
-    cookies?: Array<{ name: string; value: string }>;
+    cookies?: Array<{ name: string; value: string; domain?: string }>;
   },
   styleExtraction?: {
     enabled: boolean;
@@ -1035,7 +1279,8 @@ export async function runCrawler(
     captureOnlyVisibleElements?: boolean;
   },
   crawlRunId?: number,
-  approvedUrls?: string[]
+  approvedUrls?: string[],
+  cookieBannerHandling: CookieBannerHandling = "auto"
 ): Promise<{
   visitedUrls: string[];
   visitedPageIds: string[];
@@ -1048,7 +1293,7 @@ export async function runCrawler(
   console.log("📊 Crawler settings:", {
     maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth,
     defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, highlightAllElements,
-    captureOnlyVisibleElements,
+    captureOnlyVisibleElements, cookieBannerHandling,
     styleExtraction: styleExtraction?.enabled ? styleExtraction.preset : "disabled",
   });
 
@@ -1070,8 +1315,6 @@ export async function runCrawler(
   const userAgents = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
   ];
   const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
@@ -1097,8 +1340,7 @@ export async function runCrawler(
     console.log(`🔐 Attempting authentication via ${auth.method}`);
     try {
       if (auth.method === "cookies" && auth.cookies) {
-        console.log(`🍪 Setting ${auth.cookies.length} cookies for authentication`);
-        authSuccess = true;
+        console.log(`🍪 Will inject ${auth.cookies.length} cookies before capture`);
       } else if (auth.method === "credentials" && auth.loginUrl && auth.username && auth.password) {
         console.log(`🔑 Will attempt login at ${auth.loginUrl} for user ${auth.username}`);
         authSuccess = true;
@@ -1177,6 +1419,68 @@ export async function runCrawler(
     }
   }
 
+  async function applyAuthCookies(page: Page, targetUrl: string, log: { info: (message: string) => void; error: (message: string) => void }): Promise<boolean> {
+    if (auth?.method !== "cookies" || !auth.cookies || auth.cookies.length === 0) {
+      return false;
+    }
+
+    try {
+      const cookies = auth.cookies.map((cookie) => {
+        const domain = cookie.domain?.trim();
+        if (domain) {
+          return {
+            name: cookie.name,
+            value: cookie.value,
+            domain,
+            path: "/",
+          };
+        }
+        return {
+          name: cookie.name,
+          value: cookie.value,
+          url: targetUrl,
+        };
+      });
+
+      await page.context().addCookies(cookies);
+      authSuccess = true;
+      log.info(`✅ Injected ${cookies.length} stored authentication/consent cookies`);
+      return true;
+    } catch (error) {
+      log.error(`❌ Failed to inject cookies: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
+  async function applyBrowserFingerprint(page: Page): Promise<void> {
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"macOS"',
+      "Upgrade-Insecure-Requests": "1",
+    });
+    await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    }).catch(() => undefined);
+  }
+
+  async function isBlockedByCloudflare(page: Page): Promise<boolean> {
+    return page.evaluate(() => {
+      const title = document.title.toLowerCase();
+      const bodyText = (document.body?.innerText || document.body?.textContent || "").toLowerCase();
+      return (
+        title.includes("attention required") && title.includes("cloudflare")
+      ) || (
+        bodyText.includes("sorry, you have been blocked") &&
+        bodyText.includes("cloudflare")
+      ) || Boolean(document.querySelector(".cf-error-details, #cf-error-details"));
+    });
+  }
+
   let progressUpdateWarned = false;
 
   const updateProgress = async (
@@ -1249,22 +1553,13 @@ export async function runCrawler(
           return;
         }
 
-        // Cookie authentication on first request
+        // Fallback for jobs that did not apply cookies in preNavigationHooks.
         if (auth?.method === "cookies" && auth.cookies && !authSuccess) {
-          try {
-            log.info(`🍪 Setting cookies for authentication`);
-            for (const cookie of auth.cookies) {
-              await page.context().addCookies([{
-                name: cookie.name,
-                value: cookie.value,
-                url: canonicalStartUrl,
-                domain: new URL(canonicalStartUrl).hostname,
-              }]);
-            }
-            authSuccess = true;
-            log.info(`✅ Cookies set successfully`);
-          } catch (error) {
-            log.error(`❌ Failed to set cookies: ${error instanceof Error ? error.message : String(error)}`);
+          const cookiesApplied = await applyAuthCookies(page, request.url, log);
+          if (cookiesApplied) {
+            await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch((error) => {
+              log.info(`Cookie reload did not complete cleanly: ${error instanceof Error ? error.message : String(error)}`);
+            });
           }
         }
 
@@ -1320,23 +1615,13 @@ export async function runCrawler(
 
         await updateProgress("crawling", currentPage, totalPages, finalUrl);
 
-        await page.setExtraHTTPHeaders({
-          "Accept-Language": "en-US,en;q=0.9",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-          "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-          "Sec-Ch-Ua-Mobile": "?0",
-          "Sec-Ch-Ua-Platform": '"macOS"',
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Upgrade-Insecure-Requests": "1",
-        });
-
         await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {
           log.info("Network idle timeout, continuing anyway");
         });
+
+        if (await isBlockedByCloudflare(page)) {
+          throw new Error(`Cloudflare block page detected for ${finalUrl}`);
+        }
 
         // CAPTCHA detection
         const captchaDetection = await page.evaluate(() => {
@@ -1369,7 +1654,7 @@ export async function runCrawler(
           }
 
           return {
-            hasCaptcha: (foundElements.length > 0 && (hasSpecificText || hasCaptchaTitle)) || foundCloudflare.length > 0,
+            hasCaptcha: (foundElements.length > 0 || foundCloudflare.length > 0) && (hasSpecificText || hasCaptchaTitle),
             foundElements, foundCloudflare, hasSpecificText, hasCaptchaTitle,
             pageTitle: document.title,
           };
@@ -1399,8 +1684,7 @@ export async function runCrawler(
             log.info(`✅ CAPTCHA appears to be resolved, continuing`);
             await page.waitForTimeout(2000);
           } catch {
-            log.info(`⏰ CAPTCHA timeout on ${finalUrl}, skipping page`);
-            return;
+            log.info(`⏰ CAPTCHA timeout on ${finalUrl}, continuing capture instead of omitting approved page`);
           }
         }
 
@@ -1408,6 +1692,13 @@ export async function runCrawler(
           log.info(`Waiting ${delay}ms for dynamic content to load`);
           await page.waitForTimeout(delay);
         }
+
+        await handleCookieConsentBanner(
+          page,
+          cookieBannerHandling,
+          log,
+          finalUrl
+        );
 
         // Hide extra sticky/fixed elements
         try {
@@ -1442,6 +1733,13 @@ export async function runCrawler(
           log.info(`Completed scrolling through ${finalUrl}`);
         } catch { log.info(`Scrolling failed or not needed for ${finalUrl}`); }
 
+        await handleCookieConsentBanner(
+          page,
+          cookieBannerHandling,
+          log,
+          finalUrl
+        );
+
         const title = await page.title();
         log.info(`Crawled ${finalUrl} - Title: ${title}`);
 
@@ -1457,6 +1755,13 @@ export async function runCrawler(
           });
           await page.waitForTimeout(300);
         } catch { log.info(`⚠️ Could not ensure top position for ${finalUrl}`); }
+
+        await handleCookieConsentBanner(
+          page,
+          cookieBannerHandling,
+          log,
+          finalUrl
+        );
 
         // Interactive elements
         let interactiveElements: InteractiveElement[] = [];
@@ -1908,6 +2213,12 @@ export async function runCrawler(
             }
           }
 
+          await applyBrowserFingerprint(page);
+
+          if (auth?.method === "cookies" && auth.cookies) {
+            await applyAuthCookies(page, request.url, log);
+          }
+
           const baseDelay = maxRequestsPerCrawl && maxRequestsPerCrawl <= 3 ? 0 : requestDelay;
           const randomVariation = Math.floor(Math.random() * 500) - 250;
           const totalDelay = Math.max(0, baseDelay + randomVariation);
@@ -2148,7 +2459,7 @@ export async function openAuthSession(url: string): Promise<{
   });
 
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
     console.log(`✅ Browser opened at ${url}`);
     console.log(`👤 Please complete login/CAPTCHA, then close the browser window.`);
 
@@ -2168,6 +2479,11 @@ export async function openAuthSession(url: string): Promise<{
     console.log(`🔒 Browser closed. 🍪 Captured ${cookies.length} cookies`);
     return { cookies };
   } catch (error) {
+    if (browserClosed || finalizingSession) {
+      if (finalizingSession) await finalizingSession;
+      console.log(`🔒 Browser closed during auth navigation. 🍪 Captured ${cookies.length} cookies`);
+      return { cookies };
+    }
     console.error(`❌ Auth session error: ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   } finally {

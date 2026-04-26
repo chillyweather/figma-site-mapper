@@ -60,6 +60,7 @@ export interface CrawlParams {
   // Whether backend should capture only visible elements (optional, forwarded)
   captureOnlyVisibleElements?: boolean;
   auth: any;
+  cookieBannerHandling?: "auto" | "hide" | "off";
   styleExtraction?: StyleExtractionSettings;
   projectId: string;
 }
