@@ -15,6 +15,7 @@ import {
   KIND_COLORS,
 } from "./inventory/shared";
 import { findOrCreateSampleAnchor } from "./inventory/sampleAnchors";
+import { buildTokenTable } from "./inventory/tokenTable";
 
 async function createAssetRow(assets: RenderAsset[]): Promise<FrameNode | null> {
   const imageAssets = assets.filter((a): a is RenderAsset & { kind: "image"; url: string } => a.kind === "image" && Boolean(a.url));
@@ -96,6 +97,10 @@ async function buildCard(card: RenderCard, accent: RGB): Promise<FrameNode> {
 }
 
 async function buildSection(section: RenderSection): Promise<FrameNode> {
+  if (section.kind === "tokens") {
+    return buildTokenTable(section);
+  }
+
   const accent = KIND_COLORS[section.kind] ?? COLORS.blue;
   const container = createFrame(section.title, 1200);
   addSectionTitle(container, section.title, `${section.cards.length} items`);
@@ -110,7 +115,10 @@ async function buildSection(section: RenderSection): Promise<FrameNode> {
   return container;
 }
 
-async function buildBoard(board: RenderBoard): Promise<FrameNode> {
+async function buildBoard(
+  board: RenderBoard,
+  onProgress?: (stage: string) => void
+): Promise<FrameNode> {
   const container = createFrame(board.title, 1280);
   container.paddingTop = 40;
   container.paddingBottom = 40;
@@ -118,14 +126,28 @@ async function buildBoard(board: RenderBoard): Promise<FrameNode> {
   container.fills = [{ type: "SOLID", color: { r: 0.93, g: 0.95, b: 0.98 } }];
   container.appendChild(createText(board.title, { size: 32, style: "Bold", width: 1200 }));
 
-  for (const section of board.sections) {
+  for (let i = 0; i < board.sections.length; i += 1) {
+    const section = board.sections[i];
+    onProgress?.(`${board.title} → ${section.title}`);
+    // Yield to the event loop so the UI thread can pick up the progress message.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     container.appendChild(await buildSection(section));
   }
 
   return container;
 }
 
-export async function renderInventoryBoards(renderData: InventoryRenderData): Promise<void> {
+export interface RenderInventoryProgress {
+  stage: string;
+  current: number;
+  total: number;
+}
+
+export async function renderInventoryBoards(
+  renderData: InventoryRenderData,
+  onProgress?: (progress: RenderInventoryProgress) => void
+): Promise<void> {
+  onProgress?.({ stage: "Loading fonts", current: 0, total: renderData.boards.length });
   await loadFonts();
 
   const page = findOrCreateInventoryPage();
@@ -158,8 +180,19 @@ export async function renderInventoryBoards(renderData: InventoryRenderData): Pr
     )
   );
 
-  for (const board of renderData.boards) {
-    wrapper.appendChild(await buildBoard(board));
+  for (let i = 0; i < renderData.boards.length; i += 1) {
+    const board = renderData.boards[i];
+    onProgress?.({
+      stage: `Rendering ${board.title}`,
+      current: i + 1,
+      total: renderData.boards.length,
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    wrapper.appendChild(
+      await buildBoard(board, (stage) =>
+        onProgress?.({ stage, current: i + 1, total: renderData.boards.length })
+      )
+    );
   }
 
   figma.viewport.scrollAndZoomIntoView([wrapper]);

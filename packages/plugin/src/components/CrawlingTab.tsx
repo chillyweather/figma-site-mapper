@@ -184,6 +184,19 @@ function CandidateRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
           <PageTypeBadge type={candidate.pageType} />
+          {typeof candidate.depth === "number" && (
+            <span
+              style={{
+                fontSize: "9px",
+                padding: "1px 4px",
+                borderRadius: "3px",
+                background: "#e5e7eb",
+                color: "#374151",
+              }}
+            >
+              d{candidate.depth}
+            </span>
+          )}
           {isOtherHost && (
             <span
               style={{
@@ -346,8 +359,11 @@ function RecommendedMode({
   disableActions: boolean;
 }) {
   const {
+    discoveryMode, setDiscoveryMode,
     seedUrls, setSeedUrls,
     pageBudget, setPageBudget,
+    explorationCandidateLimit, setExplorationCandidateLimit,
+    explorationDepth, setExplorationDepth,
     includeSubdomains, setIncludeSubdomains,
     includeBlog, setIncludeBlog,
     includeSupport, setIncludeSupport,
@@ -367,6 +383,42 @@ function RecommendedMode({
     return (
       <div>
         {renderUrlField(disableActions)}
+
+        <div className="form-group">
+          <label className="form-label">Discovery mode</label>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {[
+              { value: "fast", label: "Fast" },
+              { value: "full", label: "Full site exploration" },
+            ].map((mode) => {
+              const active = discoveryMode === mode.value;
+              return (
+                <button
+                  key={mode.value}
+                  type="button"
+                  onClick={() => setDiscoveryMode(mode.value as "fast" | "full")}
+                  disabled={disableActions}
+                  style={{
+                    flex: mode.value === "full" ? 1.5 : 1,
+                    fontSize: "11px",
+                    padding: "5px 8px",
+                    borderRadius: "4px",
+                    border: "1px solid",
+                    borderColor: active ? "#0369a1" : "#d1d5db",
+                    background: active ? "#e0f2fe" : "#ffffff",
+                    color: active ? "#0369a1" : "#374151",
+                    cursor: disableActions ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="form-hint">
+            Fast discovery keeps the current shallow sources. Full site exploration follows more internal links and sitemap indexes.
+          </div>
+        </div>
 
         <div className="form-group">
           <label className="form-label">Must-include URLs</label>
@@ -408,8 +460,66 @@ function RecommendedMode({
               </button>
             ))}
           </div>
-          <div className="form-hint">Recommended page target for this project.</div>
+          <div className="form-hint">Recommended pages to approve after discovery.</div>
         </div>
+
+        {discoveryMode === "full" && (
+          <div className="form-group">
+            <label className="form-label">Exploration limit</label>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              {[100, 300, 1000].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setExplorationCandidateLimit(n)}
+                  disabled={disableActions}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    borderRadius: "4px",
+                    border: "1px solid",
+                    borderColor: explorationCandidateLimit === n ? "#0369a1" : "#d1d5db",
+                    background: explorationCandidateLimit === n ? "#e0f2fe" : "#ffffff",
+                    color: explorationCandidateLimit === n ? "#0369a1" : "#374151",
+                    cursor: disableActions ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="form-hint">Upper bound for explored candidates before recommendation filtering.</div>
+          </div>
+        )}
+
+        {discoveryMode === "full" && (
+          <div className="form-group">
+            <label className="form-label">Link depth</label>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setExplorationDepth(n)}
+                  disabled={disableActions}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: "11px",
+                    borderRadius: "4px",
+                    border: "1px solid",
+                    borderColor: explorationDepth === n ? "#0369a1" : "#d1d5db",
+                    background: explorationDepth === n ? "#e0f2fe" : "#ffffff",
+                    color: explorationDepth === n ? "#0369a1" : "#374151",
+                    cursor: disableActions ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="form-hint">How many link hops to follow when exploring beyond the initial sources.</div>
+          </div>
+        )}
 
         <div className="form-group">
           <label className="form-label">Options</label>

@@ -37,6 +37,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
   const [isLoading, setIsLoading] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState<{ stage: string; current: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
@@ -186,15 +187,26 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
 
       if (msg.type === "inventory/renderStarted") {
         setIsRendering(true);
+        setRenderProgress({ stage: "Starting render", current: 0, total: 0 });
         setError(null);
+      }
+
+      if (msg.type === "inventory/renderProgress") {
+        setRenderProgress({
+          stage: typeof msg.stage === "string" ? msg.stage : "Rendering",
+          current: typeof msg.current === "number" ? msg.current : 0,
+          total: typeof msg.total === "number" ? msg.total : 0,
+        });
       }
 
       if (msg.type === "inventory/renderCompleted") {
         setIsRendering(false);
+        setRenderProgress(null);
       }
 
       if (msg.type === "inventory/renderError") {
         setIsRendering(false);
+        setRenderProgress(null);
         setError(typeof msg.error === "string" ? msg.error : "Failed to render inventory boards.");
       }
     };
@@ -356,6 +368,36 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
           >
             {isRendering ? "Rendering Boards..." : "Render Inventory Boards"}
           </button>
+          {isRendering && renderProgress && (
+            <div style={{ marginTop: "10px", fontSize: "11px", lineHeight: 1.4 }}>
+              <div style={{ color: "var(--figma-color-text-secondary, #555)" }}>
+                {renderProgress.total > 0
+                  ? `Step ${renderProgress.current} of ${renderProgress.total} — ${renderProgress.stage}`
+                  : renderProgress.stage}
+              </div>
+              {renderProgress.total > 0 && (
+                <div
+                  style={{
+                    marginTop: "6px",
+                    height: "4px",
+                    width: "100%",
+                    background: "rgba(0,0,0,0.08)",
+                    borderRadius: "2px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(100, (renderProgress.current / renderProgress.total) * 100)}%`,
+                      background: "var(--figma-color-bg-brand, #18a0fb)",
+                      transition: "width 200ms linear",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

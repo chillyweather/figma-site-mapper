@@ -83,7 +83,7 @@ Backend and worker logs stream to the console and are written to `packages/backe
 
 ## Common Workflows
 
-Create/select a project in the plugin, then run a crawl from the Crawling tab. On completion the plugin renders screenshot pages and an index page in Figma.
+Create/select a project in the plugin, then run a crawl from the Crawling tab. In `Recommended` mode you can switch between `Fast` discovery and `Full site exploration` before approving pages. On completion the plugin renders screenshot pages and an index page in Figma.
 
 Use the Markup tab on a generated screenshot page. The tab requires the Figma page to have a stored `PAGE_ID` plugin data key and a `Page Overlay` frame.
 

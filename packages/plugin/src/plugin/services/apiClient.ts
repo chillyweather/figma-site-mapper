@@ -427,8 +427,11 @@ export async function startDiscovery(params: {
   projectId: string;
   startUrl: string;
   seedUrls?: string[];
+  discoveryMode?: "fast" | "full";
   maxCandidates?: number;
   pageBudget?: number;
+  maxDepth?: number;
+  requestDelay?: number;
   includeSubdomains?: boolean;
   includeBlog?: boolean;
   includeSupport?: boolean;

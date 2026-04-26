@@ -134,6 +134,7 @@ sqlite.exec(`
     pattern_key TEXT NOT NULL,
     score INTEGER NOT NULL DEFAULT 0,
     reasons_json TEXT NOT NULL DEFAULT '[]',
+    depth INTEGER,
     is_recommended INTEGER NOT NULL DEFAULT 0,
     is_approved INTEGER NOT NULL DEFAULT 0,
     is_excluded INTEGER NOT NULL DEFAULT 0,
@@ -179,6 +180,7 @@ ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TE
 ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
 ensureColumn("crawl_runs", "discovery_run_id", "discovery_run_id INTEGER");
 ensureColumn("crawl_runs", "approved_urls_json", "approved_urls_json TEXT");
+ensureColumn("discovery_candidates", "depth", "depth INTEGER");
 export const db = drizzle(sqlite, { schema });
 export async function connectDB() {
     console.log(`✅ SQLite database ready at ${dbPath}`);

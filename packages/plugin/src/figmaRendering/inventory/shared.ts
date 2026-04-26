@@ -11,6 +11,7 @@ export const COLORS = {
   amber: { r: 0.92, g: 0.6, b: 0.14 },
   red: { r: 0.86, g: 0.15, b: 0.15 },
   green: { r: 0.06, g: 0.55, b: 0.34 },
+  teal: { r: 0.04, g: 0.6, b: 0.62 },
 };
 
 export const KIND_COLORS: Record<string, RGB> = {

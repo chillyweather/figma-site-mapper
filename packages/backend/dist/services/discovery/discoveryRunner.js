@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { normalizeUrl } from "./urlNormalize.js";
 import { classifyPage } from "./pageClassifier.js";
 import { generateRecommendations } from "./recommendations.js";
+import { collectFullDiscoverySources } from "./collector.js";
 function isValidId(id) {
     if (!id || typeof id !== "string")
         return false;
@@ -69,6 +70,7 @@ export async function runDiscovery(input) {
     const maxCandidates = input.maxCandidates ?? 300;
     const pageBudget = input.pageBudget && input.pageBudget > 0 ? input.pageBudget : 10;
     const includeSubdomains = input.includeSubdomains ?? false;
+    const discoveryMode = input.discoveryMode ?? "fast";
     const startNormalized = normalizeUrl(input.startUrl);
     if (!startNormalized) {
         throw new Error("Invalid startUrl");
@@ -83,6 +85,7 @@ export async function runDiscovery(input) {
         startUrl: input.startUrl,
         status: "running",
         settingsJson: JSON.stringify({
+            discoveryMode,
             maxCandidates,
             pageBudget,
             maxDepth: input.maxDepth ?? 2,
@@ -99,36 +102,43 @@ export async function runDiscovery(input) {
         throw new Error("Failed to create discovery run");
     }
     const runId = runRow.id;
-    // Collect raw URLs with provenance
-    const rawSources = [];
-    // 1. Start URL
-    rawSources.push({ url: input.startUrl, source: "start-url" });
-    // 2. Seed URLs
-    for (const seed of input.seedUrls ?? []) {
-        rawSources.push({ url: seed, source: "seed-url" });
-    }
-    // 3. Existing project pages from DB
     const existingPages = db
         .select()
         .from(pages)
         .where(eq(pages.projectId, projectIdNum))
         .all();
-    for (const page of existingPages) {
-        rawSources.push({ url: page.url, source: "existing-page" });
-    }
-    // 4. Sitemap.xml
-    const sitemapUrl = new URL("/sitemap.xml", input.startUrl).href;
-    const sitemapXml = await fetchText(sitemapUrl);
-    if (sitemapXml) {
-        for (const url of extractSitemapUrls(sitemapXml)) {
-            rawSources.push({ url, source: "sitemap", sourceUrl: sitemapUrl });
+    const rawSources = discoveryMode === "full"
+        ? await collectFullDiscoverySources({
+            startUrl: input.startUrl,
+            seedUrls: input.seedUrls,
+            existingUrls: existingPages.map((page) => page.url),
+            includeSubdomains,
+            maxCandidates,
+            maxDepth: input.maxDepth,
+            requestDelay: input.requestDelay,
+        })
+        : [];
+    if (discoveryMode === "fast") {
+        // Collect raw URLs with provenance
+        rawSources.push({ url: input.startUrl, source: "start-url" });
+        for (const seed of input.seedUrls ?? []) {
+            rawSources.push({ url: seed, source: "seed-url" });
         }
-    }
-    // 5. Homepage links
-    const homepageHtml = await fetchText(input.startUrl);
-    if (homepageHtml) {
-        for (const url of extractLinks(homepageHtml, input.startUrl)) {
-            rawSources.push({ url, source: "homepage-link", sourceUrl: input.startUrl });
+        for (const page of existingPages) {
+            rawSources.push({ url: page.url, source: "existing-page" });
+        }
+        const sitemapUrl = new URL("/sitemap.xml", input.startUrl).href;
+        const sitemapXml = await fetchText(sitemapUrl);
+        if (sitemapXml) {
+            for (const url of extractSitemapUrls(sitemapXml)) {
+                rawSources.push({ url, source: "sitemap", sourceUrl: sitemapUrl });
+            }
+        }
+        const homepageHtml = await fetchText(input.startUrl);
+        if (homepageHtml) {
+            for (const url of extractLinks(homepageHtml, input.startUrl)) {
+                rawSources.push({ url, source: "homepage-link", sourceUrl: input.startUrl });
+            }
         }
     }
     // Normalize and dedupe
@@ -158,6 +168,7 @@ export async function runDiscovery(input) {
             path: norm.path,
             source: raw.source,
             sourceUrl: raw.sourceUrl ?? null,
+            depth: raw.depth,
             pageType: classification.pageType,
             patternKey: classification.patternKey,
             score: 0,
@@ -186,6 +197,7 @@ export async function runDiscovery(input) {
                 patternKey: c.patternKey,
                 score: c.score,
                 reasonsJson: JSON.stringify(c.reasons),
+                depth: c.depth ?? null,
                 isRecommended: c.isRecommended,
                 isApproved: c.isApproved,
                 isExcluded: c.isExcluded,
@@ -219,6 +231,7 @@ export async function runDiscovery(input) {
             .set({
             isRecommended: true,
             score: c.score,
+            depth: c.depth ?? null,
         })
             .where(eq(discoveryCandidates.id, c.id ?? 0))
             .run();

@@ -337,6 +337,8 @@ export interface FocusedTextareaProps {
 
 export type CrawlMode = "recommended" | "exact";
 
+export type DiscoveryMode = "fast" | "full";
+
 export type DiscoveryPhase =
   | "idle"
   | "discovering"
@@ -355,6 +357,7 @@ export interface DiscoveryCandidate {
   score: number;
   reasons: string[];
   source: string;
+  depth?: number;
   isRecommended: boolean;
   isApproved: boolean;
   isExcluded: boolean;

@@ -12,6 +12,8 @@ import { bucketDimension } from "./services/inventory/signatureBuilders.js";
 const ELEMENT_STYLE_PROPERTIES = [
     "color",
     "background-color",
+    "fill",
+    "stroke",
     "font-size",
     "font-family",
     "font-weight",

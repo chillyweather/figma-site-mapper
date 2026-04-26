@@ -4,6 +4,71 @@ import { defaultWorkspacePath } from "../workspace/paths.js";
 import { readDecisionFiles } from "../workspace/decisions.js";
 import { readWorkspaceMeta } from "../workspace/meta.js";
 import { getLatestCompletedCrawlRun } from "../workspace/index.js";
+const TOKEN_CATEGORIES = ["colors", "typography", "spacing", "radii", "shadows"];
+const TOKEN_CATEGORY_TITLES = {
+    colors: "Colors",
+    typography: "Typography",
+    spacing: "Spacing",
+    radii: "Radii",
+    shadows: "Shadows",
+};
+async function loadFrequencyByCategory(workspacePath) {
+    const result = {
+        colors: [],
+        typography: [],
+        spacing: [],
+        radii: [],
+        shadows: [],
+    };
+    for (const category of TOKEN_CATEGORIES) {
+        result[category] = await readJsonFile(path.join(workspacePath, "tokens", `${category}.json`), []);
+    }
+    return result;
+}
+function collectDecisionValues(token) {
+    const values = new Set();
+    const primary = textValue(token.value);
+    if (primary)
+        values.add(primary);
+    if (Array.isArray(token.sourceValues)) {
+        for (const raw of token.sourceValues) {
+            if (typeof raw === "string" && raw.trim())
+                values.add(raw);
+        }
+    }
+    return Array.from(values);
+}
+function dedupeOccurrencesByPageClass(occurrences) {
+    const best = new Map();
+    for (const occ of occurrences) {
+        const key = `${occ.pageId}::${occ.classKey}`;
+        const existing = best.get(key);
+        const area = bboxArea(occ.bbox);
+        if (!existing || area > bboxArea(existing.bbox)) {
+            best.set(key, occ);
+        }
+    }
+    return Array.from(best.values()).sort((a, b) => {
+        const pageDelta = Number(a.pageId) - Number(b.pageId);
+        if (pageDelta !== 0)
+            return pageDelta;
+        return bboxArea(b.bbox) - bboxArea(a.bbox);
+    });
+}
+function bboxArea(bbox) {
+    return Math.max(0, bbox[2]) * Math.max(0, bbox[3]);
+}
+function buildSampleLinks(occurrences) {
+    return occurrences.map((occ) => ({
+        label: occ.tagName || "node",
+        target: {
+            kind: "sample",
+            pageId: occ.pageId,
+            elementId: occ.elementId,
+            bbox: occ.bbox,
+        },
+    }));
+}
 async function readJsonFile(filePath, fallback) {
     const content = await fs.promises.readFile(filePath, "utf8").catch(() => null);
     if (!content)
@@ -340,51 +405,77 @@ export async function buildInventoryRenderModel(projectId, baseUrl) {
             ],
         });
     }
-    // Tokens board
+    // Tokens board — one section per category with per-page-class sample links
     const tokenRecord = asRecord(decisions.tokens);
-    const tokenCards = [];
-    for (const token of asArray(tokenRecord.colors)) {
-        const value = textValue(token.value);
-        const assets = [];
-        if (value) {
-            assets.push({ kind: "color", color: value, label: value });
+    const frequencyByCategory = await loadFrequencyByCategory(workspacePath);
+    const tokenSections = [];
+    let totalTokenCards = 0;
+    for (const category of TOKEN_CATEGORIES) {
+        const frequencyRows = frequencyByCategory[category];
+        const frequencyByValue = new Map();
+        for (const row of frequencyRows) {
+            const list = frequencyByValue.get(row.value);
+            if (list)
+                list.push(row);
+            else
+                frequencyByValue.set(row.value, [row]);
         }
-        tokenCards.push({
-            id: textValue(token.name, value) || "unknown",
-            title: textValue(token.name, value) || "Unnamed token",
-            subtitle: value || undefined,
-            badges: ["color"],
-            body: [textValue(token.usage)].filter(Boolean),
-            assets,
-            links: [],
-        });
-    }
-    for (const key of ["typography", "spacing", "radii", "shadows"]) {
-        const tokens = asArray(tokenRecord[key]);
-        for (const token of tokens) {
-            tokenCards.push({
-                id: textValue(token.name, "unknown"),
-                title: textValue(token.name, "Unnamed token"),
-                subtitle: textValue(token.value) || undefined,
-                badges: [key],
-                body: [textValue(token.usage)].filter(Boolean),
-                assets: [],
-                links: [],
+        const decisionTokens = asArray(tokenRecord[category]);
+        const cards = [];
+        for (const token of decisionTokens) {
+            const decisionValues = collectDecisionValues(token);
+            const matchedOccurrences = [];
+            let mergedUsageCount = 0;
+            let mergedPageIds = new Set();
+            for (const v of decisionValues) {
+                const rows = frequencyByValue.get(v) ?? [];
+                for (const row of rows) {
+                    mergedUsageCount += row.usageCount;
+                    for (const pid of row.pageIds)
+                        mergedPageIds.add(pid);
+                    if (Array.isArray(row.representativeOccurrences)) {
+                        matchedOccurrences.push(...row.representativeOccurrences);
+                    }
+                }
+            }
+            const occurrences = dedupeOccurrencesByPageClass(matchedOccurrences);
+            const links = buildSampleLinks(occurrences);
+            const value = textValue(token.value);
+            const assets = [];
+            if (category === "colors" && value) {
+                assets.push({ kind: "color", color: value, label: value });
+            }
+            const bodyLines = [];
+            if (token.usage && textValue(token.usage))
+                bodyLines.push(textValue(token.usage));
+            if (mergedUsageCount > 0) {
+                bodyLines.push(`${mergedUsageCount.toLocaleString()} use${mergedUsageCount === 1 ? "" : "s"} on ${mergedPageIds.size} page${mergedPageIds.size === 1 ? "" : "s"}`);
+            }
+            cards.push({
+                id: textValue(token.name, value) || "unknown",
+                title: textValue(token.name, value) || "Unnamed token",
+                subtitle: value || undefined,
+                badges: [category === "colors" ? "color" : category],
+                body: bodyLines,
+                assets,
+                links,
             });
         }
+        if (cards.length === 0)
+            continue;
+        tokenSections.push({
+            id: `tokens-${category}`,
+            title: `${TOKEN_CATEGORY_TITLES[category]} (${cards.length})`,
+            kind: "tokens",
+            cards,
+        });
+        totalTokenCards += cards.length;
     }
-    if (tokenCards.length > 0) {
+    if (tokenSections.length > 0) {
         boards.push({
             id: "tokens",
-            title: "Tokens",
-            sections: [
-                {
-                    id: "tokens",
-                    title: `${tokenCards.length} accepted tokens`,
-                    kind: "tokens",
-                    cards: tokenCards,
-                },
-            ],
+            title: `Tokens (${totalTokenCards})`,
+            sections: tokenSections,
         });
     }
     // Issues board

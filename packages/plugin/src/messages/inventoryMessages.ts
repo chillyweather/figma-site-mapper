@@ -50,6 +50,13 @@ export type InventoryPluginToUiMessage =
       projectId: string;
     }
   | {
+      type: "inventory/renderProgress";
+      projectId: string;
+      stage: string;
+      current: number;
+      total: number;
+    }
+  | {
       type: "inventory/renderCompleted";
       projectId: string;
     }

@@ -174,7 +174,15 @@ export async function handleRenderInventoryBoardsRequest(msg: {
       throw new Error("Inventory workspace is not prepared yet.");
     }
 
-    await renderInventoryBoards(renderData);
+    await renderInventoryBoards(renderData, ({ stage, current, total }) => {
+      postToUI({
+        type: "inventory/renderProgress",
+        projectId,
+        stage,
+        current,
+        total,
+      });
+    });
 
     postToUI({
       type: "inventory/renderCompleted",

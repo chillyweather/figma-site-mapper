@@ -1,4 +1,4 @@
-import { COLORS, ANCHOR_CONTAINER_NAME } from "./shared";
+import { ANCHOR_CONTAINER_NAME } from "./shared";
 
 export function findRenderedPageByPageId(pageId: string | null | undefined): PageNode | null {
   if (!pageId) return null;
@@ -28,11 +28,14 @@ export function getOrCreateAnchorContainer(page: PageNode): FrameNode {
   return frame;
 }
 
+export type SampleAnchorKind = "component" | "token";
+
 export function findOrCreateSampleAnchor(
-  clusterId: string,
+  ownerId: string,
   pageId: string,
   elementId: string,
-  bbox: [number, number, number, number]
+  bbox: [number, number, number, number],
+  kind: SampleAnchorKind = "component"
 ): FrameNode | null {
   const targetPage = findRenderedPageByPageId(pageId);
   if (!targetPage) return null;
@@ -50,7 +53,7 @@ export function findOrCreateSampleAnchor(
       : 1;
 
   const container = getOrCreateAnchorContainer(targetPage);
-  const anchorName = `DS Anchor / ${clusterId} / ${elementId}`;
+  const anchorName = `DS Anchor / ${kind} / ${ownerId} / ${elementId}`;
   let anchor = container.children.find(
     (child): child is FrameNode =>
       child.type === "FRAME" && child.getPluginData("DS_INVENTORY_ANCHOR") === anchorName
@@ -60,13 +63,12 @@ export function findOrCreateSampleAnchor(
     anchor = figma.createFrame();
     anchor.name = anchorName;
     anchor.setPluginData("DS_INVENTORY_ANCHOR", anchorName);
-    anchor.fills = [{ type: "SOLID", color: COLORS.pink, opacity: 0.04 }];
-    anchor.strokes = [{ type: "SOLID", color: COLORS.pink, opacity: 0.35 }];
-    anchor.strokeWeight = 2;
-    anchor.cornerRadius = 8;
     container.appendChild(anchor);
   }
 
+  anchor.fills = [];
+  anchor.strokes = [];
+  anchor.cornerRadius = 0;
   anchor.x = x * scale;
   anchor.y = y * scale;
   anchor.resize(Math.max(16, width * scale), Math.max(16, height * scale));

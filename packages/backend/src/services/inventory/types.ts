@@ -102,6 +102,15 @@ export interface InventoryTokenFrequency {
   cssVariableSources: string[];
   styleTokenSources: string[];
   exampleElementIds: string[];
+  representativeOccurrences: InventoryTokenOccurrence[];
+}
+
+export interface InventoryTokenOccurrence {
+  pageId: string;
+  elementId: string;
+  bbox: [number, number, number, number];
+  classKey: string;
+  tagName: string;
 }
 
 export interface InventoryTokenFrequencyTable {

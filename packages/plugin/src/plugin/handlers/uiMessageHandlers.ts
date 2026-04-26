@@ -1009,7 +1009,11 @@ async function handleStartDiscovery(msg: {
   projectId: string;
   startUrl: string;
   seedUrls?: string[];
+  discoveryMode?: "fast" | "full";
   pageBudget?: number;
+  maxCandidates?: number;
+  maxDepth?: number;
+  requestDelay?: number;
   includeSubdomains?: boolean;
   includeBlog?: boolean;
   includeSupport?: boolean;
@@ -1019,7 +1023,11 @@ async function handleStartDiscovery(msg: {
       projectId: msg.projectId,
       startUrl: msg.startUrl,
       seedUrls: msg.seedUrls,
+      discoveryMode: msg.discoveryMode ?? "fast",
       pageBudget: msg.pageBudget,
+      maxCandidates: msg.maxCandidates,
+      maxDepth: msg.maxDepth,
+      requestDelay: msg.requestDelay,
       includeSubdomains: msg.includeSubdomains,
       includeBlog: msg.includeBlog,
       includeSupport: msg.includeSupport,

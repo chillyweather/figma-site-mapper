@@ -80,7 +80,7 @@ Current required plugin-data keys are `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHO
 
 ### Discovery, capture, and sitemap flow
 
-1. Recommended mode: Plugin UI calls `POST /discovery/start`, reviews candidates from `GET /discovery/:runId`, then submits selected candidates to `POST /discovery/:runId/approval`.
+1. Recommended mode: Plugin UI calls `POST /discovery/start`, reviews candidates from `GET /discovery/:runId`, then submits selected candidates to `POST /discovery/:runId/approval`. The UI exposes `Fast` discovery and `Full site exploration`; fast uses the current shallow sources, while full adds sitemap recursion plus bounded link crawl.
 2. Exact URLs mode: Plugin creates a minimal discovery run from the pasted URLs and approves those URLs through the same approval path.
 3. Approved capture calls `POST /crawl/approved` with an explicit approved URL list. This path sets `maxRequestsPerCrawl` to the approved URL count and disables automatic interactive highlight rendering.
 4. Legacy mode still calls `POST /crawl` with broad crawl settings. Use it only for backwards-compatible broad crawl/debug behavior.
@@ -149,6 +149,7 @@ packages/plugin/src/
 
 - Discovery and approved capture are implemented:
   - Recommended discovery proposes candidate pages before capture
+  - Recommended discovery supports `Fast` and `Full site exploration` modes
   - Exact URLs capture uses the same approved-capture path
   - approved capture no longer uses the global max-request setting
   - approved capture preserves interactive data but does not draw old interactive highlight overlays

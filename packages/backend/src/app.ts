@@ -911,8 +911,11 @@ export async function buildServer(): Promise<FastifyInstance> {
       projectId?: string;
       startUrl?: string;
       seedUrls?: string[];
+      discoveryMode?: "fast" | "full";
       maxCandidates?: number;
       pageBudget?: number;
+      maxDepth?: number;
+      requestDelay?: number;
       includeSubdomains?: boolean;
       includeBlog?: boolean;
       includeSupport?: boolean;
@@ -929,8 +932,11 @@ export async function buildServer(): Promise<FastifyInstance> {
         projectId,
         startUrl,
         seedUrls: body.seedUrls,
+        discoveryMode: body.discoveryMode,
         maxCandidates: body.maxCandidates,
         pageBudget: body.pageBudget,
+        maxDepth: body.maxDepth,
+        requestDelay: body.requestDelay,
         includeSubdomains: body.includeSubdomains,
         includeBlog: body.includeBlog,
         includeSupport: body.includeSupport,
@@ -950,6 +956,7 @@ export async function buildServer(): Promise<FastifyInstance> {
           score: c.score,
           reasons: c.reasons,
           source: c.source,
+          depth: c.depth,
         })),
       };
     } catch (error) {
@@ -1004,6 +1011,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         score: c.score,
         reasons: JSON.parse(c.reasonsJson) as string[],
         source: c.source,
+        depth: c.depth ?? undefined,
         isRecommended: Boolean(c.isRecommended),
         isApproved: Boolean(c.isApproved),
         isExcluded: Boolean(c.isExcluded),
@@ -1089,6 +1097,7 @@ export async function buildServer(): Promise<FastifyInstance> {
             patternKey: classification.patternKey,
             score: 0,
             reasonsJson: JSON.stringify(["manual"]),
+            depth: 0,
             isRecommended: false,
             isApproved: true,
             isExcluded: false,

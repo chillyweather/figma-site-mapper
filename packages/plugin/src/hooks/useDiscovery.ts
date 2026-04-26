@@ -11,10 +11,12 @@ import { useSettings } from "./useSettings";
 import {
   parseScreenshotWidth,
   parseDeviceScaleFactor,
+  parseRequestDelay,
 } from "../utils/validation";
 import { STYLE_PRESETS } from "../utils/stylePresets";
 import type {
   CrawlMode,
+  DiscoveryMode,
   DiscoveryPhase,
   DiscoveryResult,
   DiscoveryCandidate,
@@ -56,11 +58,14 @@ export function useDiscovery() {
   const [crawlMode, setCrawlMode] = useState<CrawlMode>("recommended");
 
   // Recommended mode inputs
+  const [discoveryMode, setDiscoveryMode] = useState<DiscoveryMode>("fast");
   const [seedUrls, setSeedUrls] = useState("");
   const [pageBudget, setPageBudget] = useState(10);
   const [includeSubdomains, setIncludeSubdomains] = useState(false);
   const [includeBlog, setIncludeBlog] = useState(true);
   const [includeSupport, setIncludeSupport] = useState(false);
+  const [explorationCandidateLimit, setExplorationCandidateLimit] = useState(300);
+  const [explorationDepth, setExplorationDepth] = useState(2);
 
   // Exact URL mode input
   const [exactUrls, setExactUrls] = useState("");
@@ -161,14 +166,30 @@ export function useDiscovery() {
           startUrl: settings.url.trim(),
           seedUrls: seedUrlList,
           pageBudget,
+          discoveryMode,
+          maxCandidates: discoveryMode === "full" ? explorationCandidateLimit : undefined,
+          maxDepth: discoveryMode === "full" ? explorationDepth : undefined,
           includeSubdomains,
           includeBlog,
           includeSupport,
+          requestDelay: parseRequestDelay(settings.requestDelay),
         },
       },
       "*"
     );
-  }, [activeProjectId, settings.url, seedUrls, pageBudget, includeSubdomains, includeBlog, includeSupport]);
+  }, [
+    activeProjectId,
+    settings.url,
+    settings.requestDelay,
+    seedUrls,
+    pageBudget,
+    discoveryMode,
+    explorationCandidateLimit,
+    explorationDepth,
+    includeSubdomains,
+    includeBlog,
+    includeSupport,
+  ]);
 
   const toggleCandidate = useCallback((id: string, checked: boolean) => {
     setSelectedCandidateIds((prev) => {
@@ -287,11 +308,17 @@ export function useDiscovery() {
   return {
     crawlMode,
     setCrawlMode,
+    discoveryMode,
+    setDiscoveryMode,
 
     seedUrls,
     setSeedUrls,
     pageBudget,
     setPageBudget,
+    explorationCandidateLimit,
+    setExplorationCandidateLimit,
+    explorationDepth,
+    setExplorationDepth,
     includeSubdomains,
     setIncludeSubdomains,
     includeBlog,

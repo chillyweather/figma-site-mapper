@@ -108,7 +108,9 @@ The `Crawling` tab has three capture modes.
 
 **Recommended**
 
-Use this for normal design-system discovery. Enter the website URL and optional seed URLs. Set the page budget to the number of meaningful pages you want, then run discovery. The backend recommends candidate pages based on route diversity, page type, seeds, and crawl constraints. Review the candidates, select the pages you want, then start capture.
+Use this for normal design-system discovery. Enter the website URL and optional seed URLs. Choose either **Fast** discovery or **Full site exploration**. Fast discovery uses the current shallow sources. Full site exploration also follows sitemap indexes and internal links up to configured limits, which makes larger budgets meaningful. Review the candidates, select the pages you want, then start capture.
+
+The page budget controls how many recommended pages you want to approve after discovery.
 
 **Exact URLs**
 

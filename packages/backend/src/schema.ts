@@ -79,6 +79,7 @@ export const discoveryCandidates = sqliteTable("discovery_candidates", {
   patternKey: text("pattern_key").notNull(),
   score: integer("score").notNull().default(0),
   reasonsJson: text("reasons_json").notNull().default("[]"),
+  depth: integer("depth"),
   isRecommended: integer("is_recommended", { mode: "boolean" }).notNull().default(false),
   isApproved: integer("is_approved", { mode: "boolean" }).notNull().default(false),
   isExcluded: integer("is_excluded", { mode: "boolean" }).notNull().default(false),
