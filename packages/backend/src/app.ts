@@ -10,10 +10,13 @@ import { projects, pages, elements, crawlRuns, discoveryRuns, discoveryCandidate
 import { runDiscovery } from "./services/discovery/discoveryRunner.js";
 import { normalizeUrl } from "./services/discovery/urlNormalize.js";
 import { classifyPage } from "./services/discovery/pageClassifier.js";
+import { effectiveCaptureUrlKey, dedupeEffectiveCaptureUrls, getUrlLookupCandidates } from "./services/discovery/captureUrlNormalization.js";
+import { approveDiscoveryRun } from "./services/discovery/approveDiscoveryRun.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
+import { parseJson } from "./utils/parseJson.js";
 import { getInventoryTokens } from "./services/inventory/index.js";
 import { buildInventoryRenderModel } from "./services/inventory/renderModel.js";
 import {
@@ -63,40 +66,6 @@ function defaultInventoryStyleExtraction(): Record<string, unknown> {
   };
 }
 
-function effectiveCaptureUrlKey(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.hash = "";
-    let host = parsed.hostname.toLowerCase();
-    if (host.startsWith("www.")) {
-      host = host.slice(4);
-    }
-    const port = parsed.port ? `:${parsed.port}` : "";
-    let pathname = parsed.pathname.replace(/\/{2,}/g, "/");
-    if (pathname.length > 1 && pathname.endsWith("/")) {
-      pathname = pathname.slice(0, -1);
-    }
-    return `${parsed.protocol}//${host}${port}${pathname}${parsed.search}`;
-  } catch {
-    return url;
-  }
-}
-
-function dedupeEffectiveCaptureUrls(urls: string[]): string[] {
-  const seen = new Set<string>();
-  const deduped: string[] = [];
-
-  for (const url of urls) {
-    const key = effectiveCaptureUrlKey(url);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    deduped.push(url);
-  }
-
-  return deduped;
-}
 
 function projectExists(projectId: string): boolean {
   const row = db
@@ -107,34 +76,6 @@ function projectExists(projectId: string): boolean {
   return Boolean(row);
 }
 
-function getUrlLookupCandidates(rawUrl: string): string[] {
-  const candidates = new Set<string>();
-  const add = (value: string | null | undefined) => {
-    if (value && value.trim()) candidates.add(value.trim());
-  };
-
-  add(rawUrl);
-
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.hash = "";
-    add(parsed.toString());
-
-    if (parsed.pathname !== "/") {
-      const originalPath = parsed.pathname;
-      if (originalPath.endsWith("/")) {
-        parsed.pathname = originalPath.replace(/\/+$/, "") || "/";
-      } else {
-        parsed.pathname = `${originalPath}/`;
-      }
-      add(parsed.toString());
-    }
-  } catch {
-    // Keep the raw candidate only for non-URL values.
-  }
-
-  return Array.from(candidates);
-}
 
 function requestBaseUrl(request: { headers: { host?: string | string[] } }): string {
   const host = Array.isArray(request.headers.host)
@@ -770,10 +711,10 @@ export async function buildServer(): Promise<FastifyInstance> {
     const tokens = new Set<string>();
 
     const pageSummaries = pageRows.map((page) => {
-      const pageStyles = (page.globalStyles ? JSON.parse(page.globalStyles) : {}) as {
+      const pageStyles = parseJson<{
         cssVariables?: Record<string, string>;
         tokens?: string[];
-      };
+      }>(page.globalStyles, {});
 
       if (pageStyles.cssVariables) {
         for (const [key, value] of Object.entries(pageStyles.cssVariables)) {
@@ -1029,133 +970,12 @@ export async function buildServer(): Promise<FastifyInstance> {
 
     if (!isValidId(runId)) return reply.status(400).send({ error: "Invalid runId" });
 
-    const run = db
-      .select()
-      .from(discoveryRuns)
-      .where(eq(discoveryRuns.id, toId(runId)))
-      .get();
-
-    if (!run) return reply.status(404).send({ error: "Discovery run not found" });
-
-    const approvedIds = (body.approvedCandidateIds ?? [])
-      .filter(isValidId)
-      .map(toId);
-    const excludedIds = (body.excludedCandidateIds ?? [])
-      .filter(isValidId)
-      .map(toId);
-
-    // Treat each approval submission as the current selection, not an additive history.
-    db.update(discoveryCandidates)
-      .set({ isApproved: false })
-      .where(eq(discoveryCandidates.discoveryRunId, run.id))
-      .run();
-
-    // Mark approved
-    for (const cid of approvedIds) {
-      db.update(discoveryCandidates)
-        .set({ isApproved: true })
-        .where(
-          and(
-            eq(discoveryCandidates.id, cid),
-            eq(discoveryCandidates.discoveryRunId, run.id)
-          )
-        )
-        .run();
+    try {
+      return approveDiscoveryRun(runId, body);
+    } catch (err: any) {
+      if (err?.code === "NOT_FOUND") return reply.status(404).send({ error: "Discovery run not found" });
+      throw err;
     }
-
-    // Mark excluded
-    for (const cid of excludedIds) {
-      db.update(discoveryCandidates)
-        .set({ isExcluded: true })
-        .where(
-          and(
-            eq(discoveryCandidates.id, cid),
-            eq(discoveryCandidates.discoveryRunId, run.id)
-          )
-        )
-        .run();
-    }
-
-    // Add manual URLs as new approved candidates
-    const manualUrls = (body.manualUrls ?? []).filter((u) => typeof u === "string");
-    const now = new Date();
-    for (const rawUrl of manualUrls) {
-      const norm = normalizeUrl(rawUrl);
-      if (!norm) continue;
-      const classification = classifyPage(norm.path);
-      try {
-        db.insert(discoveryCandidates)
-          .values({
-            discoveryRunId: run.id,
-            projectId: run.projectId,
-            url: rawUrl,
-            normalizedUrl: norm.url,
-            host: norm.host,
-            path: norm.path,
-            source: "manual",
-            pageType: classification.pageType,
-            patternKey: classification.patternKey,
-            score: 0,
-            reasonsJson: JSON.stringify(["manual"]),
-            depth: 0,
-            isRecommended: false,
-            isApproved: true,
-            isExcluded: false,
-            createdAt: now,
-          })
-          .run();
-      } catch (err) {
-        // Unique constraint on (runId, normalizedUrl) — manual URL may already exist
-        if (err && typeof err === "object" && (err as any).message?.includes("UNIQUE")) {
-          // Update existing to approved
-          db.update(discoveryCandidates)
-            .set({ isApproved: true })
-            .where(
-              and(
-                eq(discoveryCandidates.discoveryRunId, run.id),
-                eq(discoveryCandidates.normalizedUrl, norm.url)
-              )
-            )
-            .run();
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    // Update run approved count
-    const approvedCount = db
-      .select({ count: discoveryCandidates.id })
-      .from(discoveryCandidates)
-      .where(
-        and(
-          eq(discoveryCandidates.discoveryRunId, run.id),
-          eq(discoveryCandidates.isApproved, true)
-        )
-      )
-      .all().length;
-
-    db.update(discoveryRuns)
-      .set({ approvedCount })
-      .where(eq(discoveryRuns.id, run.id))
-      .run();
-
-    const approvedRows = db
-      .select({ url: discoveryCandidates.normalizedUrl })
-      .from(discoveryCandidates)
-      .where(
-        and(
-          eq(discoveryCandidates.discoveryRunId, run.id),
-          eq(discoveryCandidates.isApproved, true)
-        )
-      )
-      .all();
-    const approvedUrls = dedupeEffectiveCaptureUrls(approvedRows.map((r) => r.url));
-
-    return {
-      ok: true,
-      approvedUrls,
-    };
   });
 
   return server;

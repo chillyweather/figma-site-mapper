@@ -9,7 +9,8 @@
     "fix-ui-path": "test -f dist/src/ui.html && mv dist/src/ui.html dist/ui.html && rmdir dist/src 2>/dev/null || true",
     "watch": "concurrently \"vite build --watch\" \"vite build --config vite.code.config.ts --watch\"",
     "predev": "pnpm --filter @sitemapper/shared build",
-    "dev": "pnpm run watch"
+    "dev": "pnpm run watch",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.92.0",
@@ -18,7 +19,8 @@
     "concurrently": "^8.2.2",
     "typescript": "^5.5.3",
     "vite": "^5.3.3",
-    "vite-plugin-singlefile": "^0.13.5"
+    "vite-plugin-singlefile": "^0.13.5",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@sitemapper/shared": "workspace:*",

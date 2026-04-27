@@ -21,7 +21,7 @@ import {
   parseSampleSize,
   parseAuthData,
 } from "../utils/validation";
-import { STYLE_PRESETS } from "../utils/stylePresets";
+import { STYLE_PRESETS, toBackendStyleFields } from "../utils/stylePresets";
 
 export function useCrawl() {
   const { settings } = useSettings();
@@ -63,8 +63,6 @@ export function useCrawl() {
         setIsLoading(true);
         setStatus("Starting crawl...");
 
-        const smartStyleExtraction = STYLE_PRESETS.smart;
-
         // Send message to plugin to start crawl (plugin will handle API call)
         parent.postMessage(
           {
@@ -91,19 +89,9 @@ export function useCrawl() {
               auth: authData,
               extractStyles: true,
               styleExtractionPreset: "smart",
-              // Map frontend field names to backend field names
-              extractInteractiveElements: smartStyleExtraction.extractInteractive,
-              extractStructuralElements: smartStyleExtraction.extractStructural,
-              extractTextElements: smartStyleExtraction.extractContentBlocks,
-              extractFormElements: smartStyleExtraction.extractFormElements,
-              extractMediaElements: smartStyleExtraction.extractCustomComponents,
-              extractColors: smartStyleExtraction.extractColors,
-              extractTypography: smartStyleExtraction.extractTypography,
-              extractSpacing: smartStyleExtraction.extractSpacing,
-              extractLayout: smartStyleExtraction.extractLayout,
-              extractBorders: smartStyleExtraction.extractBorders,
+              ...toBackendStyleFields(STYLE_PRESETS.smart),
               includeSelectors: true,
-              includeComputedStyles: true, // always include computed styles when enabled
+              includeComputedStyles: true,
               projectId: activeProjectId,
             },
           },

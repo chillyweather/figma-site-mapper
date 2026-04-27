@@ -13,7 +13,7 @@ import {
   parseDeviceScaleFactor,
   parseRequestDelay,
 } from "../utils/validation";
-import { STYLE_PRESETS } from "../utils/stylePresets";
+import { STYLE_PRESETS, toBackendStyleFields } from "../utils/stylePresets";
 import type {
   CrawlMode,
   DiscoveryMode,
@@ -27,20 +27,10 @@ export type { CrawlMode };
 function buildStyleExtractionSettings(settings: {
   captureOnlyVisibleElements: boolean;
 }): Record<string, unknown> {
-  const smart = STYLE_PRESETS.smart;
   return {
     enabled: true,
     preset: "smart",
-    extractInteractiveElements: smart.extractInteractive,
-    extractStructuralElements: smart.extractStructural,
-    extractTextElements: smart.extractContentBlocks,
-    extractFormElements: smart.extractFormElements,
-    extractMediaElements: smart.extractCustomComponents,
-    extractColors: smart.extractColors,
-    extractTypography: smart.extractTypography,
-    extractSpacing: smart.extractSpacing,
-    extractLayout: smart.extractLayout,
-    extractBorders: smart.extractBorders,
+    ...toBackendStyleFields(STYLE_PRESETS.smart),
     includeSelectors: true,
     includeComputedStyles: true,
     captureOnlyVisibleElements: settings.captureOnlyVisibleElements,

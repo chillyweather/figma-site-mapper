@@ -10,15 +10,7 @@ import type {
   WorkspaceElement,
   WorkspacePage,
 } from "./types.js";
-
-function parseJson<T>(value: string | null | undefined, fallback: T): T {
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
+import { parseJson } from "../../utils/parseJson.js";
 
 export function isValidProjectId(projectId: string): boolean {
   const parsed = Number(projectId);

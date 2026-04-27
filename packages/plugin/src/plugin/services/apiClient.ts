@@ -2,6 +2,9 @@ import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
 import type { InventoryDecisions, InventoryOverview, DiscoveryResult } from "../../types";
 import type { InventoryRenderData } from "@sitemapper/shared";
+import { createHttpClient } from "./httpClient";
+
+const client = createHttpClient(BACKEND_URL);
 
 interface PageResponseItem {
   _id: string;
@@ -66,189 +69,79 @@ interface RecrawlParams {
   styleExtraction?: CrawlParams["styleExtraction"];
 }
 
-/**
- * Start a crawl job on the backend
- */
-export async function startCrawl(
-  params: CrawlParams
-): Promise<{ jobId: string }> {
-  const response = await fetch(`${BACKEND_URL}/crawl`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url: params.url,
-      maxRequestsPerCrawl: params.maxRequestsPerCrawl,
-      screenshotWidth: params.screenshotWidth,
-      maxDepth: params.maxDepth,
-      sampleSize: params.sampleSize,
-      showBrowser: params.showBrowser,
-      auth: params.auth,
-      publicUrl: BACKEND_URL,
-      deviceScaleFactor: params.deviceScaleFactor || 1,
-      delay: params.delay || 0,
-      requestDelay: params.requestDelay || 1000,
-      defaultLanguageOnly: params.defaultLanguageOnly !== false,
-      fullRefresh: params.fullRefresh === true,
-      detectInteractiveElements: params.detectInteractiveElements !== false,
-      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
-      styleExtraction: params.styleExtraction,
-      captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
-      projectId: params.projectId,
-    }),
-  });
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === "string") {
-        message = data.error;
-      }
-    } catch {
-      // Keep HTTP status fallback.
-    }
-    throw new Error(`Failed to queue crawl: ${message}`);
-  }
-
-  const data = await response.json();
+export async function startCrawl(params: CrawlParams): Promise<{ jobId: string }> {
+  const data = await client.post("/crawl", {
+    url: params.url,
+    maxRequestsPerCrawl: params.maxRequestsPerCrawl,
+    screenshotWidth: params.screenshotWidth,
+    maxDepth: params.maxDepth,
+    sampleSize: params.sampleSize,
+    showBrowser: params.showBrowser,
+    auth: params.auth,
+    publicUrl: BACKEND_URL,
+    deviceScaleFactor: params.deviceScaleFactor || 1,
+    delay: params.delay || 0,
+    requestDelay: params.requestDelay || 1000,
+    defaultLanguageOnly: params.defaultLanguageOnly !== false,
+    fullRefresh: params.fullRefresh === true,
+    detectInteractiveElements: params.detectInteractiveElements !== false,
+    cookieBannerHandling: params.cookieBannerHandling ?? "auto",
+    styleExtraction: params.styleExtraction,
+    captureOnlyVisibleElements: params.captureOnlyVisibleElements !== false,
+    projectId: params.projectId,
+  }) as any;
   if (!data || typeof data.jobId !== "string") {
     throw new Error("Backend did not return a crawl job ID");
   }
-
   return { jobId: data.jobId };
 }
 
-/**
- * Recrawl a single page
- */
-export async function recrawlPage(
-  params: RecrawlParams
-): Promise<{ jobId: string }> {
-  const response = await fetch(`${BACKEND_URL}/recrawl-page`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url: params.url,
-      publicUrl: BACKEND_URL,
-      projectId: params.projectId,
-      deviceScaleFactor: params.deviceScaleFactor || 1,
-      delay: params.delay || 0,
-      requestDelay: params.requestDelay || 1000,
-      auth: params.auth,
-      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
-      styleExtraction: params.styleExtraction,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to queue recrawl: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+export async function recrawlPage(params: RecrawlParams): Promise<{ jobId: string }> {
+  return client.post("/recrawl-page", {
+    url: params.url,
+    publicUrl: BACKEND_URL,
+    projectId: params.projectId,
+    deviceScaleFactor: params.deviceScaleFactor || 1,
+    delay: params.delay || 0,
+    requestDelay: params.requestDelay || 1000,
+    auth: params.auth,
+    cookieBannerHandling: params.cookieBannerHandling ?? "auto",
+    styleExtraction: params.styleExtraction,
+  }) as Promise<{ jobId: string }>;
 }
 
-/**
- * Get job status from backend
- */
 export async function getJobStatus(jobId: string): Promise<any> {
-  const response = await fetch(`${BACKEND_URL}/status/${jobId}`);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch job status: ${response.status} ${response.statusText}`
-    );
-  }
-  return response.json();
+  return client.get(`/status/${jobId}`);
 }
 
-/**
- * Fetch all pages for a project from the backend
- */
-export async function fetchProjectPages(
-  projectId: string
-): Promise<PageResponseItem[]> {
-  const response = await fetch(
-    `${BACKEND_URL}/page?projectId=${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch pages: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
+export async function fetchProjectPages(projectId: string): Promise<PageResponseItem[]> {
+  const data = await client.get(`/page?projectId=${encodeURIComponent(projectId)}`) as any;
   return Array.isArray(data.pages) ? data.pages : [];
 }
 
-/**
- * Fetch all persisted elements for a project. Optionally filter by page id or URL.
- */
 export async function fetchProjectElements(
   projectId: string,
   options: { pageId?: string; url?: string } = {}
 ): Promise<ElementResponseItem[]> {
   const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
-  if (options.pageId) {
-    queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
-  }
-  if (options.url) {
-    queryParts.push(`url=${encodeURIComponent(options.url)}`);
-  }
-
-  const response = await fetch(
-    `${BACKEND_URL}/elements?${queryParts.join("&")}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch elements: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
+  if (options.pageId) queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
+  if (options.url) queryParts.push(`url=${encodeURIComponent(options.url)}`);
+  const data = await client.get(`/elements?${queryParts.join("&")}`) as any;
   return Array.isArray(data.elements) ? data.elements : [];
 }
 
-/**
- * Fetch a single page by url or pageId
- */
 export async function getPage(
   projectId: string,
   options: GetPageOptions = {}
 ): Promise<PageResponseItem | null> {
   const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
-  if (options.url) {
-    queryParts.push(`url=${encodeURIComponent(options.url)}`);
-  }
-  if (options.pageId) {
-    queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
-  }
-
-  const response = await fetch(`${BACKEND_URL}/page?${queryParts.join("&")}`);
-
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch page: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
-  if (data && data.page) {
-    return data.page as PageResponseItem;
-  }
-
+  if (options.url) queryParts.push(`url=${encodeURIComponent(options.url)}`);
+  if (options.pageId) queryParts.push(`pageId=${encodeURIComponent(options.pageId)}`);
+  const data = await client.getOrNull(`/page?${queryParts.join("&")}`) as any;
+  if (!data) return null;
+  if (data.page) return data.page as PageResponseItem;
   const pages = Array.isArray(data.pages) ? data.pages : [];
-  if (pages.length > 0) {
-    return pages[0] as PageResponseItem;
-  }
-
-  return null;
+  return pages.length > 0 ? pages[0] as PageResponseItem : null;
 }
 
 interface PagesByIdsResponse {
@@ -266,9 +159,6 @@ interface InventoryTokensResponse {
   tokens: Record<string, unknown>;
 }
 
-/**
- * Fetch a subset of pages by their identifiers.
- */
 export async function fetchPagesByIds(
   projectId: string,
   pageIds: string[]
@@ -277,150 +167,59 @@ export async function fetchPagesByIds(
     .map((id) => String(id).trim())
     .filter((id) => id.length > 0);
 
-  if (normalizedIds.length === 0) {
-    return { pages: [], elements: [] };
-  }
+  if (normalizedIds.length === 0) return { pages: [], elements: [] };
 
   // Build query string manually (URLSearchParams not available in Figma sandbox)
   const queryParts = [`projectId=${encodeURIComponent(projectId)}`];
-  for (const id of normalizedIds) {
-    queryParts.push(`ids=${encodeURIComponent(id)}`);
-  }
+  for (const id of normalizedIds) queryParts.push(`ids=${encodeURIComponent(id)}`);
 
-  const response = await fetch(
-    `${BACKEND_URL}/pages/by-ids?${queryParts.join("&")}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch pages by ids: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
-  const pages = Array.isArray((data as any).pages)
-    ? ((data as any).pages as PageResponseItem[])
-    : [];
-  const elements = Array.isArray((data as any).elements)
-    ? ((data as any).elements as ElementResponseItem[])
-    : [];
-
-  return { pages, elements };
-}
-
-/**
- * Fetch the manifest subset for a completed job.
- */
-export async function fetchJobPages(jobId: string): Promise<JobPagesResponse> {
-  const response = await fetch(
-    `${BACKEND_URL}/jobs/${encodeURIComponent(jobId)}/pages`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch job pages: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
-  const pages = Array.isArray((data as any).pages)
-    ? ((data as any).pages as PageResponseItem[])
-    : [];
-  const elements = Array.isArray((data as any).elements)
-    ? ((data as any).elements as ElementResponseItem[])
-    : [];
-
+  const data = await client.get(`/pages/by-ids?${queryParts.join("&")}`) as any;
   return {
-    jobId: (data as any).jobId ?? jobId,
-    projectId: (data as any).projectId ?? "",
-    pages,
-    elements,
+    pages: Array.isArray(data.pages) ? data.pages as PageResponseItem[] : [],
+    elements: Array.isArray(data.elements) ? data.elements as ElementResponseItem[] : [],
   };
 }
 
-/**
- * Open authentication session for manual login/CAPTCHA
- */
+export async function fetchJobPages(jobId: string): Promise<JobPagesResponse> {
+  const data = await client.get(`/jobs/${encodeURIComponent(jobId)}/pages`) as any;
+  return {
+    jobId: data.jobId ?? jobId,
+    projectId: data.projectId ?? "",
+    pages: Array.isArray(data.pages) ? data.pages as PageResponseItem[] : [],
+    elements: Array.isArray(data.elements) ? data.elements as ElementResponseItem[] : [],
+  };
+}
+
 export async function openAuthSession(url: string): Promise<{
   cookies: Array<{ name: string; value: string; domain: string }>;
 }> {
-  const response = await fetch(`${BACKEND_URL}/auth-session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to open auth session: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+  return client.post("/auth-session", { url }) as Promise<{
+    cookies: Array<{ name: string; value: string; domain: string }>;
+  }>;
 }
 
-export async function fetchInventoryOverview(
-  projectId: string
-): Promise<InventoryOverview> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/overview?projectId=${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inventory overview: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+export async function fetchInventoryOverview(projectId: string): Promise<InventoryOverview> {
+  return client.get(
+    `/inventory/overview?projectId=${encodeURIComponent(projectId)}`
+  ) as Promise<InventoryOverview>;
 }
 
-export async function fetchInventoryTokens(
-  projectId: string
-): Promise<InventoryTokensResponse> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/tokens?projectId=${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inventory tokens: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+export async function fetchInventoryTokens(projectId: string): Promise<InventoryTokensResponse> {
+  return client.get(
+    `/inventory/tokens?projectId=${encodeURIComponent(projectId)}`
+  ) as Promise<InventoryTokensResponse>;
 }
 
-export async function fetchInventoryDecisions(
-  projectId: string
-): Promise<InventoryDecisions> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/decisions/${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inventory decisions: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+export async function fetchInventoryDecisions(projectId: string): Promise<InventoryDecisions> {
+  return client.get(
+    `/inventory/decisions/${encodeURIComponent(projectId)}`
+  ) as Promise<InventoryDecisions>;
 }
 
-export async function fetchInventoryRenderData(
-  projectId: string
-): Promise<InventoryRenderData> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/render-data/${encodeURIComponent(projectId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch inventory render data: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
+export async function fetchInventoryRenderData(projectId: string): Promise<InventoryRenderData> {
+  return client.get(
+    `/inventory/render-data/${encodeURIComponent(projectId)}`
+  ) as Promise<InventoryRenderData>;
 }
 
 export async function startDiscovery(params: {
@@ -436,34 +235,14 @@ export async function startDiscovery(params: {
   includeBlog?: boolean;
   includeSupport?: boolean;
 }): Promise<{ discoveryRunId: string; status: string }> {
-  const response = await fetch(`${BACKEND_URL}/discovery/start`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === "string") message = data.error;
-    } catch { /* keep fallback */ }
-    throw new Error(`Failed to start discovery: ${message}`);
-  }
-
-  return response.json();
+  return client.post("/discovery/start", params) as Promise<{
+    discoveryRunId: string;
+    status: string;
+  }>;
 }
 
 export async function getDiscoveryRun(runId: string): Promise<DiscoveryResult> {
-  const response = await fetch(
-    `${BACKEND_URL}/discovery/${encodeURIComponent(runId)}`
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to get discovery run: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  const data = await client.get(`/discovery/${encodeURIComponent(runId)}`) as any;
   const candidates = Array.isArray(data.candidates) ? data.candidates : [];
   return {
     discoveryRunId: String(data.discoveryRunId ?? runId),
@@ -483,25 +262,10 @@ export async function approveDiscoveryRun(
     excludedCandidateIds?: string[];
   }
 ): Promise<{ ok: boolean; approvedUrls: string[] }> {
-  const response = await fetch(
-    `${BACKEND_URL}/discovery/${encodeURIComponent(runId)}/approval`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    }
-  );
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === "string") message = data.error;
-    } catch { /* keep fallback */ }
-    throw new Error(`Failed to approve discovery run: ${message}`);
-  }
-
-  return response.json();
+  return client.post(
+    `/discovery/${encodeURIComponent(runId)}/approval`,
+    params
+  ) as Promise<{ ok: boolean; approvedUrls: string[] }>;
 }
 
 export async function startApprovedCrawl(params: {
@@ -515,32 +279,17 @@ export async function startApprovedCrawl(params: {
   cookieBannerHandling?: CrawlParams["cookieBannerHandling"];
   styleExtraction?: Record<string, unknown>;
 }): Promise<{ jobId: string }> {
-  const response = await fetch(`${BACKEND_URL}/crawl/approved`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      projectId: params.projectId,
-      discoveryRunId: params.discoveryRunId,
-      approvedUrls: params.approvedUrls,
-      fullRefresh: params.fullRefresh ?? true,
-      screenshotWidth: params.screenshotWidth ?? 1440,
-      deviceScaleFactor: params.deviceScaleFactor ?? 1,
-      auth: params.auth,
-      cookieBannerHandling: params.cookieBannerHandling ?? "auto",
-      styleExtraction: params.styleExtraction,
-    }),
-  });
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`;
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === "string") message = data.error;
-    } catch { /* keep fallback */ }
-    throw new Error(`Failed to start approved crawl: ${message}`);
-  }
-
-  const data = await response.json();
+  const data = await client.post("/crawl/approved", {
+    projectId: params.projectId,
+    discoveryRunId: params.discoveryRunId,
+    approvedUrls: params.approvedUrls,
+    fullRefresh: params.fullRefresh ?? true,
+    screenshotWidth: params.screenshotWidth ?? 1440,
+    deviceScaleFactor: params.deviceScaleFactor ?? 1,
+    auth: params.auth,
+    cookieBannerHandling: params.cookieBannerHandling ?? "auto",
+    styleExtraction: params.styleExtraction,
+  }) as any;
   if (!data || typeof data.jobId !== "string") {
     throw new Error("Backend did not return a crawl job ID");
   }
@@ -550,18 +299,9 @@ export async function startApprovedCrawl(params: {
 export async function prepareInventory(
   projectId: string
 ): Promise<{ jobId: string; projectId: string; type: "inventory-prepare" }> {
-  const response = await fetch(
-    `${BACKEND_URL}/inventory/prepare/${encodeURIComponent(projectId)}`,
-    { method: "POST" }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to prepare inventory workspace: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
+  const data = await client.post(
+    `/inventory/prepare/${encodeURIComponent(projectId)}`
+  ) as any;
   if (!data || typeof data.jobId !== "string") {
     throw new Error("Backend did not return an inventory prepare job id");
   }

@@ -72,6 +72,34 @@ export const STYLE_PRESETS: Record<
   },
 };
 
+export interface BackendStyleFields {
+  extractInteractiveElements: boolean;
+  extractStructuralElements: boolean;
+  extractTextElements: boolean;
+  extractFormElements: boolean;
+  extractMediaElements: boolean;
+  extractColors: boolean;
+  extractTypography: boolean;
+  extractSpacing: boolean;
+  extractLayout: boolean;
+  extractBorders: boolean;
+}
+
+export function toBackendStyleFields(config: StyleExtractionConfig): BackendStyleFields {
+  return {
+    extractInteractiveElements: config.extractInteractive,
+    extractStructuralElements: config.extractStructural,
+    extractTextElements: config.extractContentBlocks,
+    extractFormElements: config.extractFormElements,
+    extractMediaElements: config.extractCustomComponents,
+    extractColors: config.extractColors,
+    extractTypography: config.extractTypography,
+    extractSpacing: config.extractSpacing,
+    extractLayout: config.extractLayout,
+    extractBorders: config.extractBorders,
+  };
+}
+
 /**
  * Get preset configuration by name
  */

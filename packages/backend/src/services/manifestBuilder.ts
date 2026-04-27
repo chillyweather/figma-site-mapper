@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { pages, elements } from "../schema.js";
 import { eq, and, inArray } from "drizzle-orm";
+import { parseJson } from "../utils/parseJson.js";
 
 export interface ManifestData {
   pages: Array<Record<string, unknown>>;
@@ -20,10 +21,10 @@ function serializePage(row: typeof pages.$inferSelect): Record<string, unknown> 
     projectId: String(row.projectId),
     url: row.url,
     title: row.title,
-    screenshotPaths: JSON.parse(row.screenshotPaths) as string[],
+    screenshotPaths: parseJson<string[]>(row.screenshotPaths, []),
     annotatedScreenshotPath: row.annotatedScreenshotPath ?? null,
-    interactiveElements: JSON.parse(row.interactiveElements),
-    globalStyles: row.globalStyles ? JSON.parse(row.globalStyles) : null,
+    interactiveElements: parseJson<unknown[]>(row.interactiveElements, []),
+    globalStyles: parseJson<Record<string, unknown> | null>(row.globalStyles, null),
     lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
     lastCrawlJobId: row.lastCrawlJobId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -41,12 +42,12 @@ function serializeElement(row: typeof elements.$inferSelect): Record<string, unk
     selector: row.selector ?? undefined,
     tagName: row.tagName ?? undefined,
     elementId: row.elementId ?? undefined,
-    classes: JSON.parse(row.classes) as string[],
-    bbox: row.bbox ? JSON.parse(row.bbox) : undefined,
+    classes: parseJson<string[]>(row.classes, []),
+    bbox: parseJson<Record<string, unknown> | undefined>(row.bbox, undefined),
     href: row.href ?? undefined,
     text: row.text ?? undefined,
-    styles: JSON.parse(row.styles),
-    styleTokens: JSON.parse(row.styleTokens) as string[],
+    styles: parseJson<Record<string, unknown>>(row.styles, {}),
+    styleTokens: parseJson<string[]>(row.styleTokens, []),
     ariaLabel: row.ariaLabel ?? undefined,
     role: row.role ?? undefined,
     parentTag: row.parentTag ?? undefined,

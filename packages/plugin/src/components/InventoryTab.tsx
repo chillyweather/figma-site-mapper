@@ -95,14 +95,28 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
   }, [activeProjectId, isPreparing]);
 
   const copyCommand = useCallback(async () => {
+    let ok = false;
     try {
       await navigator.clipboard.writeText(command);
-      setCopyStatus("Copied");
-      window.setTimeout(() => setCopyStatus(null), 1600);
+      ok = true;
     } catch {
-      setCopyStatus("Copy unavailable");
-      window.setTimeout(() => setCopyStatus(null), 1600);
+      // Clipboard API unavailable in Figma plugin iframe — fall back to execCommand
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = command;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
     }
+    setCopyStatus(ok ? "Copied" : "Copy unavailable");
+    window.setTimeout(() => setCopyStatus(null), 1600);
   }, [command]);
 
   const renderBoards = useCallback(() => {
