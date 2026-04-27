@@ -9,11 +9,13 @@ import { db } from "./db.js";
 import { projects, pages, elements, crawlRuns, discoveryRuns, discoveryCandidates } from "./schema.js";
 import { runDiscovery } from "./services/discovery/discoveryRunner.js";
 import { normalizeUrl } from "./services/discovery/urlNormalize.js";
-import { classifyPage } from "./services/discovery/pageClassifier.js";
+import { dedupeEffectiveCaptureUrls, getUrlLookupCandidates } from "./services/discovery/captureUrlNormalization.js";
+import { approveDiscoveryRun } from "./services/discovery/approveDiscoveryRun.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
 import { fastifyLoggerConfig } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
+import { parseJson } from "./utils/parseJson.js";
 import { getInventoryTokens } from "./services/inventory/index.js";
 import { buildInventoryRenderModel } from "./services/inventory/renderModel.js";
 import { workspaceRoot, } from "./services/workspace/paths.js";
@@ -49,38 +51,6 @@ function defaultInventoryStyleExtraction() {
         captureOnlyVisibleElements: true,
     };
 }
-function effectiveCaptureUrlKey(url) {
-    try {
-        const parsed = new URL(url);
-        parsed.hash = "";
-        let host = parsed.hostname.toLowerCase();
-        if (host.startsWith("www.")) {
-            host = host.slice(4);
-        }
-        const port = parsed.port ? `:${parsed.port}` : "";
-        let pathname = parsed.pathname.replace(/\/{2,}/g, "/");
-        if (pathname.length > 1 && pathname.endsWith("/")) {
-            pathname = pathname.slice(0, -1);
-        }
-        return `${parsed.protocol}//${host}${port}${pathname}${parsed.search}`;
-    }
-    catch {
-        return url;
-    }
-}
-function dedupeEffectiveCaptureUrls(urls) {
-    const seen = new Set();
-    const deduped = [];
-    for (const url of urls) {
-        const key = effectiveCaptureUrlKey(url);
-        if (seen.has(key)) {
-            continue;
-        }
-        seen.add(key);
-        deduped.push(url);
-    }
-    return deduped;
-}
 function projectExists(projectId) {
     const row = db
         .select({ id: projects.id })
@@ -88,33 +58,6 @@ function projectExists(projectId) {
         .where(eq(projects.id, toId(projectId)))
         .get();
     return Boolean(row);
-}
-function getUrlLookupCandidates(rawUrl) {
-    const candidates = new Set();
-    const add = (value) => {
-        if (value && value.trim())
-            candidates.add(value.trim());
-    };
-    add(rawUrl);
-    try {
-        const parsed = new URL(rawUrl);
-        parsed.hash = "";
-        add(parsed.toString());
-        if (parsed.pathname !== "/") {
-            const originalPath = parsed.pathname;
-            if (originalPath.endsWith("/")) {
-                parsed.pathname = originalPath.replace(/\/+$/, "") || "/";
-            }
-            else {
-                parsed.pathname = `${originalPath}/`;
-            }
-            add(parsed.toString());
-        }
-    }
-    catch {
-        // Keep the raw candidate only for non-URL values.
-    }
-    return Array.from(candidates);
 }
 function requestBaseUrl(request) {
     const host = Array.isArray(request.headers.host)
@@ -650,7 +593,7 @@ export async function buildServer() {
         const cssVariables = {};
         const tokens = new Set();
         const pageSummaries = pageRows.map((page) => {
-            const pageStyles = (page.globalStyles ? JSON.parse(page.globalStyles) : {});
+            const pageStyles = parseJson(page.globalStyles, {});
             if (pageStyles.cssVariables) {
                 for (const [key, value] of Object.entries(pageStyles.cssVariables)) {
                     cssVariables[key] = value;
@@ -837,6 +780,7 @@ export async function buildServer() {
             .from(discoveryCandidates)
             .where(eq(discoveryCandidates.discoveryRunId, run.id))
             .all();
+        const warnings = run.warningsJson ? JSON.parse(run.warningsJson) : [];
         return {
             discoveryRunId: String(run.id),
             projectId: String(run.projectId),
@@ -846,6 +790,7 @@ export async function buildServer() {
                 totalCandidates: candidates.length,
                 recommendedCount: candidates.filter((c) => c.isRecommended).length,
                 approvedCount: candidates.filter((c) => c.isApproved).length,
+                warnings,
                 byPageType: candidates.reduce((acc, c) => {
                     acc[c.pageType] = (acc[c.pageType] ?? 0) + 1;
                     return acc;
@@ -877,102 +822,14 @@ export async function buildServer() {
         const body = request.body;
         if (!isValidId(runId))
             return reply.status(400).send({ error: "Invalid runId" });
-        const run = db
-            .select()
-            .from(discoveryRuns)
-            .where(eq(discoveryRuns.id, toId(runId)))
-            .get();
-        if (!run)
-            return reply.status(404).send({ error: "Discovery run not found" });
-        const approvedIds = (body.approvedCandidateIds ?? [])
-            .filter(isValidId)
-            .map(toId);
-        const excludedIds = (body.excludedCandidateIds ?? [])
-            .filter(isValidId)
-            .map(toId);
-        // Treat each approval submission as the current selection, not an additive history.
-        db.update(discoveryCandidates)
-            .set({ isApproved: false })
-            .where(eq(discoveryCandidates.discoveryRunId, run.id))
-            .run();
-        // Mark approved
-        for (const cid of approvedIds) {
-            db.update(discoveryCandidates)
-                .set({ isApproved: true })
-                .where(and(eq(discoveryCandidates.id, cid), eq(discoveryCandidates.discoveryRunId, run.id)))
-                .run();
+        try {
+            return approveDiscoveryRun(runId, body);
         }
-        // Mark excluded
-        for (const cid of excludedIds) {
-            db.update(discoveryCandidates)
-                .set({ isExcluded: true })
-                .where(and(eq(discoveryCandidates.id, cid), eq(discoveryCandidates.discoveryRunId, run.id)))
-                .run();
+        catch (err) {
+            if (err?.code === "NOT_FOUND")
+                return reply.status(404).send({ error: "Discovery run not found" });
+            throw err;
         }
-        // Add manual URLs as new approved candidates
-        const manualUrls = (body.manualUrls ?? []).filter((u) => typeof u === "string");
-        const now = new Date();
-        for (const rawUrl of manualUrls) {
-            const norm = normalizeUrl(rawUrl);
-            if (!norm)
-                continue;
-            const classification = classifyPage(norm.path);
-            try {
-                db.insert(discoveryCandidates)
-                    .values({
-                    discoveryRunId: run.id,
-                    projectId: run.projectId,
-                    url: rawUrl,
-                    normalizedUrl: norm.url,
-                    host: norm.host,
-                    path: norm.path,
-                    source: "manual",
-                    pageType: classification.pageType,
-                    patternKey: classification.patternKey,
-                    score: 0,
-                    reasonsJson: JSON.stringify(["manual"]),
-                    depth: 0,
-                    isRecommended: false,
-                    isApproved: true,
-                    isExcluded: false,
-                    createdAt: now,
-                })
-                    .run();
-            }
-            catch (err) {
-                // Unique constraint on (runId, normalizedUrl) — manual URL may already exist
-                if (err && typeof err === "object" && err.message?.includes("UNIQUE")) {
-                    // Update existing to approved
-                    db.update(discoveryCandidates)
-                        .set({ isApproved: true })
-                        .where(and(eq(discoveryCandidates.discoveryRunId, run.id), eq(discoveryCandidates.normalizedUrl, norm.url)))
-                        .run();
-                }
-                else {
-                    throw err;
-                }
-            }
-        }
-        // Update run approved count
-        const approvedCount = db
-            .select({ count: discoveryCandidates.id })
-            .from(discoveryCandidates)
-            .where(and(eq(discoveryCandidates.discoveryRunId, run.id), eq(discoveryCandidates.isApproved, true)))
-            .all().length;
-        db.update(discoveryRuns)
-            .set({ approvedCount })
-            .where(eq(discoveryRuns.id, run.id))
-            .run();
-        const approvedRows = db
-            .select({ url: discoveryCandidates.normalizedUrl })
-            .from(discoveryCandidates)
-            .where(and(eq(discoveryCandidates.discoveryRunId, run.id), eq(discoveryCandidates.isApproved, true)))
-            .all();
-        const approvedUrls = dedupeEffectiveCaptureUrls(approvedRows.map((r) => r.url));
-        return {
-            ok: true,
-            approvedUrls,
-        };
     });
     return server;
 }

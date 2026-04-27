@@ -250,7 +250,7 @@ export async function getDiscoveryRun(runId: string): Promise<DiscoveryResult> {
     status: String(data.status ?? ""),
     candidates,
     recommended: candidates.filter((c: any) => c.isRecommended),
-    summary: data.summary ?? { totalCandidates: 0, recommendedCount: 0, byPageType: {}, byHost: {} },
+    summary: data.summary ?? { totalCandidates: 0, recommendedCount: 0, byPageType: {}, byHost: {}, warnings: [] },
   };
 }
 

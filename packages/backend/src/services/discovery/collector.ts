@@ -19,6 +19,11 @@ export interface DiscoveryCollectionInput {
   requestDelay?: number;
 }
 
+export interface DiscoveryCollectionResult {
+  sources: DiscoverySource[];
+  warnings: string[];
+}
+
 const TECHNICAL_PATH_PATTERNS = [
   /\/api\//i,
   /\/assets\//i,
@@ -148,6 +153,8 @@ async function fetchText(url: string, timeoutMs = 15000): Promise<{
   contentType: string | null;
   finalUrl: string | null;
   ok: boolean;
+  status: number | null;
+  server: string | null;
 }> {
   try {
     const controller = new AbortController();
@@ -167,6 +174,8 @@ async function fetchText(url: string, timeoutMs = 15000): Promise<{
         contentType: response.headers.get("content-type"),
         finalUrl: response.url || null,
         ok: false,
+        status: response.status,
+        server: response.headers.get("server"),
       };
     }
     return {
@@ -174,6 +183,8 @@ async function fetchText(url: string, timeoutMs = 15000): Promise<{
       contentType: response.headers.get("content-type"),
       finalUrl: response.url || null,
       ok: true,
+      status: response.status,
+      server: response.headers.get("server"),
     };
   } catch {
     return {
@@ -181,8 +192,26 @@ async function fetchText(url: string, timeoutMs = 15000): Promise<{
       contentType: null,
       finalUrl: null,
       ok: false,
+      status: null,
+      server: null,
     };
   }
+}
+
+function describeFetchFailure(
+  label: string,
+  url: string,
+  fetched: { status: number | null; server: string | null }
+): string {
+  const target = url.trim();
+  const server = fetched.server?.toLowerCase() ?? "";
+  if (fetched.status === 403 && server.includes("cloudflare")) {
+    return `${label} was blocked by Cloudflare (403): ${target}`;
+  }
+  if (fetched.status) {
+    return `${label} returned HTTP ${fetched.status}: ${target}`;
+  }
+  return `${label} could not be fetched: ${target}`;
 }
 
 function chooseSource(existing: DiscoverySource | undefined, next: DiscoverySource): DiscoverySource {
@@ -217,10 +246,10 @@ function chooseSource(existing: DiscoverySource | undefined, next: DiscoverySour
 
 export async function collectFullDiscoverySources(
   input: DiscoveryCollectionInput
-): Promise<DiscoverySource[]> {
+): Promise<DiscoveryCollectionResult> {
   const startNormalized = normalizeUrl(input.startUrl);
   if (!startNormalized) {
-    return [];
+    return { sources: [], warnings: [] };
   }
 
   const startHost = startNormalized.host;
@@ -233,6 +262,9 @@ export async function collectFullDiscoverySources(
   const queuedSitemaps = new Set<string>();
   const pageQueue: Array<{ url: string; source: string; sourceUrl?: string | null; depth: number }> = [];
   const sitemapQueue: Array<{ url: string; sourceUrl?: string | null }> = [];
+  const warnings = new Set<string>();
+  let readableSitemapCount = 0;
+  let sitemapFailureWarning: string | null = null;
 
   const registerCandidate = (rawUrl: string, source: string, sourceUrl?: string | null, depth = 0): boolean => {
     const norm = normalizeUrl(rawUrl);
@@ -289,6 +321,8 @@ export async function collectFullDiscoverySources(
     for (const sitemapUrl of extractRobotsSitemaps(robots.text)) {
       enqueueSitemap(sitemapUrl, robots.finalUrl ?? input.startUrl);
     }
+  } else {
+    warnings.add(describeFetchFailure("robots.txt", new URL("/robots.txt", input.startUrl).href, robots));
   }
 
   while (sitemapQueue.length > 0 && candidateByUrl.size < maxCandidates) {
@@ -301,9 +335,11 @@ export async function collectFullDiscoverySources(
 
     const fetched = await fetchText(next.url);
     if (!fetched.ok || !fetched.text || !isLikelyXmlContent(fetched.contentType, fetched.text)) {
+      sitemapFailureWarning ??= describeFetchFailure("sitemap", next.url, fetched);
       continue;
     }
 
+    readableSitemapCount += 1;
     const finalUrl = fetched.finalUrl ?? next.url;
     const text = fetched.text;
     const isIndex = /<sitemapindex[\s>]/i.test(text);
@@ -338,6 +374,9 @@ export async function collectFullDiscoverySources(
 
     const fetched = await fetchText(current.url);
     if (!fetched.ok || !fetched.text || !isLikelyHtmlContent(fetched.contentType, fetched.text)) {
+      if (current.depth === 0 && current.source === "start-url") {
+        warnings.add(describeFetchFailure("homepage", current.url, fetched));
+      }
       continue;
     }
 
@@ -362,5 +401,23 @@ export async function collectFullDiscoverySources(
     }
   }
 
-  return Array.from(candidateByUrl.values());
+  if (readableSitemapCount === 0 && sitemapFailureWarning) {
+    warnings.add(sitemapFailureWarning);
+  }
+
+  const exploredSourceCount = Array.from(candidateByUrl.values()).filter((candidate) =>
+    candidate.source === "sitemap" ||
+    candidate.source === "homepage-link" ||
+    candidate.source === "deep-link"
+  ).length;
+  if (exploredSourceCount === 0) {
+    warnings.add(
+      "Full exploration did not discover any new URLs from sitemap or HTML links. Results are limited to the start URL and existing project pages."
+    );
+  }
+
+  return {
+    sources: Array.from(candidateByUrl.values()),
+    warnings: Array.from(warnings),
+  };
 }

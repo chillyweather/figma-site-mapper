@@ -103,7 +103,12 @@ function DiscoverySummary({
   recommendedCount,
   selectedCount,
 }: {
-  summary: { totalCandidates: number; byPageType: Record<string, number>; byHost: Record<string, number> };
+  summary: {
+    totalCandidates: number;
+    byPageType: Record<string, number>;
+    byHost: Record<string, number>;
+    warnings?: string[];
+  };
   recommendedCount: number;
   selectedCount: number;
 }) {
@@ -142,6 +147,22 @@ function DiscoverySummary({
       {Object.keys(summary.byHost).length > 1 && (
         <div style={{ marginTop: "6px", color: "#64748b" }}>
           Hosts: {Object.keys(summary.byHost).join(", ")}
+        </div>
+      )}
+      {summary.warnings && summary.warnings.length > 0 && (
+        <div
+          style={{
+            marginTop: "8px",
+            paddingTop: "8px",
+            borderTop: "1px solid #bae6fd",
+            color: "#92400e",
+          }}
+        >
+          {summary.warnings.map((warning) => (
+            <div key={warning} style={{ marginTop: "4px" }}>
+              {warning}
+            </div>
+          ))}
         </div>
       )}
     </div>

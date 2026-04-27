@@ -923,6 +923,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       .from(discoveryCandidates)
       .where(eq(discoveryCandidates.discoveryRunId, run.id))
       .all();
+    const warnings = run.warningsJson ? JSON.parse(run.warningsJson) as string[] : [];
 
     return {
       discoveryRunId: String(run.id),
@@ -933,6 +934,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         totalCandidates: candidates.length,
         recommendedCount: candidates.filter((c) => c.isRecommended).length,
         approvedCount: candidates.filter((c) => c.isApproved).length,
+        warnings,
         byPageType: candidates.reduce((acc, c) => {
           acc[c.pageType] = (acc[c.pageType] ?? 0) + 1;
           return acc;

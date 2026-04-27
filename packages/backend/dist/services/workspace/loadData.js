@@ -3,16 +3,7 @@ import { db } from "../../db.js";
 import { elements, pages, projects } from "../../schema.js";
 import { categorizeElement } from "../inventory/elementCategory.js";
 import { buildTokenFrequencyTable } from "../inventory/tokenFrequencyTable.js";
-function parseJson(value, fallback) {
-    if (!value)
-        return fallback;
-    try {
-        return JSON.parse(value);
-    }
-    catch {
-        return fallback;
-    }
-}
+import { parseJson } from "../../utils/parseJson.js";
 export function isValidProjectId(projectId) {
     const parsed = Number(projectId);
     return Number.isInteger(parsed) && parsed > 0 && String(parsed) === projectId;

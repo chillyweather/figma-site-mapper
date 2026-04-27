@@ -368,6 +368,7 @@ export interface DiscoveryRunSummary {
   recommendedCount: number;
   byPageType: Record<string, number>;
   byHost: Record<string, number>;
+  warnings?: string[];
 }
 
 export interface DiscoveryResult {

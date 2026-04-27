@@ -34,14 +34,14 @@ const TYPE_CAPS: Record<PageType, number> = {
   pricing: 1,
   "product-detail": 4,
   "feature-detail": 4,
-  integration: 1,
-  "customer-story": 1,
-  "blog-listing": 0,
+  integration: 3,
+  "customer-story": 3,
+  "blog-listing": 1,
   "blog-article": 1,
   "support-doc": 0,
   legal: 0,
   utility: 0,
-  unknown: 1,
+  unknown: 5,
 };
 
 const LANGUAGE_CODES = new Set([

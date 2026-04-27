@@ -53,6 +53,7 @@ export const discoveryRuns = sqliteTable("discovery_runs", {
     startUrl: text("start_url").notNull(),
     status: text("status").notNull().default("running"),
     settingsJson: text("settings_json").notNull().default("{}"),
+    warningsJson: text("warnings_json").notNull().default("[]"),
     candidateCount: integer("candidate_count").notNull().default(0),
     recommendedCount: integer("recommended_count").notNull().default(0),
     approvedCount: integer("approved_count").notNull().default(0),

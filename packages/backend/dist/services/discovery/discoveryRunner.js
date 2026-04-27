@@ -76,6 +76,7 @@ export async function runDiscovery(input) {
         throw new Error("Invalid startUrl");
     }
     const startHost = startNormalized.host;
+    let discoveryWarnings = [];
     // Create discovery run
     const now = new Date();
     const [runRow] = db
@@ -107,8 +108,9 @@ export async function runDiscovery(input) {
         .from(pages)
         .where(eq(pages.projectId, projectIdNum))
         .all();
-    const rawSources = discoveryMode === "full"
-        ? await collectFullDiscoverySources({
+    const rawSources = [];
+    if (discoveryMode === "full") {
+        const fullCollection = await collectFullDiscoverySources({
             startUrl: input.startUrl,
             seedUrls: input.seedUrls,
             existingUrls: existingPages.map((page) => page.url),
@@ -116,8 +118,10 @@ export async function runDiscovery(input) {
             maxCandidates,
             maxDepth: input.maxDepth,
             requestDelay: input.requestDelay,
-        })
-        : [];
+        });
+        rawSources.push(...fullCollection.sources);
+        discoveryWarnings = fullCollection.warnings;
+    }
     if (discoveryMode === "fast") {
         // Collect raw URLs with provenance
         rawSources.push({ url: input.startUrl, source: "start-url" });
@@ -240,6 +244,7 @@ export async function runDiscovery(input) {
     db.update(discoveryRuns)
         .set({
         status: "completed",
+        warningsJson: JSON.stringify(discoveryWarnings),
         candidateCount: candidates.length,
         recommendedCount: recResult.recommended.length,
         approvedCount: 0,
@@ -259,6 +264,7 @@ export async function runDiscovery(input) {
             byPageType: recResult.summary.byPageType,
             byHost: recResult.summary.byHost,
             excludedCount: recResult.excluded.length,
+            warnings: discoveryWarnings,
         },
     };
 }

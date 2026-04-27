@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { pages, elements } from "../schema.js";
 import { eq, and, inArray } from "drizzle-orm";
+import { parseJson } from "../utils/parseJson.js";
 function isValidId(id) {
     if (!id || typeof id !== "string")
         return false;
@@ -14,10 +15,10 @@ function serializePage(row) {
         projectId: String(row.projectId),
         url: row.url,
         title: row.title,
-        screenshotPaths: JSON.parse(row.screenshotPaths),
+        screenshotPaths: parseJson(row.screenshotPaths, []),
         annotatedScreenshotPath: row.annotatedScreenshotPath ?? null,
-        interactiveElements: JSON.parse(row.interactiveElements),
-        globalStyles: row.globalStyles ? JSON.parse(row.globalStyles) : null,
+        interactiveElements: parseJson(row.interactiveElements, []),
+        globalStyles: parseJson(row.globalStyles, null),
         lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
         lastCrawlJobId: row.lastCrawlJobId ?? null,
         createdAt: row.createdAt.toISOString(),
@@ -34,12 +35,12 @@ function serializeElement(row) {
         selector: row.selector ?? undefined,
         tagName: row.tagName ?? undefined,
         elementId: row.elementId ?? undefined,
-        classes: JSON.parse(row.classes),
-        bbox: row.bbox ? JSON.parse(row.bbox) : undefined,
+        classes: parseJson(row.classes, []),
+        bbox: parseJson(row.bbox, undefined),
         href: row.href ?? undefined,
         text: row.text ?? undefined,
-        styles: JSON.parse(row.styles),
-        styleTokens: JSON.parse(row.styleTokens),
+        styles: parseJson(row.styles, {}),
+        styleTokens: parseJson(row.styleTokens, []),
         ariaLabel: row.ariaLabel ?? undefined,
         role: row.role ?? undefined,
         parentTag: row.parentTag ?? undefined,

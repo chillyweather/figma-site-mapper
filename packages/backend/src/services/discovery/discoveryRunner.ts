@@ -55,6 +55,7 @@ export interface DiscoveryResult {
     byPageType: Record<string, number>;
     byHost: Record<string, number>;
     excludedCount: number;
+    warnings: string[];
   };
 }
 
@@ -130,6 +131,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryResu
     throw new Error("Invalid startUrl");
   }
   const startHost = startNormalized.host;
+  let discoveryWarnings: string[] = [];
 
   // Create discovery run
   const now = new Date();
@@ -163,9 +165,10 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryResu
     .from(pages)
     .where(eq(pages.projectId, projectIdNum))
     .all();
-  const rawSources: Array<{ url: string; source: string; sourceUrl?: string | null; depth?: number }> =
-    discoveryMode === "full"
-      ? await collectFullDiscoverySources({
+  const rawSources: Array<{ url: string; source: string; sourceUrl?: string | null; depth?: number }> = [];
+
+  if (discoveryMode === "full") {
+    const fullCollection = await collectFullDiscoverySources({
           startUrl: input.startUrl,
           seedUrls: input.seedUrls,
           existingUrls: existingPages.map((page) => page.url),
@@ -173,8 +176,10 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryResu
           maxCandidates,
           maxDepth: input.maxDepth,
           requestDelay: input.requestDelay,
-        })
-      : [];
+        });
+    rawSources.push(...fullCollection.sources);
+    discoveryWarnings = fullCollection.warnings;
+  }
 
   if (discoveryMode === "fast") {
     // Collect raw URLs with provenance
@@ -312,6 +317,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryResu
   db.update(discoveryRuns)
     .set({
       status: "completed",
+      warningsJson: JSON.stringify(discoveryWarnings),
       candidateCount: candidates.length,
       recommendedCount: recResult.recommended.length,
       approvedCount: 0,
@@ -332,6 +338,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryResu
       byPageType: recResult.summary.byPageType,
       byHost: recResult.summary.byHost,
       excludedCount: recResult.excluded.length,
+      warnings: discoveryWarnings,
     },
   };
 }

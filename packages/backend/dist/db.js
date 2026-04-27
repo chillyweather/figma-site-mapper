@@ -180,6 +180,7 @@ ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TE
 ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
 ensureColumn("crawl_runs", "discovery_run_id", "discovery_run_id INTEGER");
 ensureColumn("crawl_runs", "approved_urls_json", "approved_urls_json TEXT");
+ensureColumn("discovery_runs", "warnings_json", "warnings_json TEXT NOT NULL DEFAULT '[]'");
 ensureColumn("discovery_candidates", "depth", "depth INTEGER");
 export const db = drizzle(sqlite, { schema });
 export async function connectDB() {
