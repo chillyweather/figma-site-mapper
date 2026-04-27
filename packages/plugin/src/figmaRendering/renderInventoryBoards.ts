@@ -162,8 +162,8 @@ export async function renderInventoryBoards(
   wrapper.name = `DS Inventory / Project ${renderData.projectId}`;
   wrapper.layoutMode = "VERTICAL";
   wrapper.primaryAxisSizingMode = "AUTO";
-  wrapper.counterAxisSizingMode = "FIXED";
-  wrapper.resize(1280, 100);
+  wrapper.counterAxisSizingMode = "AUTO";
+  wrapper.resize(100, 100);
   wrapper.paddingTop = 56;
   wrapper.paddingRight = 40;
   wrapper.paddingBottom = 56;

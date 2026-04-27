@@ -45,6 +45,21 @@ function hexToRgb(hex: string): RGB | null {
   };
 }
 
+function parseColor(value: string | undefined): RGB | null {
+  if (!value) return null;
+  const hex = hexToRgb(value);
+  if (hex) return hex;
+  const m = value.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+  if (m) {
+    return {
+      r: parseInt(m[1], 10) / 255,
+      g: parseInt(m[2], 10) / 255,
+      b: parseInt(m[3], 10) / 255,
+    };
+  }
+  return null;
+}
+
 // HUG-sized auto-layout frame: width and height grow to fit children.
 function hugFrame(name: string): FrameNode {
   const frame = figma.createFrame();
@@ -107,7 +122,7 @@ function buildPreviewCell(card: RenderCard, category: TokenCategory): FrameNode 
   const value = card.subtitle ?? "";
 
   if (category === "colors") {
-    const rgb = hexToRgb(value);
+    const rgb = parseColor(value);
     const swatch = figma.createRectangle();
     swatch.resize(48, 32);
     swatch.cornerRadius = 6;
@@ -260,9 +275,9 @@ function buildSamplesCell(card: RenderCard, width: number): FrameNode {
     chips.name = "chips";
     chips.layoutMode = "HORIZONTAL";
     chips.layoutWrap = "WRAP";
+    chips.resize(width, 1);
     chips.primaryAxisSizingMode = "FIXED";
     chips.counterAxisSizingMode = "AUTO";
-    chips.resize(width, 32);
     chips.itemSpacing = 6;
     chips.counterAxisSpacing = 6;
     chips.fills = [];
