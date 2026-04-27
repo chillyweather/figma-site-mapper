@@ -445,9 +445,22 @@ async function extractStyleData(
         return "content";
       };
 
+      // SVG container/structural elements that wrap drawing primitives — skip entirely
+      // to avoid recording the same color token multiple times for a single visual element.
+      // Only the actual drawing primitives (path, rect, circle, etc.) carry meaningful token data.
+      const SVG_SKIP_TAGS = new Set([
+        'svg', 'g', 'defs', 'symbol', 'use', 'clippath', 'mask',
+        'lineargradient', 'radialgradient', 'pattern', 'filter',
+        'fegaussianblur', 'feblend', 'fecolormatrix', 'fecomposite',
+        'feflood', 'femerge', 'femergenode', 'feoffset', 'feturbulence',
+        'feimage', 'fedisplacementmap', 'fedropshadow',
+      ]);
+
       for (let i = 0; i < maxElements; i++) {
         const el = allElements[i];
         if (!el) continue;
+
+        if (SVG_SKIP_TAGS.has(el.tagName.toLowerCase())) continue;
 
         const rect = el.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
