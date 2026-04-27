@@ -4,23 +4,25 @@
 
 Working:
 
-- SQLite-backed projects, pages, and elements (Drizzle ORM, WAL mode).
-- Fastify API for projects, crawls, pages, elements, and styles.
-- BullMQ + Redis worker flow for full and single-page crawls.
+- SQLite-backed projects, pages, elements, crawl runs, discovery runs, and inventory builds (Drizzle ORM, WAL mode).
+- Fastify API for discovery, approved capture, pages/elements/styles, and inventory workspace/render-data endpoints.
+- BullMQ + Redis worker flow for approved capture, single-page recrawl, and inventory-prepare jobs.
 - Playwright/Crawlee crawler with screenshots, element detection, optional style extraction, auth helpers, and CAPTCHA detection.
-- Job-scoped rendering from visited page IDs.
-- Full project snapshot rendering.
-- Markup tab with element filters and overlay rendering.
-- DB-first flow rendering with recrawl fallback.
-- React/Jotai plugin UI split into tabs/hooks/components.
+- Recommended discovery with `Fast` and `Full site exploration` modes.
+- Exact URL capture through the same approved-capture path.
+- Job-scoped rendering from visited page IDs plus stale-page cleanup on full refresh.
+- Inventory workspace generation under `packages/backend/workspace/<projectId>/`.
+- Agent-driven decision flow for clusters, tokens, inconsistencies, templates, and notes.
+- `DS Inventory` board rendering with crop thumbnails and `View sample` links.
+- React/Jotai plugin UI with top-level `Crawling` and `Inventory` tabs.
 - Pino logging with daily file rotation.
 
 Needs validation:
 
-- Styling tab end-to-end behavior.
-- Auth UX for protected crawls.
-- Screenshot loading in Figma over HTTPS.
-- Full-refresh stale page cleanup.
+- Auth UX for protected crawls on difficult sites.
+- Screenshot loading in Figma over HTTPS outside local development.
+- Inventory board behavior on very large projects and very large decision sets.
+- Decision-file validation ergonomics for agent-written outputs.
 
 ## Hardening
 
@@ -31,23 +33,27 @@ Needs validation:
 3. **Screenshot storage**: Local `/screenshots` is fine for single-server use. Add S3/object storage only when actually implemented.
 
 4. **Core workflow validation** (manual):
-   - Create project → full crawl → render job-scoped sitemap → render full project snapshot.
-   - Markup links/buttons/forms.
-   - Build a flow from a cached target page.
-   - Build a flow from an uncached target page.
-   - Run style extraction and render global/element style tables.
+   - Create project → recommended discovery → approved capture → render job-scoped sitemap.
+   - Exact URL capture for a known page set.
+   - Full refresh cleanup on a project with stale pages.
+   - Inventory workspace prepare → agent decisions → inventory board render.
+   - Protected-site capture with manual auth or cookies.
 
-5. **Automated checks**: Backend TypeScript build, plugin build, unit tests for URL normalization and manifest assembly, route-level smoke tests.
+5. **Automated checks**: Backend TypeScript build, plugin build, discovery/approved-capture validation CLIs, unit tests for URL normalization and manifest assembly, route-level smoke tests.
 
 ## Feature Work
 
 Near-term:
 
-- Clean up Styling tab implementation.
+- Add mapping-input support for future repo-backed workflows:
+  - local repo path
+  - explicit branch name
+  - Storybook URL/path
+  - known UI library hints
+- Generate a normalized `mapping-context` workspace layer from optional evidence sources.
 - Improve manual auth discoverability from the Crawling tab.
-- Add a simple project detail view: page count, last crawled date, last start URL.
-- Add recrawl controls for the active page.
-- Add clear error states for missing screenshot assets.
+- Add clearer warnings when discovery is blocked or degraded on target sites.
+- Improve inventory-board presentation for large token/template/inconsistency sets.
 
 Later:
 
@@ -55,7 +61,7 @@ Later:
 - Public/private deployment mode.
 - Crawl history per project.
 - Visual diff between crawls.
-- Design-system grouping: detect repeated component/style patterns.
+- Repo/storybook-assisted mapping automation on top of crawl workspace evidence.
 - Export Markdown/JSON reports.
 
 ## Technical Debt Watchlist
@@ -65,5 +71,5 @@ Later:
 - Queue/job payloads are loosely typed.
 - API responses are mostly unvalidated.
 - Figma plugin data keys are stringly typed.
-- Some older UI naming still references "mapping" while the current tab is "flows".
+- Some older UI/service naming still references "mapping" even though the top-level plugin workflow is now crawl/inventory oriented.
 - Production security is not designed yet.

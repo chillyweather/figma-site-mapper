@@ -11,6 +11,7 @@ The backend runs as two processes — a Fastify API and a BullMQ worker — back
 | Redis   | Job queue (BullMQ) |
 | SQLite  | Persistent storage at `packages/backend/data/sitemapper.db` |
 | Screenshots | Local filesystem under `packages/backend/screenshots/` |
+| Workspace assets | Generated inventory workspace under `packages/backend/workspace/` and served by `/workspace/...` |
 
 ## Docker Compose
 
@@ -57,5 +58,5 @@ Then load the plugin in Figma Desktop via `packages/plugin/manifest.json`.
 - [ ] Add API authentication or restrict network access (no auth by default).
 - [ ] Provision sufficient RAM — Playwright needs 2 GB minimum, 4 GB recommended.
 - [ ] Set up a process manager (systemd, PM2) for the API and worker.
-- [ ] Configure backup or retention for `packages/backend/data/sitemapper.db` and `packages/backend/screenshots/`.
+- [ ] Configure backup or retention for `packages/backend/data/sitemapper.db`, `packages/backend/screenshots/`, and `packages/backend/workspace/` if you need to preserve generated evidence or agent decisions.
 - [ ] Decide on screenshot storage: local filesystem works for single-server setups; add S3-compatible storage when scaling.

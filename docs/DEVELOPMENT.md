@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 18+
 - pnpm
 - Docker (for Redis)
 - Figma Desktop
@@ -45,10 +45,20 @@ pnpm dev:worker    # BullMQ worker
 pnpm dev:plugin    # Vite plugin watcher
 ```
 
-Build plugin for production:
+Build-based verification:
 
 ```bash
 pnpm build:plugin
+pnpm --filter backend build
+```
+
+Inventory CLI:
+
+```bash
+pnpm --filter backend run inventory:prepare <projectId>
+pnpm --filter backend run inventory:status <projectId>
+pnpm --filter backend run inventory:refresh <projectId>
+pnpm --filter backend run inventory:export <projectId>
 ```
 
 ## Load the Figma Plugin
@@ -83,21 +93,44 @@ Backend and worker logs stream to the console and are written to `packages/backe
 
 ## Common Workflows
 
-Create/select a project in the plugin, then run a crawl from the Crawling tab. In `Recommended` mode you can switch between `Fast` discovery and `Full site exploration` before approving pages. On completion the plugin renders screenshot pages and an index page in Figma.
+Create or select a project in Settings, then use the `Crawling` tab.
 
-Use the Markup tab on a generated screenshot page. The tab requires the Figma page to have a stored `PAGE_ID` plugin data key and a `Page Overlay` frame.
+For normal capture, use `Recommended` mode:
 
-Use the Flows tab after link badges exist on the current page. The flow handler queries the database first and falls back to a single-page recrawl for missing target URLs.
+- enter the start URL
+- optionally add seed URLs
+- choose `Fast` or `Full site exploration`
+- review candidates and approve the pages to capture
 
-Use the Styling tab after a crawl with style extraction enabled. This area needs a validation pass before relying on it.
+Use `Exact URLs` when you already know the full page set and want deterministic capture.
+
+On completion the plugin renders an index page plus one Figma page per captured URL.
+
+For inventory work:
+
+1. run a capture
+2. open `Inventory`
+3. click `Rebuild Inventory Workspace`
+4. run `/ds-inventory <projectId>` in Claude Code
+5. return to `Inventory`, click `Refresh`, then `Render Inventory Boards`
 
 ## Debugging Notes
 
 **Screenshots**: saved under `packages/backend/screenshots/`. Figma may reject HTTP image URLs in non-local contexts — HTTPS or a tunnel is needed for reliable image loading inside Figma.
 
-**Crawls**: Playwright/Chromium is memory-heavy. Style extraction can process thousands of DOM nodes. The worker is configured for one crawl at a time.
+**Crawls**: Playwright/Chromium is memory-heavy. Style extraction can process thousands of DOM nodes. The worker is configured for one crawl at a time. Full discovery may still produce shallow candidate sets on sites that block `fetch` access to `robots.txt`, sitemap XML, or homepage HTML.
 
-**Database**: SQLite file lives at `packages/backend/data/sitemapper.db`. It is created automatically on first start. Both files are git-ignored.
+**Database**: SQLite file lives at `packages/backend/data/sitemapper.db`. It is created automatically on first start.
+
+**Runtime state**: local generated state also lives under:
+
+```text
+packages/backend/screenshots/
+packages/backend/storage/
+packages/backend/logs/
+packages/backend/workspace/
+packages/plugin/dist/
+```
 
 ## Source Map
 
@@ -113,6 +146,9 @@ packages/backend/src/app.ts         Fastify routes
 packages/backend/src/queue.ts       BullMQ queue
 packages/backend/src/crawler.ts     Playwright/Crawlee crawler
 packages/backend/src/services/manifestBuilder.ts  DB query + serialization helpers
+packages/backend/src/services/discovery/         discovery, recommendations, approval
+packages/backend/src/services/workspace/         inventory workspace generation
+packages/backend/src/services/inventory/         render-model + token/inventory primitives
 ```
 
 Plugin UI:

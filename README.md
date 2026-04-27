@@ -104,7 +104,7 @@ For design-system inventory work, keep **Extract DOM & Style Data** enabled.
 
 ### 4. Choose Pages To Capture
 
-The `Crawling` tab has three capture modes.
+The `Crawling` tab has two capture modes.
 
 **Recommended**
 
@@ -115,10 +115,6 @@ The page budget controls how many recommended pages you want to approve after di
 **Exact URLs**
 
 Use this when you already know the page set. Paste one URL per line and start capture. This still goes through the approved-capture path, so the backend captures only those URLs.
-
-**Legacy**
-
-Use only for older broad-crawl behavior or debugging. It follows links according to crawl settings and limits. It is less controlled than Recommended or Exact URLs.
 
 Important behavior:
 
@@ -198,7 +194,6 @@ The plugin creates or replaces a `DS Inventory` page. The board includes compone
 
 - Recommended discovery flow for selecting a meaningful page set before capture
 - Exact URL capture for designer-provided page lists
-- Legacy broad crawl for debugging and backwards-compatible runs
 - Approved capture that only crawls selected URLs
 - Screenshot capture with automatic slicing for tall pages (>4096 px)
 - DOM and style extraction for inventory evidence

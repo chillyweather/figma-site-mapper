@@ -83,12 +83,11 @@ Current required plugin-data keys are `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHO
 1. Recommended mode: Plugin UI calls `POST /discovery/start`, reviews candidates from `GET /discovery/:runId`, then submits selected candidates to `POST /discovery/:runId/approval`. The UI exposes `Fast` discovery and `Full site exploration`; fast uses the current shallow sources, while full adds sitemap recursion plus bounded link crawl.
 2. Exact URLs mode: Plugin creates a minimal discovery run from the pasted URLs and approves those URLs through the same approval path.
 3. Approved capture calls `POST /crawl/approved` with an explicit approved URL list. This path sets `maxRequestsPerCrawl` to the approved URL count and disables automatic interactive highlight rendering.
-4. Legacy mode still calls `POST /crawl` with broad crawl settings. Use it only for backwards-compatible broad crawl/debug behavior.
-5. API validates project/run IDs in SQLite and enqueues a BullMQ job.
-6. Worker calls `runCrawler()` → Playwright crawls only allowed URLs when an approved allowlist is present → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` → old elements deleted → new elements batch-inserted in chunks of 200.
-7. Worker writes `visitedPageIds` (integer strings), `visitedUrls`, and `pageCount` back to the BullMQ job.
-8. Plugin polls `GET /status/:jobId` → fetches only the job subset from `GET /pages/by-ids` → renders Figma pages → stores `PROJECT_ID`, `URL`, and `PAGE_ID` in Figma plugin data.
-9. If the job was a full refresh, backend removes stale SQLite pages and the plugin removes stale generated Figma pages for the same project.
+4. API validates project/run IDs in SQLite and enqueues a BullMQ job.
+5. Worker calls `runCrawler()` → Playwright crawls only allowed URLs when an approved allowlist is present → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` → old elements deleted → new elements batch-inserted in chunks of 200.
+6. Worker writes `visitedPageIds` (integer strings), `visitedUrls`, and `pageCount` back to the BullMQ job.
+7. Plugin polls `GET /status/:jobId` → fetches only the job subset from `GET /pages/by-ids` → renders Figma pages → stores `PROJECT_ID`, `URL`, and `PAGE_ID` in Figma plugin data.
+8. If the job was a full refresh, backend removes stale SQLite pages and the plugin removes stale generated Figma pages for the same project.
 
 ### Design-system inventory flow
 
@@ -149,22 +148,18 @@ packages/plugin/src/
 
 - Discovery and approved capture are implemented:
   - Recommended discovery proposes candidate pages before capture
-  - Recommended discovery supports `Fast` and `Full site exploration` modes
+  - Recommended discovery supports `Fast` and `Full site exploration`
   - Exact URLs capture uses the same approved-capture path
   - approved capture no longer uses the global max-request setting
+  - full-mode discovery now reports warnings when sitemap/homepage fetches are blocked and no extra URLs can be discovered
   - approved capture preserves interactive data but does not draw old interactive highlight overlays
   - full refresh removes stale generated Figma pages for the active project
 - Phases A-D of the agent-driven inventory pivot are complete.
-- Phase E is MVP complete:
+- Inventory rendering is implemented:
   - plugin renders a `DS Inventory` page from decisions
   - component cards include crop thumbnails when available
   - component cards include `View sample` links to anchors on rendered screenshot pages
-  - token, inconsistency, template, and notes sections render as basic cards
-- Remaining Phase E polish:
-  - make typography/spacing/radius/shadow boards more visual
-  - link inconsistency/template cards to sample anchors or source pages
-  - improve board layout and split large boards if needed
-  - tighten render-data schema validation
+  - token, inconsistency, template, and notes sections render from the render-data model
 
 Flow-building will be revisited later with a different model. Preserve link/interactive data in the DB, but do not rebuild the old visible flow/highlight behavior as the default capture experience.
 
