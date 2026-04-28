@@ -3,6 +3,7 @@ import {
   handleLoadInventoryOverviewRequest,
   handlePrepareInventoryRequest,
   handleRenderInventoryBoardsRequest,
+  handleSaveMappingInputsRequest,
 } from "./inventoryHandlers";
 
 /**
@@ -17,6 +18,13 @@ export async function dispatchInventoryMessage(msg: InventoryUiToPluginMessage):
     }
     case "inventory/prepare": {
       await handlePrepareInventoryRequest({ projectId: msg.projectId });
+      break;
+    }
+    case "inventory/saveMappingInputs": {
+      await handleSaveMappingInputsRequest({
+        projectId: msg.projectId,
+        mappingInputs: msg.mappingInputs,
+      });
       break;
     }
     case "inventory/renderBoards": {

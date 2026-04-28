@@ -3,6 +3,9 @@ import type {
   InventoryDecisions,
   InventoryOverview,
   InventoryPrepareJob,
+  MappingContextSummary,
+  MappingSuggestions,
+  MappingInputs,
 } from "../types";
 
 interface InventoryTabProps {
@@ -30,13 +33,85 @@ function countDecisionKeys(value: unknown): number {
   }, 0);
 }
 
+function copyTextToClipboard(value: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    return navigator.clipboard.writeText(value)
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return Promise.resolve(ok);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
+
+function summarizeRepoStatus(status: string | null | undefined): string {
+  switch (status) {
+    case "verified":
+      return "Repo verified";
+    case "branch-mismatch":
+      return "Repo branch mismatch";
+    case "missing-branch":
+      return "Repo branch missing";
+    case "missing-path":
+      return "Repo path missing";
+    case "not-git":
+      return "Repo is not a git worktree";
+    case "pending":
+      return "Repo pending";
+    default:
+      return "Repo not configured";
+  }
+}
+
+function emptyMappingDraft(): Omit<MappingInputs, "projectId"> {
+  return {
+    repoPath: "",
+    branchName: "",
+    storybookUrl: "",
+    storybookPath: "",
+    uiLibrary: "",
+    tokenSources: [],
+    notes: "",
+  };
+}
+
+function toMappingDraft(value: MappingInputs | null): Omit<MappingInputs, "projectId"> {
+  if (!value) return emptyMappingDraft();
+  return {
+    repoPath: value.repoPath,
+    branchName: value.branchName,
+    storybookUrl: value.storybookUrl,
+    storybookPath: value.storybookPath,
+    uiLibrary: value.uiLibrary,
+    tokenSources: value.tokenSources,
+    notes: value.notes,
+  };
+}
+
 export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) => {
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
   const [decisions, setDecisions] = useState<InventoryDecisions | null>(null);
+  const [mappingInputs, setMappingInputs] = useState<MappingInputs | null>(null);
+  const [mappingContextSummary, setMappingContextSummary] = useState<MappingContextSummary | null>(null);
+  const [mappingSuggestions, setMappingSuggestions] = useState<MappingSuggestions | null>(null);
+  const [mappingDraft, setMappingDraft] = useState<Omit<MappingInputs, "projectId">>(emptyMappingDraft);
   const [prepareJob, setPrepareJob] = useState<InventoryPrepareJob | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [isSavingMappingInputs, setIsSavingMappingInputs] = useState(false);
   const [renderProgress, setRenderProgress] = useState<{ stage: string; current: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -50,10 +125,15 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     if (!activeProjectId) {
       setOverview(null);
       setDecisions(null);
+      setMappingInputs(null);
+      setMappingContextSummary(null);
+      setMappingSuggestions(null);
+      setMappingDraft(emptyMappingDraft());
       setPrepareJob(null);
       setError(null);
       setIsLoading(false);
       setIsPreparing(false);
+      setIsSavingMappingInputs(false);
       return;
     }
 
@@ -95,29 +175,17 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
   }, [activeProjectId, isPreparing]);
 
   const copyCommand = useCallback(async () => {
-    let ok = false;
-    try {
-      await navigator.clipboard.writeText(command);
-      ok = true;
-    } catch {
-      // Clipboard API unavailable in Figma plugin iframe — fall back to execCommand
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = command;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-      } catch {
-        ok = false;
-      }
-    }
+    const ok = await copyTextToClipboard(command);
     setCopyStatus(ok ? "Copied" : "Copy unavailable");
     window.setTimeout(() => setCopyStatus(null), 1600);
   }, [command]);
+
+  const copyHandoff = useCallback(async () => {
+    const handoffText = mappingContextSummary?.agentHandoffText ?? command;
+    const ok = await copyTextToClipboard(handoffText);
+    setCopyStatus(ok ? "Handoff copied" : "Copy unavailable");
+    window.setTimeout(() => setCopyStatus(null), 1600);
+  }, [command, mappingContextSummary]);
 
   const renderBoards = useCallback(() => {
     if (!activeProjectId || isRendering) return;
@@ -134,6 +202,23 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     );
   }, [activeProjectId, isRendering]);
 
+  const saveMappingInputs = useCallback(() => {
+    if (!activeProjectId || isSavingMappingInputs) return;
+
+    setError(null);
+    setIsSavingMappingInputs(true);
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "inventory/saveMappingInputs",
+          projectId: activeProjectId,
+          mappingInputs: mappingDraft,
+        },
+      },
+      "*"
+    );
+  }, [activeProjectId, isSavingMappingInputs, mappingDraft]);
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
@@ -145,12 +230,18 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
       if (msg.type === "inventory/loaded") {
         setOverview(msg.overview as InventoryOverview);
         setDecisions((msg.decisions as InventoryDecisions | undefined) ?? null);
+        const nextMappingInputs = (msg.mappingInputs as MappingInputs | undefined) ?? null;
+        setMappingContextSummary((msg.mappingContextSummary as MappingContextSummary | undefined) ?? null);
+        setMappingSuggestions((msg.mappingSuggestions as MappingSuggestions | undefined) ?? null);
+        setMappingInputs(nextMappingInputs);
+        setMappingDraft(toMappingDraft(nextMappingInputs));
         setIsLoading(false);
         setError(null);
       }
 
       if (msg.type === "inventory/error") {
         setIsLoading(false);
+        setIsSavingMappingInputs(false);
         setError(typeof msg.error === "string" ? msg.error : "Failed to load inventory status.");
       }
 
@@ -197,6 +288,14 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
             : null
         );
         setError(typeof msg.error === "string" ? msg.error : "Failed to prepare inventory workspace.");
+      }
+
+      if (msg.type === "inventory/mappingInputsSaved") {
+        const saved = msg.mappingInputs as MappingInputs;
+        setMappingInputs(saved);
+        setMappingDraft(toMappingDraft(saved));
+        setIsSavingMappingInputs(false);
+        setError(null);
       }
 
       if (msg.type === "inventory/renderStarted") {
@@ -250,6 +349,19 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
     countDecisionKeys(decisions?.tokens) +
     countDecisionKeys(decisions?.inconsistencies) +
     countDecisionKeys(decisions?.templates);
+  const repoBranchError = mappingDraft.repoPath.trim().length > 0 && mappingDraft.branchName.trim().length === 0;
+  const mappingInputsDirty = JSON.stringify(mappingDraft) !== JSON.stringify(toMappingDraft(mappingInputs));
+  const handoffWarnings = mappingContextSummary?.warnings ?? [];
+  const handoffText = mappingContextSummary?.agentHandoffText ?? command;
+  const repoStatusTone =
+    mappingContextSummary?.repo.status === "verified"
+      ? "status-success"
+      : mappingContextSummary?.repo.status === "branch-mismatch" ||
+        mappingContextSummary?.repo.status === "missing-branch" ||
+        mappingContextSummary?.repo.status === "missing-path" ||
+        mappingContextSummary?.repo.status === "not-git"
+        ? "status-warning"
+        : "status-info";
 
   return (
     <div className="container">
@@ -315,11 +427,240 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
       )}
 
       <div style={{ marginTop: "24px" }}>
-        <h4 className="section-header">Agent Handoff</h4>
+        <h4 className="section-header">Mapping Inputs</h4>
         <div className="status-display status-info">
-          <div style={{ marginBottom: "8px" }}>
-            After the workspace is ready, run this in Claude Code from the repo root:
+          <div style={{ marginBottom: "10px" }}>
+            Save optional evidence sources for future mapping workflows. If you set a repo path, branch name is required.
           </div>
+
+          <div style={{ display: "grid", gap: "10px" }}>
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Repo Path</div>
+              <input
+                value={mappingDraft.repoPath}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, repoPath: e.target.value }))}
+                className="form-input"
+                placeholder="/abs/path/to/client/repo"
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Branch Name</div>
+              <input
+                value={mappingDraft.branchName}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, branchName: e.target.value }))}
+                className="form-input"
+                placeholder="release/marketing-q3"
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Storybook URL</div>
+              <input
+                value={mappingDraft.storybookUrl}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, storybookUrl: e.target.value }))}
+                className="form-input"
+                placeholder="https://storybook.example.com"
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Storybook Path</div>
+              <input
+                value={mappingDraft.storybookPath}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, storybookPath: e.target.value }))}
+                className="form-input"
+                placeholder="/abs/path/to/storybook-static"
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Known UI Library</div>
+              <input
+                value={mappingDraft.uiLibrary}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, uiLibrary: e.target.value }))}
+                className="form-input"
+                placeholder="Material UI"
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Token / Theme Paths</div>
+              <textarea
+                value={mappingDraft.tokenSources.join("\n")}
+                onChange={(e) =>
+                  setMappingDraft((current) => ({
+                    ...current,
+                    tokenSources: e.target.value
+                      .split("\n")
+                      .map((item) => item.trim())
+                      .filter(Boolean),
+                  }))
+                }
+                rows={3}
+                className="form-input"
+                style={{ resize: "vertical", fontFamily: "monospace", fontSize: "11px" }}
+                placeholder={"/abs/path/to/tokens.css\n/abs/path/to/theme.ts"}
+              />
+            </label>
+
+            <label style={{ fontSize: "12px" }}>
+              <div style={{ marginBottom: "4px", fontWeight: 600 }}>Notes</div>
+              <textarea
+                value={mappingDraft.notes}
+                onChange={(e) => setMappingDraft((current) => ({ ...current, notes: e.target.value }))}
+                rows={3}
+                className="form-input"
+                style={{ resize: "vertical" }}
+                placeholder="Marketing app lives under apps/web"
+              />
+            </label>
+          </div>
+
+          {repoBranchError && (
+            <div className="status-display status-warning" style={{ marginTop: "10px" }}>
+              Branch name is required when repo path is set.
+            </div>
+          )}
+
+          <button
+            onClick={saveMappingInputs}
+            disabled={isSavingMappingInputs || !mappingInputsDirty || repoBranchError}
+            className={`button-secondary ${isSavingMappingInputs || !mappingInputsDirty || repoBranchError ? "button-flow-disabled" : ""}`}
+            style={{ marginTop: "12px" }}
+          >
+            {isSavingMappingInputs ? "Saving..." : mappingInputsDirty ? "Save Mapping Inputs" : "Saved"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: "24px" }}>
+        <h4 className="section-header">Suggestions</h4>
+        <div className="status-display status-info">
+          {mappingSuggestions ? (
+            <div>
+              <div style={{ marginBottom: "10px", fontWeight: 600 }}>Evidence Summary</div>
+              <div style={{ fontSize: "11px", lineHeight: 1.5, marginBottom: "8px" }}>
+                <div>Repo status: {mappingSuggestions.repoStatus}</div>
+                <div>Storybook status: {mappingSuggestions.storybookStatus}</div>
+                {mappingSuggestions.uiLibraryHints.length > 0 && (
+                  <div>UI library hints: {mappingSuggestions.uiLibraryHints.join(", ")}</div>
+                )}
+              </div>
+
+              {mappingSuggestions.topComponentCandidates.length > 0 && (
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ fontWeight: 600, marginBottom: "4px", fontSize: "12px" }}>
+                    Top Component Candidates
+                  </div>
+                  <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                    {mappingSuggestions.topComponentCandidates.slice(0, 3).map((c, i) => (
+                      <div key={i}>
+                        {c.name}
+                        <span style={{ color: "#6b7280", marginLeft: "4px" }}>
+                          ({c.source}, {c.confidence})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mappingSuggestions.topTokenCandidates.length > 0 && (
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ fontWeight: 600, marginBottom: "4px", fontSize: "12px" }}>
+                    Top Token Candidates
+                  </div>
+                  <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                    {mappingSuggestions.topTokenCandidates.slice(0, 3).map((c, i) => (
+                      <div key={i}>
+                        {c.name}
+                        <span style={{ color: "#6b7280", marginLeft: "4px" }}>
+                          ({c.source}, {c.confidence})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mappingSuggestions.topTemplateCandidates.length > 0 && (
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ fontWeight: 600, marginBottom: "4px", fontSize: "12px" }}>
+                    Top Template Candidates
+                  </div>
+                  <div style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                    {mappingSuggestions.topTemplateCandidates.slice(0, 3).map((c, i) => (
+                      <div key={i}>
+                        {c.name}
+                        <span style={{ color: "#6b7280", marginLeft: "4px" }}>
+                          ({c.source}, {c.confidence})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mappingSuggestions.warnings.length > 0 && (
+                <div className="status-display status-warning" style={{ marginTop: "8px" }}>
+                  {mappingSuggestions.warnings.map((warning) => (
+                    <div key={warning}>{warning}</div>
+                  ))}
+                </div>
+              )}
+
+              {mappingSuggestions.topComponentCandidates.length === 0 &&
+                mappingSuggestions.topTokenCandidates.length === 0 &&
+                mappingSuggestions.topTemplateCandidates.length === 0 && (
+                <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                  No suggestions available. Add mapping inputs (repo, Storybook) before preparing the workspace.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: "11px", color: "#6b7280" }}>
+              Prepare the workspace to generate suggestions.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: "24px" }}>
+        <h4 className="section-header">Agent Handoff</h4>
+        <div className={`status-display ${mappingContextSummary?.hasMappingContext ? repoStatusTone : "status-info"}`}>
+          <div style={{ marginBottom: "8px", fontWeight: 600 }}>
+            {mappingContextSummary?.hasMappingContext
+              ? summarizeRepoStatus(mappingContextSummary.repo.status)
+              : "Prepare the workspace to generate mapping-context handoff"}
+          </div>
+          {mappingContextSummary?.hasMappingContext ? (
+            <div style={{ fontSize: "11px", lineHeight: 1.5, marginBottom: "10px" }}>
+              <div>Context built: {formatDate(mappingContextSummary.generatedAt)}</div>
+              <div>Workflow mode: {mappingContextSummary.mode ?? "crawl-only"}</div>
+              <div>Repo path: {mappingContextSummary.repo.path ?? "(not set)"}</div>
+              <div>Requested branch: {mappingContextSummary.repo.requestedBranch ?? "(not set)"}</div>
+              <div>Checked-out branch: {mappingContextSummary.repo.resolvedBranch ?? "(unknown)"}</div>
+              <div>Commit SHA: {mappingContextSummary.repo.commitSha ?? "(unknown)"}</div>
+              {mappingContextSummary.uiLibrary.hints.length > 0 && (
+                <div>UI library hints: {mappingContextSummary.uiLibrary.hints.join(", ")}</div>
+              )}
+              {mappingContextSummary.tokenSources.length > 0 && (
+                <div>Configured token sources: {mappingContextSummary.tokenSources.join(", ")}</div>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginBottom: "10px" }}>
+              After the workspace is ready, run this in Claude Code from the repo root:
+            </div>
+          )}
+          {handoffWarnings.length > 0 && (
+            <div className="status-display status-warning" style={{ marginBottom: "10px" }}>
+              {handoffWarnings.map((warning) => (
+                <div key={warning}>{warning}</div>
+              ))}
+            </div>
+          )}
           <div
             style={{
               fontFamily: "monospace",
@@ -331,15 +672,22 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({ activeProjectId }) =
               wordBreak: "break-word",
             }}
           >
-            {command}
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{handoffText}</pre>
           </div>
-          <button
-            onClick={copyCommand}
-            className="button-secondary"
-            style={{ marginTop: "8px" }}
-          >
-            {copyStatus ?? "Copy Command"}
-          </button>
+          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            <button
+              onClick={copyHandoff}
+              className="button-secondary"
+            >
+              {copyStatus ?? "Copy Handoff"}
+            </button>
+            <button
+              onClick={copyCommand}
+              className="button-secondary"
+            >
+              Copy Command Only
+            </button>
+          </div>
         </div>
       </div>
 

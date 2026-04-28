@@ -473,6 +473,326 @@ export declare const InventoryOverviewSchema: z.ZodObject<{
     latestCrawlRunId?: string | null | undefined;
     isWorkspaceStale?: boolean | undefined;
 }>;
+export declare const MappingContextRepoSummarySchema: z.ZodObject<{
+    enabled: z.ZodBoolean;
+    path: z.ZodNullable<z.ZodString>;
+    requestedBranch: z.ZodNullable<z.ZodString>;
+    requestedBranchRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    resolvedBranch: z.ZodNullable<z.ZodString>;
+    resolvedHeadRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    commitSha: z.ZodNullable<z.ZodString>;
+    status: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    status: string;
+    path: string | null;
+    enabled: boolean;
+    requestedBranch: string | null;
+    resolvedBranch: string | null;
+    commitSha: string | null;
+    requestedBranchRef?: string | null | undefined;
+    resolvedHeadRef?: string | null | undefined;
+}, {
+    status: string;
+    path: string | null;
+    enabled: boolean;
+    requestedBranch: string | null;
+    resolvedBranch: string | null;
+    commitSha: string | null;
+    requestedBranchRef?: string | null | undefined;
+    resolvedHeadRef?: string | null | undefined;
+}>;
+export declare const MappingContextStorybookSummarySchema: z.ZodObject<{
+    enabled: z.ZodBoolean;
+    url: z.ZodNullable<z.ZodString>;
+    path: z.ZodNullable<z.ZodString>;
+    status: z.ZodString;
+    detectedRoots: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    storyCount: z.ZodOptional<z.ZodNumber>;
+    componentCount: z.ZodOptional<z.ZodNumber>;
+}, "strip", z.ZodTypeAny, {
+    status: string;
+    path: string | null;
+    enabled: boolean;
+    url: string | null;
+    detectedRoots?: string[] | undefined;
+    storyCount?: number | undefined;
+    componentCount?: number | undefined;
+}, {
+    status: string;
+    path: string | null;
+    enabled: boolean;
+    url: string | null;
+    detectedRoots?: string[] | undefined;
+    storyCount?: number | undefined;
+    componentCount?: number | undefined;
+}>;
+export declare const MappingContextUiLibrarySummarySchema: z.ZodObject<{
+    enabled: z.ZodBoolean;
+    configuredName: z.ZodNullable<z.ZodString>;
+    hints: z.ZodArray<z.ZodString, "many">;
+    status: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    status: string;
+    enabled: boolean;
+    configuredName: string | null;
+    hints: string[];
+}, {
+    status: string;
+    enabled: boolean;
+    configuredName: string | null;
+    hints: string[];
+}>;
+export declare const MappingContextSummarySchema: z.ZodObject<{
+    projectId: z.ZodString;
+    workspaceRoot: z.ZodString;
+    hasMappingContext: z.ZodBoolean;
+    generatedAt: z.ZodNullable<z.ZodString>;
+    mode: z.ZodNullable<z.ZodString>;
+    repo: z.ZodObject<{
+        enabled: z.ZodBoolean;
+        path: z.ZodNullable<z.ZodString>;
+        requestedBranch: z.ZodNullable<z.ZodString>;
+        requestedBranchRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        resolvedBranch: z.ZodNullable<z.ZodString>;
+        resolvedHeadRef: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        commitSha: z.ZodNullable<z.ZodString>;
+        status: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        requestedBranch: string | null;
+        resolvedBranch: string | null;
+        commitSha: string | null;
+        requestedBranchRef?: string | null | undefined;
+        resolvedHeadRef?: string | null | undefined;
+    }, {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        requestedBranch: string | null;
+        resolvedBranch: string | null;
+        commitSha: string | null;
+        requestedBranchRef?: string | null | undefined;
+        resolvedHeadRef?: string | null | undefined;
+    }>;
+    storybook: z.ZodObject<{
+        enabled: z.ZodBoolean;
+        url: z.ZodNullable<z.ZodString>;
+        path: z.ZodNullable<z.ZodString>;
+        status: z.ZodString;
+        detectedRoots: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+        storyCount: z.ZodOptional<z.ZodNumber>;
+        componentCount: z.ZodOptional<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        url: string | null;
+        detectedRoots?: string[] | undefined;
+        storyCount?: number | undefined;
+        componentCount?: number | undefined;
+    }, {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        url: string | null;
+        detectedRoots?: string[] | undefined;
+        storyCount?: number | undefined;
+        componentCount?: number | undefined;
+    }>;
+    uiLibrary: z.ZodObject<{
+        enabled: z.ZodBoolean;
+        configuredName: z.ZodNullable<z.ZodString>;
+        hints: z.ZodArray<z.ZodString, "many">;
+        status: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        status: string;
+        enabled: boolean;
+        configuredName: string | null;
+        hints: string[];
+    }, {
+        status: string;
+        enabled: boolean;
+        configuredName: string | null;
+        hints: string[];
+    }>;
+    tokenSources: z.ZodArray<z.ZodString, "many">;
+    warnings: z.ZodArray<z.ZodString, "many">;
+    agentHandoffText: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    projectId: string;
+    workspaceRoot: string;
+    hasMappingContext: boolean;
+    generatedAt: string | null;
+    mode: string | null;
+    repo: {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        requestedBranch: string | null;
+        resolvedBranch: string | null;
+        commitSha: string | null;
+        requestedBranchRef?: string | null | undefined;
+        resolvedHeadRef?: string | null | undefined;
+    };
+    storybook: {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        url: string | null;
+        detectedRoots?: string[] | undefined;
+        storyCount?: number | undefined;
+        componentCount?: number | undefined;
+    };
+    uiLibrary: {
+        status: string;
+        enabled: boolean;
+        configuredName: string | null;
+        hints: string[];
+    };
+    tokenSources: string[];
+    warnings: string[];
+    agentHandoffText: string;
+}, {
+    projectId: string;
+    workspaceRoot: string;
+    hasMappingContext: boolean;
+    generatedAt: string | null;
+    mode: string | null;
+    repo: {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        requestedBranch: string | null;
+        resolvedBranch: string | null;
+        commitSha: string | null;
+        requestedBranchRef?: string | null | undefined;
+        resolvedHeadRef?: string | null | undefined;
+    };
+    storybook: {
+        status: string;
+        path: string | null;
+        enabled: boolean;
+        url: string | null;
+        detectedRoots?: string[] | undefined;
+        storyCount?: number | undefined;
+        componentCount?: number | undefined;
+    };
+    uiLibrary: {
+        status: string;
+        enabled: boolean;
+        configuredName: string | null;
+        hints: string[];
+    };
+    tokenSources: string[];
+    warnings: string[];
+    agentHandoffText: string;
+}>;
+export declare const MappingSuggestionCandidateSchema: z.ZodObject<{
+    name: z.ZodString;
+    source: z.ZodEnum<["storybook", "repo", "ui-library"]>;
+    confidence: z.ZodEnum<["high", "medium", "low"]>;
+}, "strip", z.ZodTypeAny, {
+    name: string;
+    confidence: "high" | "medium" | "low";
+    source: "repo" | "storybook" | "ui-library";
+}, {
+    name: string;
+    confidence: "high" | "medium" | "low";
+    source: "repo" | "storybook" | "ui-library";
+}>;
+export declare const MappingSuggestionsSchema: z.ZodObject<{
+    generatedAt: z.ZodString;
+    projectId: z.ZodString;
+    repoStatus: z.ZodString;
+    storybookStatus: z.ZodString;
+    uiLibraryHints: z.ZodArray<z.ZodString, "many">;
+    topComponentCandidates: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        source: z.ZodEnum<["storybook", "repo", "ui-library"]>;
+        confidence: z.ZodEnum<["high", "medium", "low"]>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }>, "many">;
+    topTokenCandidates: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        source: z.ZodEnum<["storybook", "repo", "ui-library"]>;
+        confidence: z.ZodEnum<["high", "medium", "low"]>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }>, "many">;
+    topTemplateCandidates: z.ZodArray<z.ZodObject<{
+        name: z.ZodString;
+        source: z.ZodEnum<["storybook", "repo", "ui-library"]>;
+        confidence: z.ZodEnum<["high", "medium", "low"]>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }, {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }>, "many">;
+    warnings: z.ZodArray<z.ZodString, "many">;
+}, "strip", z.ZodTypeAny, {
+    projectId: string;
+    generatedAt: string;
+    warnings: string[];
+    repoStatus: string;
+    storybookStatus: string;
+    uiLibraryHints: string[];
+    topComponentCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+    topTokenCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+    topTemplateCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+}, {
+    projectId: string;
+    generatedAt: string;
+    warnings: string[];
+    repoStatus: string;
+    storybookStatus: string;
+    uiLibraryHints: string[];
+    topComponentCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+    topTokenCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+    topTemplateCandidates: {
+        name: string;
+        confidence: "high" | "medium" | "low";
+        source: "repo" | "storybook" | "ui-library";
+    }[];
+}>;
 export declare const InventoryDecisionsSchema: z.ZodObject<{
     projectId: z.ZodString;
     workspaceRoot: z.ZodString;
@@ -1693,6 +2013,9 @@ export type InventoryTemplateDecisionFile = z.infer<typeof InventoryTemplateDeci
 export type ClusterExample = z.infer<typeof ClusterExampleSchema>;
 export type InventoryDecisionSummary = z.infer<typeof InventoryDecisionSummarySchema>;
 export type InventoryOverview = z.infer<typeof InventoryOverviewSchema>;
+export type MappingContextSummary = z.infer<typeof MappingContextSummarySchema>;
+export type MappingSuggestionCandidate = z.infer<typeof MappingSuggestionCandidateSchema>;
+export type MappingSuggestions = z.infer<typeof MappingSuggestionsSchema>;
 export type InventoryDecisions = z.infer<typeof InventoryDecisionsSchema>;
 export type RenderAsset = z.infer<typeof RenderAssetSchema>;
 export type RenderLinkTarget = z.infer<typeof RenderLinkTargetSchema>;

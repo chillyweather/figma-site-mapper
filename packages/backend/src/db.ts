@@ -23,6 +23,18 @@ sqlite.exec(`
     updated_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS project_mapping_inputs (
+    project_id INTEGER PRIMARY KEY REFERENCES projects(id),
+    repo_path TEXT,
+    branch_name TEXT,
+    storybook_url TEXT,
+    storybook_path TEXT,
+    ui_library TEXT,
+    token_sources_json TEXT NOT NULL DEFAULT '[]',
+    notes TEXT NOT NULL DEFAULT '',
+    updated_at INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL REFERENCES projects(id),

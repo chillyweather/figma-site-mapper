@@ -1,10 +1,12 @@
-import type { InventoryOverview, InventoryDecisions, InventoryRenderData } from "@sitemapper/shared";
+import type { InventoryOverview, InventoryDecisions, InventoryRenderData, MappingContextSummary, MappingSuggestions } from "@sitemapper/shared";
+import type { MappingInputs } from "../types";
 
 // ── UI -> Plugin ────────────────────────────────────────────────────────────
 
 export type InventoryUiToPluginMessage =
   | { type: "inventory/load"; projectId: string }
   | { type: "inventory/prepare"; projectId: string }
+  | { type: "inventory/saveMappingInputs"; projectId: string; mappingInputs: Omit<MappingInputs, "projectId"> }
   | { type: "inventory/renderBoards"; projectId: string };
 
 // ── Plugin -> UI ────────────────────────────────────────────────────────────
@@ -15,6 +17,9 @@ export type InventoryPluginToUiMessage =
       projectId: string;
       overview: InventoryOverview;
       decisions: InventoryDecisions;
+      mappingInputs: MappingInputs;
+      mappingContextSummary: MappingContextSummary;
+      mappingSuggestions: MappingSuggestions;
     }
   | {
       type: "inventory/error";
@@ -44,6 +49,11 @@ export type InventoryPluginToUiMessage =
       projectId: string;
       jobId?: string;
       error: string;
+    }
+  | {
+      type: "inventory/mappingInputsSaved";
+      projectId: string;
+      mappingInputs: MappingInputs;
     }
   | {
       type: "inventory/renderStarted";

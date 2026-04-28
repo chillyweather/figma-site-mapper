@@ -51,7 +51,20 @@ export type {
   InventoryDecisionSummary,
   InventoryOverview,
   InventoryDecisions,
+  MappingContextSummary,
+  MappingSuggestions,
 } from "@sitemapper/shared";
+
+export interface MappingInputs {
+  projectId: string;
+  repoPath: string;
+  branchName: string;
+  storybookUrl: string;
+  storybookPath: string;
+  uiLibrary: string;
+  tokenSources: string[];
+  notes: string;
+}
 
 export interface InventoryPrepareJob {
   jobId: string;

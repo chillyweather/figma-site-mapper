@@ -21,6 +21,7 @@ import { writeWorkspaceReadme } from "./readme.js";
 import { buildColorSwatches } from "./swatches.js";
 import { buildTypographySpecimens } from "./typeSpecimens.js";
 import type { WorkspaceBuildResult } from "./types.js";
+import { writeMappingContextScaffold } from "../mappingContext/scaffold.js";
 
 export function getLatestCompletedCrawlRun(projectId: string) {
   const n = parseInt(projectId, 10);
@@ -41,6 +42,7 @@ const GENERATED_ENTRIES = [
   "catalog",
   "tokens",
   "regions",
+  "mapping-context",
   "exports",
 ];
 
@@ -125,6 +127,9 @@ export async function buildWorkspace(
     log(options.verbose, "Generating contact sheets and token images");
     await buildContactSheets(workspacePath, groupsByFolder);
     await writeTokenFiles(workspacePath, data);
+
+    log(options.verbose, "Writing mapping-context scaffold");
+    await writeMappingContextScaffold(workspacePath, projectId, generatedAt);
 
     await writeWorkspaceReadme(workspacePath, data, generatedAt);
     await writeWorkspaceMeta(workspacePath, data, generatedAt, {

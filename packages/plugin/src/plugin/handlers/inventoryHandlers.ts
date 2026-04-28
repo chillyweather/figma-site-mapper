@@ -1,9 +1,13 @@
 import {
   fetchInventoryDecisions,
+  fetchMappingContextSummary,
+  fetchSuggestions,
+  fetchMappingInputs,
   fetchInventoryOverview,
   fetchInventoryRenderData,
   getJobStatus,
   prepareInventory,
+  saveProjectMappingInputs,
 } from "../services/apiClient";
 import { renderInventoryBoards } from "../../figmaRendering/renderInventoryBoards";
 import type { InventoryPluginToUiMessage } from "../../messages/inventoryMessages";
@@ -30,9 +34,12 @@ function postToUI(msg: InventoryPluginToUiMessage): void {
 }
 
 async function postInventoryState(projectId: string): Promise<void> {
-  const [overview, decisions] = await Promise.all([
+  const [overview, decisions, mappingInputs, mappingContextSummary, mappingSuggestions] = await Promise.all([
     fetchInventoryOverview(projectId),
     fetchInventoryDecisions(projectId),
+    fetchMappingInputs(projectId),
+    fetchMappingContextSummary(projectId),
+    fetchSuggestions(projectId),
   ]);
 
   postToUI({
@@ -40,6 +47,9 @@ async function postInventoryState(projectId: string): Promise<void> {
     projectId,
     overview,
     decisions,
+    mappingInputs,
+    mappingContextSummary,
+    mappingSuggestions,
   });
 }
 
@@ -197,5 +207,37 @@ export async function handleRenderInventoryBoardsRequest(msg: {
       error: error instanceof Error ? error.message : "Failed to render inventory boards.",
     });
     figma.notify("Failed to render inventory boards.", { error: true });
+  }
+}
+
+export async function handleSaveMappingInputsRequest(msg: {
+  projectId?: string | null;
+  mappingInputs?: Record<string, unknown>;
+}): Promise<void> {
+  const projectId = typeof msg.projectId === "string" ? msg.projectId.trim() : "";
+
+  if (!projectId) {
+    postToUI({
+      type: "inventory/error",
+      projectId: null,
+      error: "Select a project before saving mapping inputs.",
+    });
+    return;
+  }
+
+  try {
+    const saved = await saveProjectMappingInputs(projectId, (msg.mappingInputs ?? {}) as any);
+    postToUI({
+      type: "inventory/mappingInputsSaved",
+      projectId,
+      mappingInputs: saved,
+    });
+  } catch (error) {
+    console.error("Failed to save mapping inputs", error);
+    postToUI({
+      type: "inventory/error",
+      projectId,
+      error: error instanceof Error ? error.message : "Failed to save mapping inputs.",
+    });
   }
 }

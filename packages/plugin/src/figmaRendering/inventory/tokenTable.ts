@@ -28,10 +28,12 @@ function categoryFromBadge(card: RenderCard): TokenCategory {
 
 function parsePx(value: string | undefined): number | null {
   if (!value) return null;
+  const isRem = /rem/.test(value);
   const match = value.match(/-?\d+(?:\.\d+)?/);
   if (!match) return null;
   const n = Number(match[0]);
-  return Number.isFinite(n) ? n : null;
+  if (!Number.isFinite(n)) return null;
+  return isRem ? Math.round(n * 16) : n;
 }
 
 function hexToRgb(hex: string): RGB | null {
@@ -138,7 +140,7 @@ function buildPreviewCell(card: RenderCard, category: TokenCategory): FrameNode 
   if (category === "typography") {
     const isFontFamily = /[a-zA-Z]/.test(value) && !/^\d/.test(value);
     const text = createText("Aa", {
-      size: isFontFamily ? 20 : Math.min(parsePx(value) ?? 14, 22),
+      size: isFontFamily ? 20 : Math.max(1, Math.min(parsePx(value) ?? 14, 22)),
       style: "Medium",
     });
     cell.appendChild(text);

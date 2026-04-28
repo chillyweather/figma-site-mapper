@@ -1,6 +1,6 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
-import type { InventoryDecisions, InventoryOverview, DiscoveryResult } from "../../types";
+import type { InventoryDecisions, InventoryOverview, DiscoveryResult, MappingContextSummary, MappingSuggestions, MappingInputs } from "../../types";
 import type { InventoryRenderData } from "@sitemapper/shared";
 import { createHttpClient } from "./httpClient";
 
@@ -214,6 +214,34 @@ export async function fetchInventoryDecisions(projectId: string): Promise<Invent
   return client.get(
     `/inventory/decisions/${encodeURIComponent(projectId)}`
   ) as Promise<InventoryDecisions>;
+}
+
+export async function fetchMappingInputs(projectId: string): Promise<MappingInputs> {
+  return client.get(
+    `/mapping-inputs/${encodeURIComponent(projectId)}`
+  ) as Promise<MappingInputs>;
+}
+
+export async function fetchMappingContextSummary(projectId: string): Promise<MappingContextSummary> {
+  return client.get(
+    `/mapping-context/${encodeURIComponent(projectId)}`
+  ) as Promise<MappingContextSummary>;
+}
+
+export async function fetchSuggestions(projectId: string): Promise<MappingSuggestions> {
+  return client.get(
+    `/mapping-suggestions/${encodeURIComponent(projectId)}`
+  ) as Promise<MappingSuggestions>;
+}
+
+export async function saveProjectMappingInputs(
+  projectId: string,
+  mappingInputs: Omit<MappingInputs, "projectId">
+): Promise<MappingInputs> {
+  return client.post(
+    `/mapping-inputs/${encodeURIComponent(projectId)}`,
+    mappingInputs
+  ) as Promise<MappingInputs>;
 }
 
 export async function fetchInventoryRenderData(projectId: string): Promise<InventoryRenderData> {

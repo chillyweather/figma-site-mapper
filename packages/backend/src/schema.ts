@@ -7,6 +7,18 @@ export const projects = sqliteTable("projects", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+export const projectMappingInputs = sqliteTable("project_mapping_inputs", {
+  projectId: integer("project_id").primaryKey(),
+  repoPath: text("repo_path"),
+  branchName: text("branch_name"),
+  storybookUrl: text("storybook_url"),
+  storybookPath: text("storybook_path"),
+  uiLibrary: text("ui_library"),
+  tokenSourcesJson: text("token_sources_json").notNull().default("[]"),
+  notes: text("notes").notNull().default(""),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const pages = sqliteTable("pages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id").notNull(),
@@ -127,6 +139,7 @@ export const elements = sqliteTable("elements", {
 });
 
 export type Project = typeof projects.$inferSelect;
+export type ProjectMappingInputs = typeof projectMappingInputs.$inferSelect;
 export type Page = typeof pages.$inferSelect;
 export type Element = typeof elements.$inferSelect;
 export type CrawlRun = typeof crawlRuns.$inferSelect;

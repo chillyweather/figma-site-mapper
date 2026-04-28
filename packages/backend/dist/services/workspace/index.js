@@ -12,6 +12,7 @@ import { defaultWorkspacePath, ensureDir, writeJson } from "./paths.js";
 import { writeWorkspaceReadme } from "./readme.js";
 import { buildColorSwatches } from "./swatches.js";
 import { buildTypographySpecimens } from "./typeSpecimens.js";
+import { writeMappingContextScaffold } from "../mappingContext/scaffold.js";
 export function getLatestCompletedCrawlRun(projectId) {
     const n = parseInt(projectId, 10);
     if (isNaN(n) || n <= 0)
@@ -31,6 +32,7 @@ const GENERATED_ENTRIES = [
     "catalog",
     "tokens",
     "regions",
+    "mapping-context",
     "exports",
 ];
 function log(verbose, message) {
@@ -97,6 +99,8 @@ export async function buildWorkspace(projectId, options = {}) {
         log(options.verbose, "Generating contact sheets and token images");
         await buildContactSheets(workspacePath, groupsByFolder);
         await writeTokenFiles(workspacePath, data);
+        log(options.verbose, "Writing mapping-context scaffold");
+        await writeMappingContextScaffold(workspacePath, projectId, generatedAt);
         await writeWorkspaceReadme(workspacePath, data, generatedAt);
         await writeWorkspaceMeta(workspacePath, data, generatedAt, {
             inventoryBuildId: buildRow ? String(buildRow.id) : undefined,

@@ -20,9 +20,11 @@ The intended end-to-end process:
 4. Approve the pages to capture.
 5. The backend captures only the approved URLs and stores screenshots, DOM/style data, elements, and crawl-run metadata in SQLite.
 6. The plugin renders an `Index` page plus one Figma page per captured URL.
-7. In the `Inventory` tab, rebuild the inventory workspace.
-8. Run `/ds-inventory <projectId>` in Claude Code from the repo root.
-9. Refresh the `Inventory` tab and render `DS Inventory` boards from the agent decisions.
+7. In the `Inventory` tab, optionally save mapping inputs such as repo path + branch, Storybook path or URL, UI library, token/theme paths, and notes.
+8. Rebuild the inventory workspace. The backend generates `mapping-context/`, `suggestions.json`, and the other inventory artifacts.
+9. Review the read-only `Suggestions` and `Agent Handoff` blocks in the plugin.
+10. Run `/ds-inventory <projectId>` in Claude Code from the repo root.
+11. Refresh the `Inventory` tab and render `DS Inventory` boards from the agent decisions.
 
 ## User Guide
 
@@ -149,6 +151,13 @@ packages/backend/workspace/<projectId>/
 
 That workspace contains contact sheets, crop images, token tables, page metadata, element metadata, region hints, and decision file scaffolding. It is generated runtime data and is ignored by Git.
 
+The `Inventory` tab also shows:
+
+- saved mapping inputs
+- repo and Storybook evidence status
+- read-only suggestion summaries
+- a copyable agent handoff block with the current mapping context
+
 ### 7. Run The Agent Inventory Pass
 
 From the repo root, run Claude Code and invoke:
@@ -163,7 +172,7 @@ Example:
 /ds-inventory 4
 ```
 
-The agent reads the workspace and writes decisions to:
+The agent reads the workspace, including `mapping-context/`, and writes decisions to:
 
 ```text
 packages/backend/workspace/<projectId>/decisions/
@@ -201,7 +210,7 @@ The plugin creates or replaces a `DS Inventory` page. The board includes compone
 - DB-first page lookup and single-page recrawl
 - Project snapshot rendering from stored data at any time
 - Authentication support: credentials, cookies, or manual login via visible browser
-- Agent-driven design-system inventory workspace with contact sheets, token tables, annotated screenshots, and persisted decision files
+- Agent-driven design-system inventory workspace with contact sheets, token tables, annotated screenshots, persisted decision files, and read-only mapping context/suggestion summaries
 - Figma `DS Inventory` board rendering from agent decisions, including component crops and links back to source screenshot samples
 
 ## Repository structure

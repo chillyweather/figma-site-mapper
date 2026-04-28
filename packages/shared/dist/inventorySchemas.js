@@ -103,6 +103,61 @@ export const InventoryOverviewSchema = z.object({
     latestCrawlRunId: z.string().nullable().optional(),
     isWorkspaceStale: z.boolean().optional(),
 });
+export const MappingContextRepoSummarySchema = z.object({
+    enabled: z.boolean(),
+    path: z.string().nullable(),
+    requestedBranch: z.string().nullable(),
+    requestedBranchRef: z.string().nullable().optional(),
+    resolvedBranch: z.string().nullable(),
+    resolvedHeadRef: z.string().nullable().optional(),
+    commitSha: z.string().nullable(),
+    status: z.string(),
+});
+export const MappingContextStorybookSummarySchema = z.object({
+    enabled: z.boolean(),
+    url: z.string().nullable(),
+    path: z.string().nullable(),
+    status: z.string(),
+    detectedRoots: z.array(z.string()).optional(),
+    storyCount: z.number().optional(),
+    componentCount: z.number().optional(),
+});
+export const MappingContextUiLibrarySummarySchema = z.object({
+    enabled: z.boolean(),
+    configuredName: z.string().nullable(),
+    hints: z.array(z.string()),
+    status: z.string(),
+});
+export const MappingContextSummarySchema = z.object({
+    projectId: z.string(),
+    workspaceRoot: z.string(),
+    hasMappingContext: z.boolean(),
+    generatedAt: z.string().nullable(),
+    mode: z.string().nullable(),
+    repo: MappingContextRepoSummarySchema,
+    storybook: MappingContextStorybookSummarySchema,
+    uiLibrary: MappingContextUiLibrarySummarySchema,
+    tokenSources: z.array(z.string()),
+    warnings: z.array(z.string()),
+    agentHandoffText: z.string(),
+});
+// ── Mapping suggestions (read-only guidance for the agent) ───────────────────
+export const MappingSuggestionCandidateSchema = z.object({
+    name: z.string(),
+    source: z.enum(["storybook", "repo", "ui-library"]),
+    confidence: z.enum(["high", "medium", "low"]),
+});
+export const MappingSuggestionsSchema = z.object({
+    generatedAt: z.string(),
+    projectId: z.string(),
+    repoStatus: z.string(),
+    storybookStatus: z.string(),
+    uiLibraryHints: z.array(z.string()),
+    topComponentCandidates: z.array(MappingSuggestionCandidateSchema),
+    topTokenCandidates: z.array(MappingSuggestionCandidateSchema),
+    topTemplateCandidates: z.array(MappingSuggestionCandidateSchema),
+    warnings: z.array(z.string()),
+});
 // ── Decisions payload (what /inventory/decisions returns) ───────────────────
 export const InventoryDecisionsSchema = z.object({
     projectId: z.string(),

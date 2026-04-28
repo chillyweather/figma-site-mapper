@@ -28,10 +28,18 @@ import {
   getWorkspaceStatus,
 } from "./services/workspace/index.js";
 import {
+  getMappingInputs,
+  saveMappingInputs,
+} from "./services/mappingInputs.js";
+import {
   InventoryOverviewSchema,
   InventoryDecisionsSchema,
   InventoryRenderDataSchema,
+  MappingContextSummarySchema,
+  MappingSuggestionsSchema,
 } from "@sitemapper/shared";
+import { getMappingContextSummary } from "./services/mappingContext/summary.js";
+import { deriveSuggestionsFromDisk } from "./services/mappingContext/suggestions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -795,6 +803,71 @@ export async function buildServer(): Promise<FastifyInstance> {
     } catch (error) {
       request.log.error(`Failed to build inventory overview: ${error instanceof Error ? error.message : String(error)}`);
       return reply.status(500).send({ error: "Failed to build inventory overview" });
+    }
+  });
+
+  server.get("/mapping-inputs/:projectId", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    try {
+      return getMappingInputs(projectId);
+    } catch (error) {
+      request.log.error(`Failed to load mapping inputs: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to load mapping inputs" });
+    }
+  });
+
+  server.get("/mapping-context/:projectId", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    try {
+      const payload = await getMappingContextSummary(projectId);
+      devValidate("MappingContextSummary", MappingContextSummarySchema, payload);
+      return payload;
+    } catch (error) {
+      request.log.error(`Failed to load mapping context summary: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to load mapping context summary" });
+    }
+  });
+
+  server.get("/mapping-suggestions/:projectId", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    try {
+      const mappingContextPath = path.join(defaultWorkspacePath(projectId), "mapping-context");
+      const payload = await deriveSuggestionsFromDisk(mappingContextPath, projectId, new Date().toISOString());
+      devValidate("MappingSuggestions", MappingSuggestionsSchema, payload);
+      return payload;
+    } catch (error) {
+      request.log.error(`Failed to load mapping suggestions: ${error instanceof Error ? error.message : String(error)}`);
+      return reply.status(500).send({ error: "Failed to load mapping suggestions" });
+    }
+  });
+
+  server.post("/mapping-inputs/:projectId", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+
+    try {
+      return saveMappingInputs(projectId, request.body as Record<string, unknown>);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save mapping inputs";
+      if (message.includes("branchName is required")) {
+        return reply.status(400).send({ error: message });
+      }
+      request.log.error(`Failed to save mapping inputs: ${message}`);
+      return reply.status(500).send({ error: "Failed to save mapping inputs" });
     }
   });
 
