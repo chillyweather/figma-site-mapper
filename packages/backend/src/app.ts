@@ -6,7 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { eq, and, or, inArray, desc } from "drizzle-orm";
 import { db } from "./db.js";
-import { projects, pages, elements, crawlRuns, discoveryRuns, discoveryCandidates } from "./schema.js";
+import { projects, pages, elements, crawlRuns, discoveryRuns, discoveryCandidates, flows, flowSteps } from "./schema.js";
 import { runDiscovery } from "./services/discovery/discoveryRunner.js";
 import { normalizeUrl } from "./services/discovery/urlNormalize.js";
 import { classifyPage } from "./services/discovery/pageClassifier.js";
@@ -14,7 +14,7 @@ import { effectiveCaptureUrlKey, dedupeEffectiveCaptureUrls, getUrlLookupCandida
 import { approveDiscoveryRun } from "./services/discovery/approveDiscoveryRun.js";
 import { crawlQueue } from "./queue.js";
 import { openAuthSession } from "./crawler.js";
-import { fastifyLoggerConfig } from "./logger.js";
+import { fastifyLoggerConfig, logger } from "./logger.js";
 import { buildManifestForPageIds, serializePage, serializeElement } from "./services/manifestBuilder.js";
 import { parseJson } from "./utils/parseJson.js";
 import { getInventoryTokens } from "./services/inventory/index.js";
@@ -119,6 +119,26 @@ function workspaceAssetUrl(baseUrl: string, projectId: string, relativePath: str
     .join("/")}`;
 }
 
+function serializeFlowStep(row: typeof flowSteps.$inferSelect): Record<string, unknown> {
+  return {
+    _id: String(row.id),
+    id: row.id,
+    flowId: String(row.flowId),
+    stepIndex: row.stepIndex,
+    sourcePageId: String(row.sourcePageId),
+    sourceUrl: row.sourceUrl,
+    elementId: row.elementId != null ? String(row.elementId) : undefined,
+    elementSelector: row.elementSelector ?? undefined,
+    elementText: row.elementText ?? undefined,
+    elementBbox: parseJson<Record<string, unknown> | undefined>(row.elementBboxJson, undefined),
+    targetUrl: row.targetUrl ?? undefined,
+    targetPageId: row.targetPageId != null ? String(row.targetPageId) : undefined,
+    actionKind: row.actionKind,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export async function buildInventoryRenderData(projectId: string, baseUrl: string): Promise<Record<string, unknown>> {
   return buildInventoryRenderModel(projectId, baseUrl) as unknown as Record<string, unknown>;
 }
@@ -152,6 +172,35 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   server.get("/", async () => ({ hello: "world" }));
+
+  // ── Remote logging from Figma plugin contexts ─────────────────────────────
+  // Accepts log entries from the plugin sandbox and UI iframe, writing them
+  // into the same pino log file used by the backend. logLevel "silent" keeps
+  // the HTTP request itself out of the access log to avoid noise.
+  server.post(
+    "/log",
+    { config: { logLevel: "silent" } },
+    async (request, reply) => {
+      const body = request.body as {
+        level?: string;
+        source?: string;
+        msg?: string;
+        data?: unknown;
+      };
+      const level = typeof body.level === "string" ? body.level : "info";
+      const source = typeof body.source === "string" ? body.source : "plugin";
+      const msg = typeof body.msg === "string" ? body.msg : "(no message)";
+      const data = body.data !== undefined ? body.data : undefined;
+
+      const child = logger.child({ source });
+      if (level === "error") child.error({ data }, msg);
+      else if (level === "warn") child.warn({ data }, msg);
+      else if (level === "debug") child.debug({ data }, msg);
+      else child.info({ data }, msg);
+
+      return reply.status(204).send();
+    }
+  );
 
   // ── Projects ──────────────────────────────────────────────────────────────
 
@@ -206,6 +255,12 @@ export async function buildServer(): Promise<FastifyInstance> {
       .get();
     if (!existing) {
       return reply.status(404).send({ error: "Project not found" });
+    }
+    const flowRows = db.select({ id: flows.id }).from(flows).where(eq(flows.projectId, pid)).all();
+    if (flowRows.length > 0) {
+      const flowIds = flowRows.map((f) => f.id);
+      db.delete(flowSteps).where(inArray(flowSteps.flowId, flowIds)).run();
+      db.delete(flows).where(eq(flows.projectId, pid)).run();
     }
     db.delete(elements).where(eq(elements.projectId, pid)).run();
     db.delete(pages).where(eq(pages.projectId, pid)).run();
@@ -916,6 +971,247 @@ export async function buildServer(): Promise<FastifyInstance> {
       request.log.error(`Failed to build inventory tokens: ${error instanceof Error ? error.message : String(error)}`);
       return reply.status(500).send({ error: "Failed to build inventory tokens" });
     }
+  });
+
+  // ── Flows ─────────────────────────────────────────────────────────────────
+
+  server.get("/flows", async (request, reply) => {
+    const { projectId } = request.query as { projectId?: string };
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+
+    const pid = toId(projectId);
+    const flowRows = db.select().from(flows).where(eq(flows.projectId, pid)).orderBy(desc(flows.updatedAt)).all();
+
+    const result = await Promise.all(flowRows.map(async (flow) => {
+      const steps = db.select().from(flowSteps).where(eq(flowSteps.flowId, flow.id)).orderBy(flowSteps.stepIndex).all();
+      return {
+        _id: String(flow.id),
+        id: flow.id,
+        projectId: String(flow.projectId),
+        name: flow.name,
+        description: flow.description,
+        status: flow.status,
+        stepCount: steps.length,
+        steps: steps.map((s) => serializeFlowStep(s)),
+        createdAt: flow.createdAt.toISOString(),
+        updatedAt: flow.updatedAt.toISOString(),
+      };
+    }));
+
+    return { flows: result };
+  });
+
+  server.post("/flows", async (request, reply) => {
+    const { projectId, name, description } = request.body as {
+      projectId?: string;
+      name?: string;
+      description?: string;
+    };
+
+    if (!projectId) return reply.status(400).send({ error: "projectId is required" });
+    if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
+    if (!name || !name.trim()) return reply.status(400).send({ error: "name is required" });
+
+    const now = new Date();
+    const pid = toId(projectId);
+    const [row] = db.insert(flows).values({
+      projectId: pid,
+      name: name.trim(),
+      description: (description || "").trim(),
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+    }).returning().all();
+
+    return {
+      flow: {
+        _id: String(row!.id),
+        id: row!.id,
+        projectId: String(row!.projectId),
+        name: row!.name,
+        description: row!.description,
+        status: row!.status,
+        steps: [],
+        createdAt: row!.createdAt.toISOString(),
+        updatedAt: row!.updatedAt.toISOString(),
+      },
+    };
+  });
+
+  server.get("/flows/:flowId", async (request, reply) => {
+    const { flowId } = request.params as { flowId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+
+    const fid = toId(flowId);
+    const flow = db.select().from(flows).where(eq(flows.id, fid)).get();
+    if (!flow) return reply.status(404).send({ error: "Flow not found" });
+
+    const steps = db.select().from(flowSteps).where(eq(flowSteps.flowId, fid)).orderBy(flowSteps.stepIndex).all();
+
+    return {
+      flow: {
+        _id: String(flow.id),
+        id: flow.id,
+        projectId: String(flow.projectId),
+        name: flow.name,
+        description: flow.description,
+        status: flow.status,
+        steps: steps.map(serializeFlowStep),
+        createdAt: flow.createdAt.toISOString(),
+        updatedAt: flow.updatedAt.toISOString(),
+      },
+    };
+  });
+
+  server.put("/flows/:flowId", async (request, reply) => {
+    const { flowId } = request.params as { flowId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+
+    const fid = toId(flowId);
+    const existing = db.select().from(flows).where(eq(flows.id, fid)).get();
+    if (!existing) return reply.status(404).send({ error: "Flow not found" });
+
+    const { name, description } = request.body as { name?: string; description?: string };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name.trim();
+    if (description !== undefined) updates.description = description.trim();
+
+    db.update(flows).set(updates).where(eq(flows.id, fid)).run();
+
+    const updated = db.select().from(flows).where(eq(flows.id, fid)).get()!;
+    const steps = db.select().from(flowSteps).where(eq(flowSteps.flowId, fid)).orderBy(flowSteps.stepIndex).all();
+
+    return {
+      flow: {
+        _id: String(updated.id),
+        id: updated.id,
+        projectId: String(updated.projectId),
+        name: updated.name,
+        description: updated.description,
+        status: updated.status,
+        steps: steps.map(serializeFlowStep),
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    };
+  });
+
+  server.delete("/flows/:flowId", async (request, reply) => {
+    const { flowId } = request.params as { flowId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+
+    const fid = toId(flowId);
+    const existing = db.select().from(flows).where(eq(flows.id, fid)).get();
+    if (!existing) return reply.status(404).send({ error: "Flow not found" });
+
+    db.delete(flowSteps).where(eq(flowSteps.flowId, fid)).run();
+    db.delete(flows).where(eq(flows.id, fid)).run();
+
+    return { ok: true, deletedId: flowId };
+  });
+
+  server.post("/flows/:flowId/steps", async (request, reply) => {
+    const { flowId } = request.params as { flowId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+
+    const fid = toId(flowId);
+    const flow = db.select().from(flows).where(eq(flows.id, fid)).get();
+    if (!flow) return reply.status(404).send({ error: "Flow not found" });
+
+    const body = request.body as {
+      sourcePageId?: string;
+      sourceUrl?: string;
+      elementId?: string;
+      elementSelector?: string;
+      elementText?: string;
+      elementBbox?: { x: number; y: number; width: number; height: number };
+      targetUrl?: string;
+      targetPageId?: string;
+      actionKind?: string;
+    };
+
+    if (!body.sourcePageId) return reply.status(400).send({ error: "sourcePageId is required" });
+    if (!body.sourceUrl) return reply.status(400).send({ error: "sourceUrl is required" });
+    if (!body.actionKind) return reply.status(400).send({ error: "actionKind is required" });
+
+    const existingSteps = db.select().from(flowSteps).where(eq(flowSteps.flowId, fid)).orderBy(flowSteps.stepIndex).all();
+    const nextIndex = existingSteps.length > 0 ? Math.max(...existingSteps.map((s) => s.stepIndex)) + 1 : 0;
+    const now = new Date();
+
+    const values: Record<string, unknown> = {
+      flowId: fid,
+      stepIndex: nextIndex,
+      sourcePageId: toId(body.sourcePageId),
+      sourceUrl: body.sourceUrl,
+      actionKind: body.actionKind,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (body.elementId && isValidId(body.elementId)) values.elementId = toId(body.elementId);
+    if (body.elementSelector) values.elementSelector = body.elementSelector;
+    if (body.elementText) values.elementText = body.elementText;
+    if (body.elementBbox) values.elementBboxJson = JSON.stringify(body.elementBbox);
+    if (body.targetUrl) values.targetUrl = body.targetUrl;
+    if (body.targetPageId && isValidId(body.targetPageId)) values.targetPageId = toId(body.targetPageId);
+
+    const [row] = db.insert(flowSteps).values(values as any).returning().all();
+
+    db.update(flows).set({ updatedAt: now }).where(eq(flows.id, fid)).run();
+
+    return { step: serializeFlowStep(row!) };
+  });
+
+  server.put("/flows/:flowId/steps/:stepId", async (request, reply) => {
+    const { flowId, stepId } = request.params as { flowId: string; stepId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+    if (!isValidId(stepId)) return reply.status(400).send({ error: "Invalid stepId" });
+
+    const fid = toId(flowId);
+    const sid = toId(stepId);
+    const step = db.select().from(flowSteps).where(and(eq(flowSteps.flowId, fid), eq(flowSteps.id, sid))).get();
+    if (!step) return reply.status(404).send({ error: "Step not found" });
+
+    const body = request.body as Record<string, unknown>;
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.stepIndex !== undefined) updates.stepIndex = body.stepIndex;
+    if (body.elementSelector !== undefined) updates.elementSelector = body.elementSelector;
+    if (body.elementText !== undefined) updates.elementText = body.elementText;
+    if (body.targetUrl !== undefined) updates.targetUrl = body.targetUrl;
+    if (body.targetPageId !== undefined) updates.targetPageId = isValidId(body.targetPageId as string) ? toId(body.targetPageId as string) : null;
+
+    db.update(flowSteps).set(updates).where(eq(flowSteps.id, sid)).run();
+
+    const updated = db.select().from(flowSteps).where(eq(flowSteps.id, sid)).get()!;
+    db.update(flows).set({ updatedAt: new Date() }).where(eq(flows.id, fid)).run();
+
+    return { step: serializeFlowStep(updated) };
+  });
+
+  server.delete("/flows/:flowId/steps/:stepId", async (request, reply) => {
+    const { flowId, stepId } = request.params as { flowId: string; stepId: string };
+    if (!isValidId(flowId)) return reply.status(400).send({ error: "Invalid flowId" });
+    if (!isValidId(stepId)) return reply.status(400).send({ error: "Invalid stepId" });
+
+    const fid = toId(flowId);
+    const sid = toId(stepId);
+    const step = db.select().from(flowSteps).where(and(eq(flowSteps.flowId, fid), eq(flowSteps.id, sid))).get();
+    if (!step) return reply.status(404).send({ error: "Step not found" });
+
+    db.delete(flowSteps).where(eq(flowSteps.id, sid)).run();
+
+    const remaining = db.select().from(flowSteps).where(eq(flowSteps.flowId, fid)).orderBy(flowSteps.stepIndex).all();
+    for (let i = 0; i < remaining.length; i++) {
+      const item = remaining[i];
+      if (item && item.stepIndex !== i) {
+        db.update(flowSteps).set({ stepIndex: i, updatedAt: new Date() }).where(eq(flowSteps.id, item.id)).run();
+      }
+    }
+
+    db.update(flows).set({ updatedAt: new Date() }).where(eq(flows.id, fid)).run();
+
+    return { ok: true, deletedId: stepId };
   });
 
   // ── Discovery ─────────────────────────────────────────────────────────────

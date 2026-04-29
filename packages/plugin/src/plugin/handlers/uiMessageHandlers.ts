@@ -43,6 +43,13 @@ import {
 } from "./inventoryHandlers";
 import { dispatchInventoryMessage } from "./inventoryMessageDispatcher";
 import { isInventoryUiMessage } from "../../messages/inventoryMessages";
+import {
+  handleGetActiveScreenshotPage,
+  handlePreviewFlowElement,
+  handleClearFlowPreview,
+  handleContinueFromTarget,
+  handleRenderFlowBoard,
+} from "./flowBuilderHandlers";
 
 /** Persist cookies for a domain */
 async function storeDomainCookies(
@@ -1290,6 +1297,26 @@ export async function handleUIMessage(msg: any): Promise<void> {
 
     case "submit-exact-urls":
       await handleSubmitExactUrls(msg);
+      break;
+
+    case "get-active-screenshot-page":
+      await handleGetActiveScreenshotPage();
+      break;
+
+    case "preview-flow-element":
+      await handlePreviewFlowElement(msg);
+      break;
+
+    case "clear-flow-preview":
+      await handleClearFlowPreview();
+      break;
+
+    case "continue-from-target":
+      await handleContinueFromTarget(msg);
+      break;
+
+    case "render-flow-board":
+      await handleRenderFlowBoard(msg);
       break;
 
     case "close":

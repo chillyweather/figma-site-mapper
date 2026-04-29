@@ -40,5 +40,26 @@ export function createHttpClient(baseUrl: string) {
     return response.json();
   }
 
-  return { get, post, getOrNull };
+  async function put(path: string, body?: unknown): Promise<unknown> {
+    const hasBody = body !== undefined;
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "PUT",
+      headers: hasBody ? { "Content-Type": "application/json" } : {},
+      body: hasBody ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  async function del(path: string): Promise<unknown> {
+    const response = await fetch(`${baseUrl}${path}`, { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+    return response.json();
+  }
+
+  return { get, post, put, del, getOrNull };
 }

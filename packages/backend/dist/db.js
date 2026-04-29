@@ -153,6 +153,36 @@ sqlite.exec(`
     created_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS flows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id),
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS flow_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    flow_id INTEGER NOT NULL REFERENCES flows(id),
+    step_index INTEGER NOT NULL,
+    source_page_id INTEGER NOT NULL REFERENCES pages(id),
+    source_url TEXT NOT NULL,
+    element_id INTEGER,
+    element_selector TEXT,
+    element_text TEXT,
+    element_bbox_json TEXT,
+    target_url TEXT,
+    target_page_id INTEGER,
+    action_kind TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS flows_project_id_idx ON flows(project_id);
+  CREATE INDEX IF NOT EXISTS flow_steps_flow_id_idx ON flow_steps(flow_id);
+
   CREATE UNIQUE INDEX IF NOT EXISTS discovery_candidates_run_norm_idx
     ON discovery_candidates(discovery_run_id, normalized_url);
 

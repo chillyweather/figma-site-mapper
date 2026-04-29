@@ -7,6 +7,10 @@ import {
   ElementFilters,
   CategorizedElements,
   Project,
+  FlowAction,
+  FlowDraftStep,
+  FlowRecord,
+  ActiveScreenshotPage,
 } from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
 import type { ManifestData } from "../plugin/types";
@@ -99,3 +103,15 @@ export const activeMarkupPageAtom = atom<{
 
 export const isMarkupRenderingAtom = atom(false);
 export const markupStatusAtom = atom<string>("");
+
+// Flow builder atoms
+export const activeScreenshotPageAtom = atom<ActiveScreenshotPage | null>(null);
+export const flowActionsAtom = atom<FlowAction[]>([]);
+export const flowActionsLoadingAtom = atom(false);
+export const flowDraftStepsAtom = atom<FlowDraftStep[]>([]);
+export const flowDraftNameAtom = atom("");
+export const selectedActionAtom = atom<FlowAction | null>(null);
+export const savedFlowsAtom = atom<FlowRecord[]>([]);
+export const activeFlowIdAtom = atom<string | null>(null);
+export const flowCapturingAtom = atom(false);
+export const flowCaptureJobIdAtom = atom<string | null>(null);

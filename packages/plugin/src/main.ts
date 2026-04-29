@@ -10,6 +10,9 @@
 import { UI_CONFIG } from "./plugin/constants";
 import { handleUIMessage } from "./plugin/handlers/uiMessageHandlers";
 import { initializePageEventListeners } from "./plugin/events/pageEventHandlers";
+import { installRemoteConsoleOverride } from "./utils/remoteLogger";
+
+installRemoteConsoleOverride("plugin:sandbox");
 
 // ============================================
 // INITIALIZE PLUGIN UI

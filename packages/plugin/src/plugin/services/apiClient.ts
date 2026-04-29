@@ -1,6 +1,6 @@
 import { BACKEND_URL } from "../constants";
 import { CrawlParams } from "../types";
-import type { InventoryDecisions, InventoryOverview, DiscoveryResult, MappingContextSummary, MappingSuggestions, MappingInputs } from "../../types";
+import type { InventoryDecisions, InventoryOverview, DiscoveryResult, MappingContextSummary, MappingSuggestions, MappingInputs, FlowRecord, FlowStepRecord } from "../../types";
 import type { InventoryRenderData } from "@sitemapper/shared";
 import { createHttpClient } from "./httpClient";
 
@@ -338,4 +338,71 @@ export async function prepareInventory(
     projectId: String(data.projectId ?? projectId),
     type: "inventory-prepare",
   };
+}
+
+// ── Flow API ────────────────────────────────────────────────────────────────
+
+export async function fetchFlows(projectId: string): Promise<FlowRecord[]> {
+  const data = await client.get(`/flows?projectId=${encodeURIComponent(projectId)}`) as any;
+  return Array.isArray(data.flows) ? data.flows : [];
+}
+
+export async function createFlow(params: {
+  projectId: string;
+  name: string;
+  description?: string;
+}): Promise<FlowRecord> {
+  const data = await client.post("/flows", params) as any;
+  return data.flow;
+}
+
+export async function fetchFlow(flowId: string): Promise<FlowRecord> {
+  const data = await client.get(`/flows/${encodeURIComponent(flowId)}`) as any;
+  return data.flow;
+}
+
+export async function updateFlow(
+  flowId: string,
+  params: { name?: string; description?: string }
+): Promise<FlowRecord> {
+  const data = await client.put(`/flows/${encodeURIComponent(flowId)}`, params) as any;
+  return data.flow;
+}
+
+export async function deleteFlow(flowId: string): Promise<void> {
+  await client.del(`/flows/${encodeURIComponent(flowId)}`);
+}
+
+export async function addFlowStep(
+  flowId: string,
+  params: {
+    sourcePageId: string;
+    sourceUrl: string;
+    elementId?: string;
+    elementSelector?: string;
+    elementText?: string;
+    elementBbox?: { x: number; y: number; width: number; height: number };
+    targetUrl?: string;
+    targetPageId?: string;
+    actionKind: string;
+  }
+): Promise<FlowStepRecord> {
+  const data = await client.post(`/flows/${encodeURIComponent(flowId)}/steps`, params) as any;
+  return data.step;
+}
+
+export async function updateFlowStep(
+  flowId: string,
+  stepId: string,
+  params: Record<string, unknown>
+): Promise<FlowStepRecord> {
+  const data = await client.put(
+    `/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(stepId)}`,
+    params
+  ) as any;
+  return data.step;
+}
+
+export async function deleteFlowStep(flowId: string, stepId: string): Promise<void> {
+  await client.del(`/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(stepId)}`);
 }

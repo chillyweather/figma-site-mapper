@@ -392,3 +392,81 @@ export interface DiscoveryResult {
   recommended: DiscoveryCandidate[];
   summary: DiscoveryRunSummary;
 }
+
+// ── Flow Builder types ────────────────────────────────────────────────
+
+export type TargetStatus =
+  | "captured"
+  | "needs-capture"
+  | "external"
+  | "same-page-anchor"
+  | "no-target";
+
+export type ActionKind = "link" | "button" | "input" | "other";
+
+export interface FlowAction {
+  elementId: string;
+  label: string;
+  elementType: string;
+  tagName: string;
+  targetUrl: string | null;
+  targetStatus: TargetStatus;
+  targetPageId: string | null;
+  selector: string | null;
+  regionLabel: string | null;
+  role: string | null;
+  bbox: { x: number; y: number; width: number; height: number } | null;
+}
+
+export interface FlowDraftStep {
+  sourcePageId: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  elementId: string | null;
+  elementSelector: string | null;
+  elementText: string | null;
+  elementBbox: { x: number; y: number; width: number; height: number } | null;
+  actionLabel: string;
+  actionKind: ActionKind;
+  targetUrl: string | null;
+  targetPageId: string | null;
+  targetStatus: TargetStatus;
+}
+
+export interface FlowRecord {
+  _id: string;
+  id: number;
+  projectId: string;
+  name: string;
+  description: string;
+  status: string;
+  stepCount?: number;
+  steps?: FlowStepRecord[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FlowStepRecord {
+  _id: string;
+  id: number;
+  flowId: string;
+  stepIndex: number;
+  sourcePageId: string;
+  sourceUrl: string;
+  elementId?: string;
+  elementSelector?: string;
+  elementText?: string;
+  elementBbox?: { x: number; y: number; width: number; height: number };
+  targetUrl?: string;
+  targetPageId?: string;
+  actionKind: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ActiveScreenshotPage {
+  pageId: string;
+  pageUrl: string;
+  pageName: string;
+  projectId: string;
+}

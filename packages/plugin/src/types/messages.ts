@@ -16,7 +16,14 @@ export type PluginMessageType =
   | "set-active-project"
   | "render-global-styles"
   | "render-element-styles"
-  | "select-element-style";
+  | "select-element-style"
+  | "get-active-screenshot-page"
+  | "active-screenshot-page"
+  | "preview-flow-element"
+  | "clear-flow-preview"
+  | "continue-from-target"
+  | "flow-preview-cleared"
+  | "flow-switch-page-result";
 
 export interface StyleExtractionSettings {
   enabled: boolean;

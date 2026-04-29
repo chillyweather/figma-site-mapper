@@ -138,6 +138,33 @@ export const elements = sqliteTable("elements", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+export const flows = sqliteTable("flows", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  status: text("status").notNull().default("draft"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const flowSteps = sqliteTable("flow_steps", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  flowId: integer("flow_id").notNull(),
+  stepIndex: integer("step_index").notNull(),
+  sourcePageId: integer("source_page_id").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  elementId: integer("element_id"),
+  elementSelector: text("element_selector"),
+  elementText: text("element_text"),
+  elementBboxJson: text("element_bbox_json"),
+  targetUrl: text("target_url"),
+  targetPageId: integer("target_page_id"),
+  actionKind: text("action_kind").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export type Project = typeof projects.$inferSelect;
 export type ProjectMappingInputs = typeof projectMappingInputs.$inferSelect;
 export type Page = typeof pages.$inferSelect;
@@ -146,3 +173,5 @@ export type CrawlRun = typeof crawlRuns.$inferSelect;
 export type InventoryBuild = typeof inventoryBuilds.$inferSelect;
 export type DiscoveryRun = typeof discoveryRuns.$inferSelect;
 export type DiscoveryCandidate = typeof discoveryCandidates.$inferSelect;
+export type Flow = typeof flows.$inferSelect;
+export type FlowStep = typeof flowSteps.$inferSelect;

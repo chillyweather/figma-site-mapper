@@ -10,6 +10,7 @@ function notifyActiveScreenshotPage(): void {
   const currentPage = figma.currentPage;
   const pageId = currentPage.getPluginData("PAGE_ID") || null;
   const pageUrl = currentPage.getPluginData("URL") || null;
+  const projectId = currentPage.getPluginData("PROJECT_ID") || null;
   const isScreenshot = Boolean(pageId || pageUrl);
 
   let screenshotWidth: number | null = null;
@@ -46,9 +47,17 @@ function notifyActiveScreenshotPage(): void {
     pageId,
     pageUrl,
     pageName: currentPage.name,
+    projectId,
     isScreenshot,
     screenshotWidth,
     originalWidth,
+    // Also include payload wrapper for flow builder
+    payload: pageId && pageUrl ? {
+      pageId,
+      pageUrl,
+      pageName: currentPage.name,
+      projectId,
+    } : null,
   });
 }
 
