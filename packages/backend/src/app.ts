@@ -1246,6 +1246,99 @@ export async function buildServer(): Promise<FastifyInstance> {
     return { ok: true, deletedId: stepId };
   });
 
+  // ── Extension trace import ───────────────────────────────────────────────
+
+  server.post("/flows/import-trace", async (request, reply) => {
+    const body = request.body as {
+      version?: number;
+      name?: string;
+      origin?: string;
+      startedAt?: string;
+      completedAt?: string;
+      steps?: Array<{
+        index: number;
+        sourceUrl: string;
+        sourceTitle?: string;
+        startedAt: string;
+        action: {
+          type: string;
+          tagName: string;
+          text?: string;
+          ariaLabel?: string;
+          role?: string;
+          href?: string;
+          selector?: string;
+          cssPath?: string;
+          elementId?: string;
+          classes?: string[];
+          bbox: { x: number; y: number; width: number; height: number };
+          viewport: { width: number; height: number; scrollX: number; scrollY: number };
+        };
+        targetUrl?: string;
+        completedAt?: string;
+        navigation?: { status: string };
+      }>;
+      projectId?: string;
+    };
+
+    if (body.version !== 1) return reply.status(400).send({ error: "Expected version:1" });
+    if (body.origin !== "chrome-extension") return reply.status(400).send({ error: "Expected origin:chrome-extension" });
+    if (!Array.isArray(body.steps) || body.steps.length === 0) return reply.status(400).send({ error: "Trace has no steps" });
+
+    // Use projectId from body if provided; otherwise use the first existing project
+    let projectId: number | undefined;
+    if (body.projectId && isValidId(body.projectId)) {
+      projectId = toId(body.projectId);
+    } else {
+      const first = db.select({ id: projects.id }).from(projects).orderBy(projects.id).limit(1).get();
+      projectId = first?.id;
+    }
+    if (!projectId) return reply.status(400).send({ error: "No projectId provided and no projects exist" });
+
+    const now = new Date();
+    const name = (typeof body.name === "string" && body.name.trim()) ? body.name.trim() : "Recorded Flow";
+
+    const inserted = db.insert(flows).values({
+      projectId,
+      name,
+      description: `Imported from Chrome extension on ${now.toISOString()}`,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    }).returning().all();
+    const flow = inserted[0];
+    if (!flow) return reply.status(500).send({ error: "Failed to create flow" });
+
+    for (let i = 0; i < body.steps.length; i++) {
+      const step = body.steps[i]!;
+      const docX = step.action.bbox.x + (step.action.viewport?.scrollX ?? 0);
+      const docY = step.action.bbox.y + (step.action.viewport?.scrollY ?? 0);
+      const bboxJson = JSON.stringify({ x: docX, y: docY, width: step.action.bbox.width, height: step.action.bbox.height });
+
+      db.insert(flowSteps).values({
+        flowId: flow.id,
+        stepIndex: i,
+        sourcePageId: 0,
+        sourceUrl: step.sourceUrl,
+        elementSelector: step.action.selector ?? step.action.cssPath ?? null,
+        elementText: step.action.text ?? step.action.ariaLabel ?? null,
+        elementBboxJson: bboxJson,
+        targetUrl: step.targetUrl ?? null,
+        targetPageId: null,
+        actionKind: step.action.tagName === "a" || step.action.role === "link" ? "link"
+          : step.action.tagName === "button" ? "button"
+          : step.action.tagName === "input" ? "input"
+          : "other",
+        createdAt: now,
+        updatedAt: now,
+      }).run();
+    }
+
+    db.update(flows).set({ updatedAt: now }).where(eq(flows.id, flow.id)).run();
+
+    return reply.status(201).send({ ok: true, flowId: String(flow.id), name });
+  });
+
   // ── Discovery ─────────────────────────────────────────────────────────────
 
   server.post("/discovery/start", async (request, reply) => {

@@ -4,8 +4,13 @@ import { MainViewProps } from "../types/index";
 import { CrawlingTab } from "./CrawlingTab";
 import { InventoryTab } from "./InventoryTab";
 import { FlowsTab } from "./FlowsTab";
-import { useFlowBuilder } from "../hooks/useFlowBuilder";
+import { useImportedFlows } from "../hooks/useImportedFlows";
+import { useAtom, useAtomValue } from "jotai";
+import { savedFlowsAtom, activeProjectIdAtom } from "../store/atoms";
+import { fetchFlows, deleteFlow, fetchFlow, addFlowStep, createFlow } from "../plugin/services/apiClient";
+import type { FlowRecord, FlowDraftStep } from "../types";
 
+const TAG = "[MainView]";
 
 export const MainView: React.FC<MainViewProps> = ({
   activeProjectId,
@@ -18,21 +23,22 @@ export const MainView: React.FC<MainViewProps> = ({
   crawlProgress,
   isRenderingSnapshot,
 }) => {
-  const [activeTab, setActiveTab] = useState<"crawling" | "inventory" | "flows">(
-    "crawling"
-  );
-
-  const flowBuilder = useFlowBuilder();
+  const [activeTab, setActiveTab] = useState<"crawling" | "inventory" | "flows">("crawling");
   const [renderingBoard, setRenderingBoard] = useState(false);
 
-  // Auto-load saved flows when project changes
+  const { importedFlows, importTrace, removeFlow, captureAndRender } = useImportedFlows();
+  const [savedFlows, setSavedFlows] = useAtom(savedFlowsAtom);
+  const projectId = useAtomValue(activeProjectIdAtom);
+
+  // Load saved flows when project changes
   useEffect(() => {
-    if (activeProjectId) {
-      flowBuilder.loadSavedFlows();
-    }
+    if (!activeProjectId) return;
+    fetchFlows(activeProjectId)
+      .then(setSavedFlows)
+      .catch((err) => console.error(`${TAG} fetchFlows failed:`, err));
   }, [activeProjectId]);
 
-  // Listen for flow board render responses from plugin sandbox
+  // Listen for flow board render status from plugin sandbox
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data?.pluginMessage;
@@ -44,30 +50,67 @@ export const MainView: React.FC<MainViewProps> = ({
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  const handleRerenderSaved = useCallback(async (flow: FlowRecord) => {
+    if (!activeProjectId) return;
+    let steps = flow.steps;
+    if (!steps || steps.length === 0) {
+      try {
+        const full = await fetchFlow(flow._id);
+        steps = full.steps ?? [];
+      } catch (err) {
+        console.error(`${TAG} fetchFlow failed:`, err);
+        return;
+      }
+    }
+
+    const draftSteps: FlowDraftStep[] = steps.map((s) => ({
+      sourcePageId: s.sourcePageId,
+      sourceUrl: s.sourceUrl,
+      sourceTitle: s.sourceUrl,
+      elementId: s.elementId ?? null,
+      elementSelector: s.elementSelector ?? null,
+      elementText: s.elementText ?? null,
+      elementBbox: s.elementBbox ?? null,
+      actionLabel: s.elementText || s.elementSelector?.split(" > ").at(-1) || "(step)",
+      actionKind: s.actionKind as FlowDraftStep["actionKind"],
+      targetUrl: s.targetUrl ?? null,
+      targetPageId: s.targetPageId ?? null,
+      targetStatus: (s.targetPageId ? "captured" : s.targetUrl ? "needs-capture" : "no-target") as FlowDraftStep["targetStatus"],
+    }));
+
+    parent.postMessage({
+      pluginMessage: {
+        type: "render-flow-board",
+        flowName: flow.name,
+        flowId: flow._id,
+        projectId: activeProjectId,
+        steps: draftSteps,
+      },
+    }, "*");
+  }, [activeProjectId]);
+
+  const handleDeleteSaved = useCallback(async (flowId: string) => {
+    try {
+      await deleteFlow(flowId);
+      if (activeProjectId) {
+        const flows = await fetchFlows(activeProjectId);
+        setSavedFlows(flows);
+      }
+    } catch (err) {
+      console.error(`${TAG} deleteFlow failed:`, err);
+    }
+  }, [activeProjectId, setSavedFlows]);
+
   const projectSelected = Boolean(activeProjectId);
 
   return (
     <div id="main-view">
-      <div
-        id="main-header"
-        className="header"
-      >
-        <h3
-          id="main-title"
-          className="header-title"
-        >
-          Figma Site Mapper
-        </h3>
-        <button
-          id="main-settings-button"
-          onClick={switchToSettings}
-          className="settings-button"
-        >
+      <div id="main-header" className="header">
+        <h3 id="main-title" className="header-title">Figma Site Mapper</h3>
+        <button id="main-settings-button" onClick={switchToSettings} className="settings-button">
           <IconSettings size={16} />
         </button>
       </div>
-
-      {/* Project-related UI moved to SettingsView */}
 
       {!projectSelected ? (
         <div className="flows-empty">
@@ -78,10 +121,7 @@ export const MainView: React.FC<MainViewProps> = ({
         </div>
       ) : (
         <>
-          <div
-            id="tab-navigation"
-            className="tab-navigation"
-          >
+          <div id="tab-navigation" className="tab-navigation">
             <button
               id="crawling-tab-button"
               onClick={() => setActiveTab("crawling")}
@@ -124,37 +164,17 @@ export const MainView: React.FC<MainViewProps> = ({
 
           {activeTab === "flows" && (
             <FlowsTab
-              activePage={flowBuilder.activePage}
-              actions={flowBuilder.actions}
-              actionsLoading={flowBuilder.actionsLoading}
-              draftSteps={flowBuilder.draftSteps}
-              draftName={flowBuilder.draftName}
-              selectedAction={flowBuilder.selectedAction}
-              savedFlows={flowBuilder.savedFlows}
-              activeFlowId={flowBuilder.activeFlowId}
-              capturing={flowBuilder.capturing}
-              onPreview={flowBuilder.previewAction}
-              onClearPreview={flowBuilder.clearPreview}
-              onAddStep={flowBuilder.addStep}
-              onRemoveStep={flowBuilder.removeStep}
-              onMoveStepUp={flowBuilder.moveStepUp}
-              onMoveStepDown={flowBuilder.moveStepDown}
-              onClearDraft={flowBuilder.clearDraft}
-              onDraftNameChange={flowBuilder.setDraftName}
-              onCaptureTarget={flowBuilder.captureTarget}
-              onContinueFromTarget={flowBuilder.continueFromTarget}
-              onSaveFlow={flowBuilder.saveFlow}
-              onLoadFlow={flowBuilder.loadFlowIntoDraft}
-              onDeleteFlow={flowBuilder.deleteSavedFlow}
-              onRenameFlow={flowBuilder.renameFlow}
-              onDuplicateFlow={flowBuilder.duplicateFlow}
-              onRerenderFlow={flowBuilder.rerenderSavedFlow}
-              onRenderBoard={flowBuilder.renderBoard}
+              projectId={projectId}
+              importedFlows={importedFlows}
+              savedFlows={savedFlows}
               renderingBoard={renderingBoard}
+              onImportTrace={importTrace}
+              onRemoveImported={removeFlow}
+              onCaptureAndRender={captureAndRender}
+              onRerenderSaved={handleRerenderSaved}
+              onDeleteSaved={handleDeleteSaved}
             />
           )}
-
-
         </>
       )}
     </div>

@@ -1,0 +1,25 @@
+{
+  "name": "@sitemapper/extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build --config vite.content.config.ts && vite build --config vite.config.ts && node scripts/copyAssets.js",
+    "dev": "concurrently \"vite build --watch --config vite.content.config.ts\" \"vite build --watch --config vite.config.ts\"",
+    "build:content": "vite build --config vite.content.config.ts",
+    "build:main": "vite build --config vite.config.ts"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  }
+}

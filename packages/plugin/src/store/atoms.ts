@@ -11,6 +11,7 @@ import {
   FlowDraftStep,
   FlowRecord,
   ActiveScreenshotPage,
+  ImportedFlowEntry,
 } from "../types";
 import { DEFAULT_SETTINGS } from "../constants";
 import type { ManifestData } from "../plugin/types";
@@ -106,6 +107,7 @@ export const markupStatusAtom = atom<string>("");
 
 // Flow builder atoms
 export const activeScreenshotPageAtom = atom<ActiveScreenshotPage | null>(null);
+export const importedFlowsAtom = atom<ImportedFlowEntry[]>([]);
 export const flowActionsAtom = atom<FlowAction[]>([]);
 export const flowActionsLoadingAtom = atom(false);
 export const flowDraftStepsAtom = atom<FlowDraftStep[]>([]);

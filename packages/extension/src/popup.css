@@ -1,0 +1,183 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 280px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #1a1a2e;
+  background: #ffffff;
+}
+
+.recorder {
+  padding: 16px;
+}
+
+.recorder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.recorder-title {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ccc;
+  flex-shrink: 0;
+}
+
+.dot.recording {
+  background: #e53e3e;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.recorder-status {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 14px;
+  min-height: 18px;
+}
+
+.recorder-status.recording {
+  color: #e53e3e;
+  font-weight: 500;
+}
+
+.recorder-step-count {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.recorder-step-label {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recorder-name-row {
+  margin-bottom: 12px;
+}
+
+.recorder-name-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.recorder-name-input:focus {
+  border-color: #4f46e5;
+}
+
+.recorder-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-start {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.btn-start:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.btn-stop {
+  background: #e53e3e;
+  color: #fff;
+}
+
+.btn-stop:hover:not(:disabled) {
+  background: #c53030;
+}
+
+.btn-export {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #dcfce7;
+}
+
+.btn-send {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+.btn-send:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.btn-clear {
+  background: #f8f8f8;
+  color: #666;
+  border: 1px solid #e0e0e0;
+}
+
+.btn-clear:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.recorder-message {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.recorder-message.success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.recorder-message.error {
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #fed7d7;
+}
