@@ -84,6 +84,15 @@ function projectExists(projectId: string): boolean {
   return Boolean(row);
 }
 
+function pageBelongsToProject(pageId: string, projectId: number): boolean {
+  const row = db
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.id, toId(pageId)), eq(pages.projectId, projectId)))
+    .get();
+  return Boolean(row);
+}
+
 
 function requestBaseUrl(request: { headers: { host?: string | string[] } }): string {
   const host = Array.isArray(request.headers.host)
@@ -979,6 +988,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     const { projectId } = request.query as { projectId?: string };
     if (!projectId) return reply.status(400).send({ error: "projectId is required" });
     if (!isValidId(projectId)) return reply.status(400).send({ error: "Invalid projectId" });
+    if (!projectExists(projectId)) return reply.status(404).send({ error: "Project not found" });
 
     const pid = toId(projectId);
     const flowRows = db.select().from(flows).where(eq(flows.projectId, pid)).orderBy(desc(flows.updatedAt)).all();
@@ -1135,6 +1145,16 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (!body.sourcePageId) return reply.status(400).send({ error: "sourcePageId is required" });
     if (!body.sourceUrl) return reply.status(400).send({ error: "sourceUrl is required" });
     if (!body.actionKind) return reply.status(400).send({ error: "actionKind is required" });
+    if (!isValidId(body.sourcePageId)) return reply.status(400).send({ error: "Invalid sourcePageId" });
+    if (!pageBelongsToProject(body.sourcePageId, flow.projectId)) {
+      return reply.status(400).send({ error: "sourcePageId does not belong to this flow's project" });
+    }
+    if (body.targetPageId) {
+      if (!isValidId(body.targetPageId)) return reply.status(400).send({ error: "Invalid targetPageId" });
+      if (!pageBelongsToProject(body.targetPageId, flow.projectId)) {
+        return reply.status(400).send({ error: "targetPageId does not belong to this flow's project" });
+      }
+    }
 
     const existingSteps = db.select().from(flowSteps).where(eq(flowSteps.flowId, fid)).orderBy(flowSteps.stepIndex).all();
     const nextIndex = existingSteps.length > 0 ? Math.max(...existingSteps.map((s) => s.stepIndex)) + 1 : 0;
@@ -1154,7 +1174,7 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (body.elementText) values.elementText = body.elementText;
     if (body.elementBbox) values.elementBboxJson = JSON.stringify(body.elementBbox);
     if (body.targetUrl) values.targetUrl = body.targetUrl;
-    if (body.targetPageId && isValidId(body.targetPageId)) values.targetPageId = toId(body.targetPageId);
+    if (body.targetPageId) values.targetPageId = toId(body.targetPageId);
 
     const [row] = db.insert(flowSteps).values(values as any).returning().all();
 
@@ -1179,7 +1199,19 @@ export async function buildServer(): Promise<FastifyInstance> {
     if (body.elementSelector !== undefined) updates.elementSelector = body.elementSelector;
     if (body.elementText !== undefined) updates.elementText = body.elementText;
     if (body.targetUrl !== undefined) updates.targetUrl = body.targetUrl;
-    if (body.targetPageId !== undefined) updates.targetPageId = isValidId(body.targetPageId as string) ? toId(body.targetPageId as string) : null;
+    if (body.targetPageId !== undefined) {
+      if (body.targetPageId === null || body.targetPageId === "") {
+        updates.targetPageId = null;
+      } else if (typeof body.targetPageId === "string" && isValidId(body.targetPageId)) {
+        const flow = db.select().from(flows).where(eq(flows.id, fid)).get();
+        if (!flow || !pageBelongsToProject(body.targetPageId, flow.projectId)) {
+          return reply.status(400).send({ error: "targetPageId does not belong to this flow's project" });
+        }
+        updates.targetPageId = toId(body.targetPageId);
+      } else {
+        return reply.status(400).send({ error: "Invalid targetPageId" });
+      }
+    }
 
     db.update(flowSteps).set(updates).where(eq(flowSteps.id, sid)).run();
 

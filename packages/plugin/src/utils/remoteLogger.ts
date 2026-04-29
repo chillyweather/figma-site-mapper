@@ -30,13 +30,47 @@ function argsToData(args: unknown[]): unknown {
   return args.map(serializeArg);
 }
 
+function safeStringify(value: unknown): string | null {
+  const seen = new WeakSet<object>();
+  try {
+    return JSON.stringify(value, (_key, current) => {
+      if (typeof current === "function") {
+        return `[Function: ${current.name || "anonymous"}]`;
+      }
+      if (current instanceof Error) {
+        return { errorMessage: current.message, stack: current.stack };
+      }
+      if (current && typeof current === "object") {
+        if (seen.has(current)) return "[Circular]";
+        seen.add(current);
+      }
+      return current;
+    });
+  } catch {
+    return null;
+  }
+}
+
+function getConsoleMethod(
+  name: "log" | "info" | "warn" | "error" | "debug",
+  fallback?: (...args: unknown[]) => void
+): (...args: unknown[]) => void {
+  const candidate = (console as Partial<Record<typeof name, unknown>>)[name];
+  if (typeof candidate === "function") {
+    return candidate.bind(console) as (...args: unknown[]) => void;
+  }
+  if (fallback) return fallback;
+  return () => {};
+}
+
 // ─── Fire-and-forget POST ─────────────────────────────────────────────────────
 
 function post(level: string, source: string, msg: string, data: unknown): void {
   // Fire and forget — intentionally not awaited.
-  const body = JSON.stringify(
+  const body = safeStringify(
     data !== undefined ? { level, source, msg, data } : { level, source, msg }
   );
+  if (!body) return;
   fetch(LOG_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,13 +90,13 @@ function post(level: string, source: string, msg: string, data: unknown): void {
  *                or "plugin:ui". Visible as the `source` field in pino output.
  */
 export function installRemoteConsoleOverride(source: string): void {
-  const original = {
-    log:   console.log.bind(console),
-    info:  console.info.bind(console),
-    warn:  console.warn.bind(console),
-    error: console.error.bind(console),
-    debug: console.debug.bind(console),
-  };
+  const log = getConsoleMethod("log");
+  const info = getConsoleMethod("info", log);
+  const warn = getConsoleMethod("warn", log);
+  const error = getConsoleMethod("error", warn);
+  const debug = getConsoleMethod("debug", log);
+
+  const original = { log, info, warn, error, debug };
 
   console.log = (...args: unknown[]) => {
     original.log(...args);

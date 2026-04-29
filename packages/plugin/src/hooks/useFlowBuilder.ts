@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { fetchProjectElements, fetchProjectPages, recrawlPage, getJobStatus } from "../plugin/services/apiClient";
 import { fetchFlows, fetchFlow, createFlow, addFlowStep, deleteFlowStep, updateFlow } from "../plugin/services/apiClient";
@@ -117,32 +117,10 @@ export function useFlowBuilder() {
   const [activeFlowId, setActiveFlowId] = useAtom(activeFlowIdAtom);
   const [capturing, setCapturing] = useAtom(flowCapturingAtom);
   const [captureJobId, setCaptureJobId] = useAtom(flowCaptureJobIdAtom);
-
-  // Poll for capture job completion
-  useEffect(() => {
-    if (!captureJobId || !capturing) return;
-    console.log(`${TAG} capture poll — watching jobId=${captureJobId}`);
-    const poll = async () => {
-      try {
-        const result = await getJobStatus(captureJobId);
-        console.log(`${TAG} capture poll — jobId=${captureJobId} status=${result.status}`);
-        if (result.status === "completed") {
-          console.log(`${TAG} capture poll — job completed; refreshing actions`);
-          setCapturing(false);
-          setCaptureJobId(null);
-          if (activePage) loadActions(activePage);
-        } else if (result.status === "failed") {
-          console.error(`${TAG} capture poll — job FAILED for jobId=${captureJobId}`);
-          setCapturing(false);
-          setCaptureJobId(null);
-        }
-      } catch (err) {
-        console.warn(`${TAG} capture poll — poll error (will retry):`, err);
-      }
-    };
-    const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
-  }, [captureJobId, capturing]);
+  const [captureRequest, setCaptureRequest] = useState<{
+    stepIndex: number;
+    targetUrl: string;
+  } | null>(null);
 
   // Listen for active screenshot page messages from the sandbox
   useEffect(() => {
@@ -168,6 +146,11 @@ export function useFlowBuilder() {
   const loadActions = useCallback(async (page: { pageId: string; pageUrl: string; projectId: string }) => {
     if (!activeProjectId) {
       console.warn(`${TAG} loadActions — skipped: no activeProjectId`);
+      return;
+    }
+    if (page.projectId && page.projectId !== activeProjectId) {
+      console.warn(`${TAG} loadActions — skipped: active project ${activeProjectId} does not match page project ${page.projectId}`);
+      setActions([]);
       return;
     }
     console.log(`${TAG} loadActions — loading for page ${page.pageId} (${page.pageUrl}), project ${activeProjectId}`);
@@ -250,18 +233,71 @@ export function useFlowBuilder() {
     }
   }, [activeProjectId]);
 
-  // Auto-load actions when active page changes
+  // Poll for capture job completion.
   useEffect(() => {
-    if (activePage) {
+    if (!captureJobId || !capturing) return;
+    console.log(`${TAG} capture poll — watching jobId=${captureJobId}`);
+    const poll = async () => {
+      try {
+        const result = await getJobStatus(captureJobId);
+        console.log(`${TAG} capture poll — jobId=${captureJobId} status=${result.status}`);
+        if (result.status === "completed") {
+          const visitedPageIds = Array.isArray(result.result?.visitedPageIds)
+            ? result.result.visitedPageIds.map(String)
+            : [];
+          const capturedPageId = visitedPageIds[0] ?? null;
+          console.log(`${TAG} capture poll — job completed; refreshing actions`, {
+            capturedPageId,
+            target: captureRequest,
+          });
+          if (capturedPageId && captureRequest) {
+            setDraftSteps((prev) => prev.map((step, index) => {
+              if (index !== captureRequest.stepIndex || step.targetUrl !== captureRequest.targetUrl) {
+                return step;
+              }
+              return {
+                ...step,
+                targetPageId: capturedPageId,
+                targetStatus: "captured",
+              };
+            }));
+          } else {
+            console.warn(`${TAG} capture poll — completed without a returned target page id`);
+          }
+          setCapturing(false);
+          setCaptureJobId(null);
+          setCaptureRequest(null);
+          if (activePage) loadActions(activePage);
+        } else if (result.status === "failed") {
+          console.error(`${TAG} capture poll — job FAILED for jobId=${captureJobId}`);
+          setCapturing(false);
+          setCaptureJobId(null);
+          setCaptureRequest(null);
+        }
+      } catch (err) {
+        console.warn(`${TAG} capture poll — poll error (will retry):`, err);
+      }
+    };
+    const interval = setInterval(poll, 3000);
+    void poll();
+    return () => clearInterval(interval);
+  }, [activePage, captureJobId, captureRequest, capturing, loadActions, setCaptureJobId, setCapturing, setDraftSteps]);
+
+  // Auto-load actions when active page or project readiness changes.
+  useEffect(() => {
+    if (activePage && activeProjectId) {
       console.log(`${TAG} active page changed to: ${activePage.pageId} (${activePage.pageUrl})`);
       loadActions(activePage);
+    } else if (activePage) {
+      console.log(`${TAG} active page available but project is not ready; clearing actions`);
+      setActions([]);
     } else {
       console.log(`${TAG} active page cleared; resetting actions and draft`);
       setActions([]);
       setDraftSteps([]);
       setSelectedAction(null);
     }
-  }, [activePage]);
+  }, [activePage, activeProjectId, loadActions, setActions, setDraftSteps, setSelectedAction]);
 
   const previewAction = useCallback((action: FlowAction) => {
     console.log(`${TAG} previewAction — element: "${action.label}" (${action.elementId})`, {
@@ -363,6 +399,7 @@ export function useFlowBuilder() {
     }
     console.log(`${TAG} captureTarget — starting capture for step ${stepIndex}: "${step.targetUrl}"`);
     setCapturing(true);
+    setCaptureRequest({ stepIndex, targetUrl: step.targetUrl });
     try {
       const result = await recrawlPage({ url: step.targetUrl, projectId: activeProjectId });
       console.log(`${TAG} captureTarget — recrawl started, jobId=${result.jobId}`);
@@ -370,8 +407,9 @@ export function useFlowBuilder() {
     } catch (err) {
       console.error(`${TAG} captureTarget — FAILED to start recrawl:`, err);
       setCapturing(false);
+      setCaptureRequest(null);
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, setCaptureJobId, setCapturing]);
 
   const continueFromTarget = useCallback((step: FlowDraftStep) => {
     if (!step.targetPageId) {
