@@ -199,6 +199,9 @@ async function buildScreenPanel(opts: {
   pageItem: PageApiItem | null;
   stepIndex: number;
   bbox?: { x: number; y: number; width: number; height: number } | null;
+  // When set, bbox.y is viewport-relative and this is the page scroll offset.
+  // The crop is positioned at scrollY instead of centering on the element.
+  elementScrollY?: number;
   originalViewportWidth: number;
   label: string;
   isSource: boolean;
@@ -279,17 +282,31 @@ async function buildScreenPanel(opts: {
       if (bbox && originalViewportWidth > 0) {
         const displayScale = PANEL_WIDTH / originalViewportWidth;
         hx = bbox.x * displayScale;
-        hy = bbox.y * displayScale;
         hw = Math.max(bbox.width * displayScale, 4);
         hh = Math.max(bbox.height * displayScale, 4);
-        const elementCentre = hy + hh / 2;
-        cropY = Math.max(0, Math.min(elementCentre - PANEL_HEIGHT * 0.4, imgHeight - PANEL_HEIGHT));
+
+        if (opts.elementScrollY !== undefined) {
+          // Extension-recorded flow: bbox.y is viewport-relative, scrollY is the page offset.
+          // Crop at the exact scroll position so the panel shows what the user saw.
+          // highlight.y = hy - cropY = (docY * scale) - (scrollY * scale) = viewportY * scale
+          // which correctly places the highlight at its viewport position inside the 480px panel.
+          const docY = (bbox.y + opts.elementScrollY) * displayScale;
+          hy = docY;
+          cropY = Math.max(0, Math.min(opts.elementScrollY * displayScale, imgHeight - PANEL_HEIGHT));
+        } else {
+          // Manually built flow: bbox.y is already a document coordinate.
+          // Center the element vertically in the panel.
+          hy = bbox.y * displayScale;
+          const elementCentre = hy + hh / 2;
+          cropY = Math.max(0, Math.min(elementCentre - PANEL_HEIGHT * 0.4, imgHeight - PANEL_HEIGHT));
+        }
+
         console.log(
           `${TAG} buildScreenPanel — ${stepLabel} crop:`,
           {
             displayScale: displayScale.toFixed(3),
+            mode: opts.elementScrollY !== undefined ? "scroll-exact" : "center",
             highlight: { hx: Math.round(hx), hy: Math.round(hy), hw: Math.round(hw), hh: Math.round(hh) },
-            elementCentre: Math.round(elementCentre),
             cropY: Math.round(cropY),
             highlightInFrame: { x: Math.round(hx), y: Math.round(hy - cropY) },
           }
@@ -495,6 +512,7 @@ export async function renderFlowBoard(opts: RenderFlowBoardOptions): Promise<voi
       pageItem: sourcePage,
       stepIndex: i,
       bbox: step.elementBbox,
+      elementScrollY: step.elementScrollY,
       originalViewportWidth,
       label: step.actionLabel,
       isSource: true,

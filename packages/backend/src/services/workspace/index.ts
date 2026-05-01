@@ -3,25 +3,13 @@ import path from "path";
 import { and, eq, desc } from "drizzle-orm";
 import { db } from "../../db.js";
 import { inventoryBuilds, crawlRuns } from "../../schema.js";
-import { buildContactSheets } from "./contactSheet.js";
-import { ensureDecisionScaffold, readDecisionFiles, decisionSummary } from "./decisions.js";
+import { readDecisionFiles, decisionSummary } from "./decisions.js";
 import { loadWorkspaceData } from "./loadData.js";
-import {
-  allCatalogFolders,
-  buildCatalogGroups,
-  categoryCounts,
-  writeCatalogManifests,
-  writePageManifests,
-  writeProjectManifest,
-  writeRegionManifests,
-} from "./manifests.js";
-import { readWorkspaceMeta, writeWorkspaceMeta } from "./meta.js";
+import { materializeWorkspace } from "./materialize.js";
+import { readWorkspaceMeta } from "./meta.js";
 import { defaultWorkspacePath, ensureDir, writeJson } from "./paths.js";
-import { writeWorkspaceReadme } from "./readme.js";
-import { buildColorSwatches } from "./swatches.js";
-import { buildTypographySpecimens } from "./typeSpecimens.js";
-import type { WorkspaceBuildResult } from "./types.js";
-import { writeMappingContextScaffold } from "../mappingContext/scaffold.js";
+import { composeWorkspaceArtifacts } from "./prepare.js";
+import type { WorkspaceBuildResult, WorkspaceData } from "./types.js";
 
 export function getLatestCompletedCrawlRun(projectId: string) {
   const n = parseInt(projectId, 10);
@@ -34,18 +22,6 @@ export function getLatestCompletedCrawlRun(projectId: string) {
     .get() ?? null;
 }
 
-const GENERATED_ENTRIES = [
-  "README.md",
-  "project.json",
-  ".workspace-meta.json",
-  "pages",
-  "catalog",
-  "tokens",
-  "regions",
-  "mapping-context",
-  "exports",
-];
-
 export interface BuildWorkspaceOptions {
   outPath?: string;
   verbose?: boolean;
@@ -55,110 +31,88 @@ function log(verbose: boolean | undefined, message: string): void {
   if (verbose) console.log(message);
 }
 
-async function resetGeneratedWorkspace(workspacePath: string): Promise<void> {
-  await ensureDir(workspacePath);
-  for (const entry of GENERATED_ENTRIES) {
-    await fs.promises.rm(path.join(workspacePath, entry), {
-      recursive: true,
-      force: true,
-    });
-  }
-  await ensureDecisionScaffold(workspacePath);
+interface InventoryBuildRecord {
+  id: number;
+  crawlRunId: number | null;
 }
 
-async function writeTokenFiles(workspacePath: string, data: Awaited<ReturnType<typeof loadWorkspaceData>>): Promise<void> {
-  const tokenDir = path.join(workspacePath, "tokens");
-  await writeJson(path.join(tokenDir, "colors.json"), data.tokenTable.colors);
-  await writeJson(path.join(tokenDir, "typography.json"), data.tokenTable.typography);
-  await writeJson(path.join(tokenDir, "spacing.json"), data.tokenTable.spacing);
-  await writeJson(path.join(tokenDir, "radii.json"), data.tokenTable.radii);
-  await writeJson(path.join(tokenDir, "shadows.json"), data.tokenTable.shadows);
-  await buildColorSwatches(data.tokenTable, path.join(tokenDir, "colors-swatches.png"));
-  await buildTypographySpecimens(data.tokenTable, path.join(tokenDir, "typography-specimens.png"));
+function startInventoryBuild(projectId: string, workspacePath: string): InventoryBuildRecord | null {
+  const projectNumId = parseInt(projectId, 10);
+  if (isNaN(projectNumId) || projectNumId <= 0) return null;
+
+  const latestCrawlRun = getLatestCompletedCrawlRun(projectId);
+  const crawlRunId = latestCrawlRun?.id ?? null;
+
+  const [row] = db
+    .insert(inventoryBuilds)
+    .values({
+      projectId: projectNumId,
+      crawlRunId,
+      workspacePath,
+      schemaVersion: 1,
+      status: "running",
+      startedAt: new Date(),
+    })
+    .returning()
+    .all();
+
+  return row ? { id: row.id, crawlRunId } : null;
+}
+
+function completeInventoryBuild(buildId: number, data: WorkspaceData): void {
+  db.update(inventoryBuilds)
+    .set({
+      status: "completed",
+      pageCount: data.pages.length,
+      elementCount: data.elements.length,
+      completedAt: new Date(),
+    })
+    .where(eq(inventoryBuilds.id, buildId))
+    .run();
+}
+
+function failInventoryBuild(buildId: number): void {
+  db.update(inventoryBuilds)
+    .set({ status: "failed", completedAt: new Date() })
+    .where(eq(inventoryBuilds.id, buildId))
+    .run();
 }
 
 export async function buildWorkspace(
   projectId: string,
   options: BuildWorkspaceOptions = {}
 ): Promise<WorkspaceBuildResult> {
+  log(options.verbose, `Loading project ${projectId} from SQLite`);
+  const data = await loadWorkspaceData(projectId);
+  return buildWorkspaceFromData(projectId, data, options);
+}
+
+export async function buildWorkspaceFromData(
+  projectId: string,
+  data: WorkspaceData,
+  options: BuildWorkspaceOptions = {}
+): Promise<WorkspaceBuildResult> {
   const workspacePath = options.outPath ?? defaultWorkspacePath(projectId);
   const generatedAt = new Date().toISOString();
 
-  log(options.verbose, `Loading project ${projectId} from SQLite`);
-  const data = await loadWorkspaceData(projectId);
+  log(options.verbose, "Composing workspace artifacts");
+  const artifacts = composeWorkspaceArtifacts(data);
 
-  const latestCrawlRun = getLatestCompletedCrawlRun(projectId);
-  const crawlRunId = latestCrawlRun?.id ?? null;
-
-  log(options.verbose, `Creating inventory build record`);
-  const projectNumId = parseInt(projectId, 10);
-  let buildRow: typeof inventoryBuilds.$inferSelect | null = null;
-  if (!isNaN(projectNumId) && projectNumId > 0) {
-    const [row] = db
-      .insert(inventoryBuilds)
-      .values({
-        projectId: projectNumId,
-        crawlRunId,
-        workspacePath,
-        schemaVersion: 1,
-        status: "running",
-        startedAt: new Date(),
-      })
-      .returning()
-      .all();
-    buildRow = row ?? null;
-  }
+  log(options.verbose, "Creating inventory build record");
+  const buildRecord = startInventoryBuild(projectId, workspacePath);
 
   try {
-    log(options.verbose, `Resetting generated workspace at ${workspacePath}`);
-    await resetGeneratedWorkspace(workspacePath);
-
-    for (const folder of allCatalogFolders()) {
-      await ensureDir(path.join(workspacePath, "catalog", folder, "crops"));
-    }
-
-    log(options.verbose, "Writing project/page/catalog manifests");
-    const groupsByFolder = buildCatalogGroups(data.elements);
-    await writeProjectManifest(workspacePath, data, generatedAt);
-    await writeCatalogManifests(workspacePath, data, groupsByFolder);
-    await writePageManifests(workspacePath, data);
-    await writeRegionManifests(workspacePath, data);
-
-    log(options.verbose, "Generating contact sheets and token images");
-    await buildContactSheets(workspacePath, groupsByFolder);
-    await writeTokenFiles(workspacePath, data);
-
-    log(options.verbose, "Writing mapping-context scaffold");
-    await writeMappingContextScaffold(workspacePath, projectId, generatedAt);
-
-    await writeWorkspaceReadme(workspacePath, data, generatedAt);
-    await writeWorkspaceMeta(workspacePath, data, generatedAt, {
-      inventoryBuildId: buildRow ? String(buildRow.id) : undefined,
-      crawlRunId: crawlRunId ? String(crawlRunId) : undefined,
+    log(options.verbose, `Materializing workspace at ${workspacePath}`);
+    await materializeWorkspace(workspacePath, data, artifacts, generatedAt, {
+      metaExtra: {
+        inventoryBuildId: buildRecord ? String(buildRecord.id) : undefined,
+        crawlRunId: buildRecord?.crawlRunId ? String(buildRecord.crawlRunId) : undefined,
+      },
     });
-    await ensureDecisionScaffold(workspacePath);
 
-    if (buildRow) {
-      db.update(inventoryBuilds)
-        .set({
-          status: "completed",
-          pageCount: data.pages.length,
-          elementCount: data.elements.length,
-          completedAt: new Date(),
-        })
-        .where(eq(inventoryBuilds.id, buildRow.id))
-        .run();
-    }
+    if (buildRecord) completeInventoryBuild(buildRecord.id, data);
   } catch (error) {
-    if (buildRow) {
-      db.update(inventoryBuilds)
-        .set({
-          status: "failed",
-          completedAt: new Date(),
-        })
-        .where(eq(inventoryBuilds.id, buildRow.id))
-        .run();
-    }
+    if (buildRecord) failInventoryBuild(buildRecord.id);
     throw error;
   }
 
@@ -167,7 +121,7 @@ export async function buildWorkspace(
     workspaceRoot: workspacePath,
     pageCount: data.pages.length,
     elementCount: data.elements.length,
-    categoryCounts: categoryCounts(data.elements),
+    categoryCounts: artifacts.categoryCountsAll,
     generatedAt,
   };
 }
@@ -261,7 +215,9 @@ export async function exportDecisions(projectId: string, outPath?: string): Prom
 export async function refreshWorkspace(projectId: string, options: BuildWorkspaceOptions = {}): Promise<Record<string, unknown>> {
   const workspacePath = options.outPath ?? defaultWorkspacePath(projectId);
   const previousDecisions = await readDecisionFiles(workspacePath);
-  const result = await buildWorkspace(projectId, options);
+
+  const data = await loadWorkspaceData(projectId);
+  const result = await buildWorkspaceFromData(projectId, data, options);
 
   const clusters = previousDecisions.clusters as
     | { clusters?: Array<{ id?: string; memberFingerprints?: string[] }> }
@@ -270,7 +226,6 @@ export async function refreshWorkspace(projectId: string, options: BuildWorkspac
     return { ...result, mergeReport: null };
   }
 
-  const data = await loadWorkspaceData(projectId);
   const observed = new Set(
     data.elements
       .map((element) => element.componentFingerprint)

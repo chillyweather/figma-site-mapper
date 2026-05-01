@@ -426,6 +426,9 @@ export interface FlowDraftStep {
   elementSelector: string | null;
   elementText: string | null;
   elementBbox: { x: number; y: number; width: number; height: number } | null;
+  // When present, elementBbox.y is viewport-relative and this is the page scroll offset
+  // at recording time. The renderer crops at scrollY instead of centering on the element.
+  elementScrollY?: number;
   actionLabel: string;
   actionKind: ActionKind;
   targetUrl: string | null;

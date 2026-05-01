@@ -20,23 +20,26 @@ const TAG = "[ImportedFlows]";
 
 function traceStepToDraftStep(step: RecordedFlowStep): FlowDraftStep {
   const { action } = step;
-  // Convert viewport-relative bbox to document coordinates
-  const docX = action.bbox.x + action.viewport.scrollX;
-  const docY = action.bbox.y + action.viewport.scrollY;
 
+  // Keep bbox.y viewport-relative and carry scrollY separately.
+  // The renderer uses scrollY to position the crop (show what the user saw)
+  // and viewport-relative bbox.y to place the highlight within the panel.
+  // This avoids layout-drift errors that accumulate when docY = viewportY + scrollY
+  // is computed against a screenshot taken at a different viewport width.
   return {
-    sourcePageId: "",       // filled in after page capture
+    sourcePageId: "",
     sourceUrl: step.sourceUrl,
     sourceTitle: step.sourceTitle ?? step.sourceUrl,
     elementId: null,
     elementSelector: action.selector ?? action.cssPath ?? null,
     elementText: action.text ?? action.ariaLabel ?? null,
     elementBbox: {
-      x: docX,
-      y: docY,
+      x: action.bbox.x + action.viewport.scrollX,  // doc X (scrollX is usually 0)
+      y: action.bbox.y,                             // viewport-relative Y
       width: action.bbox.width,
       height: action.bbox.height,
     },
+    elementScrollY: action.viewport.scrollY,
     actionLabel: action.text ?? action.ariaLabel ?? action.selector?.split(" > ").at(-1) ?? "(click)",
     actionKind: action.tagName === "a" || action.role === "link" ? "link"
       : action.tagName === "button" ? "button"

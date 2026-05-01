@@ -4,6 +4,7 @@ import type {
   ParsedInventoryElement,
   ParsedInventoryPage,
 } from "../inventory/types.js";
+import type { analyzeRegionsAndTemplates } from "../inventory/regionDetection.js";
 
 export const WORKSPACE_SCHEMA_VERSION = 1;
 
@@ -56,6 +57,15 @@ export interface CatalogGroup {
   isGlobalChrome: boolean;
   textSamples: string[];
   elementIds: string[];
+}
+
+export type RegionAnalysis = ReturnType<typeof analyzeRegionsAndTemplates>;
+
+export interface WorkspaceArtifacts {
+  catalogGroups: Map<WorkspaceCategoryFolder, CatalogGroup[]>;
+  regionAnalysis: RegionAnalysis;
+  globalChromeElements: WorkspaceElement[];
+  categoryCountsAll: Record<string, number>;
 }
 
 export interface WorkspaceBuildResult {

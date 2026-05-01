@@ -1,6 +1,5 @@
 import path from "path";
 import crypto from "crypto";
-import { analyzeRegionsAndTemplates } from "../inventory/regionDetection.js";
 import { getNormalizedStyle } from "../inventory/normalizeStyles.js";
 import {
   linkOrCopyFile,
@@ -10,6 +9,7 @@ import {
 } from "./paths.js";
 import type {
   CatalogGroup,
+  WorkspaceArtifacts,
   WorkspaceCategoryFolder,
   WorkspaceData,
   WorkspaceElement,
@@ -351,19 +351,17 @@ export async function writeCatalogManifests(
 
 export async function writeRegionManifests(
   workspacePath: string,
-  data: WorkspaceData
+  artifacts: WorkspaceArtifacts
 ): Promise<void> {
-  const { regions, templates } = analyzeRegionsAndTemplates(data.pages, data.elements);
-  const globalChrome = data.elements
-    .filter((element) => element.isGlobalChrome)
-    .map((element) => ({
-      id: element.id,
-      pageId: element.pageId,
-      fingerprint: element.componentFingerprint,
-      category: element.category,
-      text: element.text,
-      region: element.regionLabel,
-    }));
+  const { regions, templates } = artifacts.regionAnalysis;
+  const globalChrome = artifacts.globalChromeElements.map((element) => ({
+    id: element.id,
+    pageId: element.pageId,
+    fingerprint: element.componentFingerprint,
+    category: element.category,
+    text: element.text,
+    region: element.regionLabel,
+  }));
 
   await writeJson(path.join(workspacePath, "regions", "regions.json"), {
     regions,

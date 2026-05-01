@@ -1,6 +1,5 @@
 import path from "path";
 import crypto from "crypto";
-import { analyzeRegionsAndTemplates } from "../inventory/regionDetection.js";
 import { getNormalizedStyle } from "../inventory/normalizeStyles.js";
 import { linkOrCopyFile, publicAssetUrlToLocalPath, toPosixRelative, writeJson, } from "./paths.js";
 const CATALOG_FOLDERS = [
@@ -275,11 +274,9 @@ export async function writeCatalogManifests(workspacePath, data, groupsByFolder)
         })));
     }
 }
-export async function writeRegionManifests(workspacePath, data) {
-    const { regions, templates } = analyzeRegionsAndTemplates(data.pages, data.elements);
-    const globalChrome = data.elements
-        .filter((element) => element.isGlobalChrome)
-        .map((element) => ({
+export async function writeRegionManifests(workspacePath, artifacts) {
+    const { regions, templates } = artifacts.regionAnalysis;
+    const globalChrome = artifacts.globalChromeElements.map((element) => ({
         id: element.id,
         pageId: element.pageId,
         fingerprint: element.componentFingerprint,
