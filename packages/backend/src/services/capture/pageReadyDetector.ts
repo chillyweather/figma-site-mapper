@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { sleep } from "./sleep.js";
 
 export type SignalOutcome = "fired" | "timeout";
 
@@ -98,7 +99,7 @@ async function waitForRequestQuiet(page: Page, quietWindowMs: number): Promise<v
   try {
     while (Date.now() - lastResponseAt < quietWindowMs) {
       const remaining = quietWindowMs - (Date.now() - lastResponseAt);
-      await new Promise((resolveTick) => setTimeout(resolveTick, Math.max(remaining, 25)));
+      await sleep(Math.max(remaining, 25));
     }
   } finally {
     page.off("response", onResponse);
@@ -144,6 +145,8 @@ async function waitForVideos(page: Page): Promise<void> {
   });
 }
 
+// One-shot: the injected <style> is never removed and the document.getAnimations()
+// pause is never resumed. Callers must discard the page after a capture.
 async function settleAnimations(page: Page): Promise<void> {
   await page.evaluate(() => {
     const style = document.createElement("style");

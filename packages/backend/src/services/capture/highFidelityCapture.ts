@@ -26,6 +26,10 @@ export interface CaptureResult {
   readinessReport: ReadinessReport;
 }
 
+// One-shot: this orchestrator freezes animations and zero-duration transitions
+// by injecting a <style> tag that is never removed. Discard the page after
+// calling this — reusing it for a second capture leaves the freeze in place
+// and may also leave sticky elements hidden via inline display:none.
 export async function captureHighFidelity(
   page: Page,
   opts: CaptureOptions = {}
@@ -67,6 +71,11 @@ export async function captureHighFidelity(
   return { buffer, width: dims.width, height: dims.height, readinessReport };
 }
 
+// Limitation: keeps the first match in DOM order, not the visually-topmost
+// sticky. A late-in-DOM sticky that paints at y=0 will be hidden while an
+// early-in-DOM sticky lower on the page is kept. Selector also only matches
+// `.sticky`, `.fixed`, or inline position:fixed/sticky — computed-style
+// stickies on real sites slip through. Preserved from the legacy inline flow.
 async function hideRedundantStickyElements(page: Page): Promise<void> {
   await page
     .evaluate(() => {
@@ -98,7 +107,18 @@ async function scrollToTop(page: Page): Promise<void> {
 
 async function pngDimensions(buffer: Buffer): Promise<{ width: number; height: number }> {
   // PNG dimensions live in the IHDR chunk at bytes 16..24 (big-endian uint32).
+  // page.screenshot({ type: "png" }) guarantees PNG output today; the
+  // signature check guards against future drift (format option change, error
+  // payload returned in place of the screenshot, etc.).
   if (buffer.length < 24) return { width: 0, height: 0 };
+  if (
+    buffer[0] !== 0x89 ||
+    buffer[1] !== 0x50 ||
+    buffer[2] !== 0x4e ||
+    buffer[3] !== 0x47
+  ) {
+    return { width: 0, height: 0 };
+  }
   const width = buffer.readUInt32BE(16);
   const height = buffer.readUInt32BE(20);
   return { width, height };

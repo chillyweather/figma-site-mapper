@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { sleep } from "../sleep.js";
 
 const PAGES_DIR = resolve(fileURLToPath(new URL("./pages", import.meta.url)));
 
@@ -138,6 +139,3 @@ function parsePositiveInt(raw: string | null): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
-}

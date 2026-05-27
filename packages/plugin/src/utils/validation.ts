@@ -17,6 +17,10 @@ export function parseScreenshotWidth(screenshotWidth: string): number {
 }
 
 export function parseDeviceScaleFactor(deviceScaleFactor: string): number {
+  // Defaults to 2 (max) on invalid input rather than 1 (safe). Capture quality
+  // is the headline feature and "invalid" here means a UI-side typo, not a
+  // resource-constrained environment — falling back to DPR 1 would silently
+  // give the user a lower-fidelity screenshot than they almost certainly want.
   const value =
     deviceScaleFactor.trim() === "" ? 2 : parseInt(deviceScaleFactor);
   return isNaN(value) || value < 1 || value > 2 ? 2 : value;

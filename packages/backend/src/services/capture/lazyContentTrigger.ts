@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { sleep } from "./sleep.js";
 
 export interface TriggerLazyContentOptions {
   /** Quiet window between scroll steps — wait this long with no new network
@@ -70,6 +71,6 @@ async function waitForQuiet(
     const sinceLast = Date.now() - getLastResponseAt();
     if (sinceLast >= quietWindowMs) return;
     const remaining = quietWindowMs - sinceLast;
-    await new Promise((r) => setTimeout(r, Math.max(remaining, 25)));
+    await sleep(Math.max(remaining, 25));
   }
 }

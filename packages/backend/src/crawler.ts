@@ -1847,8 +1847,16 @@ export async function runCrawler(
         }
 
         const captureViewport = page.viewportSize();
+        // Read the DPR actually in effect from the page itself — the
+        // `deviceScaleFactor` parameter is what we asked for, but Crawlee's
+        // context lifecycle has bitten us before (per-page CDP overrides and
+        // chromium flags both lose to context defaults). Logging the applied
+        // value makes regressions visible instead of silently mislogging.
+        const appliedDpr = await page
+          .evaluate(() => window.devicePixelRatio)
+          .catch(() => deviceScaleFactor);
         log.info(
-          `📸 Captured ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${deviceScaleFactor} (raster ${captureResult.width}x${captureResult.height})`
+          `📸 Captured ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${appliedDpr} (raster ${captureResult.width}x${captureResult.height})`
         );
 
         const fullPageBuffer = captureResult.buffer;

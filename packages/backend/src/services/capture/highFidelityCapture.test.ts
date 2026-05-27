@@ -51,8 +51,10 @@ describe("HighFidelityCapture", () => {
     expect(result.readinessReport.fonts).toBe("fired");
     expect(result.readinessReport.animations).toBe("fired");
 
-    // 3. dismissBanners was invoked at least once.
-    expect(dismissBannersCalls.length).toBeGreaterThan(0);
+    // 3. dismissBanners was invoked at exactly the three documented points
+    // (pre-lazy, post-lazy, post-scroll). Exact count guards against a
+    // regression that silently drops a banner pass.
+    expect(dismissBannersCalls.length).toBe(3);
 
     // 4. After capture, lazy images are loaded (proof the trigger ran).
     const loadedCount = await page.evaluate(
