@@ -10,6 +10,7 @@ import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
 import { waitUntilStable } from "./services/capture/pageReadyDetector.js";
+import { triggerLazyContent } from "./services/capture/lazyContentTrigger.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -1730,24 +1731,15 @@ export async function runCrawler(
           });
         } catch { log.info(`Could not handle sticky elements for ${finalUrl}`); }
 
-        // Scroll to trigger lazy loading
+        // Trigger lazy-loaded content via settle-based scroll-then-wait.
         try {
-          await page.evaluate(async () => {
-            const scrollHeight = document.documentElement.scrollHeight;
-            const viewportHeight = window.innerHeight;
-            let pos = 0;
-            while (pos < scrollHeight) {
-              pos += viewportHeight;
-              window.scrollTo(0, pos);
-              await new Promise((r) => setTimeout(r, Math.min(500, 500)));
-            }
-            window.scrollTo(0, 0);
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-          });
-          await page.waitForTimeout(delay > 0 ? Math.min(2000, delay / 2) : 1000);
-          log.info(`Completed scrolling through ${finalUrl}`);
-        } catch { log.info(`Scrolling failed or not needed for ${finalUrl}`); }
+          await triggerLazyContent(page);
+          log.info(`Completed lazy-content trigger for ${finalUrl}`);
+        } catch (error) {
+          log.info(
+            `Lazy-content trigger failed for ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
 
         await handleCookieConsentBanner(
           page,

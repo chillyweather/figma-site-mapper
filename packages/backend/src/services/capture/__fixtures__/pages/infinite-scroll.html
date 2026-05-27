@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Infinite scroll fixture</title>
+    <style>
+      body { margin: 0; }
+      .item { height: 400px; border-bottom: 1px solid #ccc; padding: 24px; }
+    </style>
+  </head>
+  <body>
+    <div id="feed"></div>
+    <script>
+      const feed = document.getElementById("feed");
+      let counter = 0;
+      function appendBatch(n) {
+        for (let i = 0; i < n; i++) {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.textContent = `item ${counter++}`;
+          feed.appendChild(div);
+        }
+      }
+      appendBatch(5);
+      // Whenever the bottom comes into view, append more items forever.
+      const sentinel = document.createElement("div");
+      sentinel.id = "sentinel";
+      sentinel.style.height = "1px";
+      feed.parentElement.appendChild(sentinel);
+      new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) appendBatch(5);
+          }
+        },
+        { rootMargin: "200px" }
+      ).observe(sentinel);
+    </script>
+  </body>
+</html>
