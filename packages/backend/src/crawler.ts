@@ -1477,7 +1477,7 @@ export async function runCrawler(
       "Sec-Ch-Ua-Platform": '"macOS"',
       "Upgrade-Insecure-Requests": "1",
     });
-    await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
+    await page.setViewportSize({ width: 1920, height: 1080 }).catch(() => undefined);
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     }).catch(() => undefined);
@@ -1884,6 +1884,10 @@ export async function runCrawler(
           log.info(`Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables).length} CSS variables`);
         }
 
+        const captureViewport = page.viewportSize();
+        log.info(
+          `📸 Capturing ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"}`
+        );
         const fullPageBuffer = await page.screenshot({ fullPage: true });
 
         await updateProgress("processing", currentPage, totalPages, finalUrl);
@@ -2411,7 +2415,7 @@ export async function openAuthSession(url: string): Promise<{
 
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    viewport: { width: 1440, height: 900 },
+    viewport: { width: 1920, height: 1080 },
     locale: "en-US",
     timezoneId: "America/New_York",
   });
