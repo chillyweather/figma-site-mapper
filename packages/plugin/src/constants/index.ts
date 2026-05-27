@@ -4,7 +4,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   url: "",
   maxRequests: "10",
   screenshotWidth: "1440",
-  deviceScaleFactor: "1",
+  deviceScaleFactor: "2",
   delay: "0",
   requestDelay: "1000",
   maxDepth: "0",

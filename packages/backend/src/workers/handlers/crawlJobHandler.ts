@@ -81,7 +81,7 @@ export async function crawlJobHandler(job: Job): Promise<unknown> {
       url,
       publicUrl,
       maxRequestsPerCrawl,
-      deviceScaleFactor || 1,
+      deviceScaleFactor || 2,
       job.id,
       delay || 0,
       requestDelay || 1000,

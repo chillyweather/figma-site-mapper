@@ -44,6 +44,7 @@ sqlite.exec(`
     interactive_elements TEXT NOT NULL DEFAULT '[]',
     global_styles TEXT,
     annotated_screenshot_path TEXT,
+    viewport_width INTEGER,
     last_crawled_at INTEGER,
     last_crawl_job_id TEXT,
     created_at INTEGER NOT NULL,
@@ -231,6 +232,7 @@ ensureColumn("elements", "crop_error", "crop_error TEXT");
 ensureColumn("elements", "is_global_chrome", "is_global_chrome INTEGER DEFAULT 0");
 ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TEXT");
 ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
+ensureColumn("pages", "viewport_width", "viewport_width INTEGER");
 ensureColumn("crawl_runs", "discovery_run_id", "discovery_run_id INTEGER");
 ensureColumn("crawl_runs", "approved_urls_json", "approved_urls_json TEXT");
 ensureColumn("discovery_runs", "warnings_json", "warnings_json TEXT NOT NULL DEFAULT '[]'");

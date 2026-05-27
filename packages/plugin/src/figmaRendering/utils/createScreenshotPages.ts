@@ -794,9 +794,19 @@ export async function createScreenshotPages(
       navFrame.resize(screenshotWidth, navHeight);
       overlayContainer.appendChild(navFrame);
 
-      // Compute scaling factor once (for both interactive and style elements)
+      // Compute scaling factor once (for both interactive and style elements).
+      // The backend records CSS viewport width separately from the raw image
+      // pixel width. Prefer CSS viewport when present — at DPR > 1 the image
+      // is wider than the viewport, and using image.width here scales element
+      // bboxes (in CSS px) incorrectly. Fall back to image width for legacy
+      // captures that pre-date the viewportWidth field.
       const referenceShot = loadedScreenshots[0];
-      const originalWidth = referenceShot?.width || screenshotWidth;
+      const originalWidth =
+        (page.viewportWidth && Number.isFinite(page.viewportWidth) && page.viewportWidth > 0
+          ? page.viewportWidth
+          : null) ??
+        referenceShot?.width ??
+        screenshotWidth;
       const scaleFactor =
         originalWidth > 0 ? screenshotWidth / originalWidth : 1;
 

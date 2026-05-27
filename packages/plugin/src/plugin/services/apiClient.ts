@@ -21,6 +21,9 @@ interface PageResponseItem {
     text?: string;
   }>;
   globalStyles?: Record<string, unknown> | null;
+  /** CSS viewport width at capture time, set by the backend. Distinct from
+   * the raw image pixel width (viewport × DPR). Used for overlay scaling. */
+  viewportWidth?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -79,7 +82,7 @@ export async function startCrawl(params: CrawlParams): Promise<{ jobId: string }
     showBrowser: params.showBrowser,
     auth: params.auth,
     publicUrl: BACKEND_URL,
-    deviceScaleFactor: params.deviceScaleFactor || 1,
+    deviceScaleFactor: params.deviceScaleFactor || 2,
     delay: params.delay || 0,
     requestDelay: params.requestDelay || 1000,
     defaultLanguageOnly: params.defaultLanguageOnly !== false,
@@ -101,7 +104,7 @@ export async function recrawlPage(params: RecrawlParams): Promise<{ jobId: strin
     url: params.url,
     publicUrl: BACKEND_URL,
     projectId: params.projectId,
-    deviceScaleFactor: params.deviceScaleFactor || 1,
+    deviceScaleFactor: params.deviceScaleFactor || 2,
     delay: params.delay || 0,
     requestDelay: params.requestDelay || 1000,
     auth: params.auth,
@@ -313,7 +316,7 @@ export async function startApprovedCrawl(params: {
     approvedUrls: params.approvedUrls,
     fullRefresh: params.fullRefresh ?? true,
     screenshotWidth: params.screenshotWidth ?? 1440,
-    deviceScaleFactor: params.deviceScaleFactor ?? 1,
+    deviceScaleFactor: params.deviceScaleFactor ?? 2,
     auth: params.auth,
     cookieBannerHandling: params.cookieBannerHandling ?? "auto",
     styleExtraction: params.styleExtraction,

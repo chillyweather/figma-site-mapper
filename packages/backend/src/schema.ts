@@ -28,6 +28,10 @@ export const pages = sqliteTable("pages", {
   interactiveElements: text("interactive_elements").notNull().default("[]"),
   globalStyles: text("global_styles"),
   annotatedScreenshotPath: text("annotated_screenshot_path"),
+  /** CSS viewport width at capture time. Distinct from the raw image pixel
+   * width, which is viewport × DPR. The plugin uses this to scale element
+   * bboxes correctly when DPR > 1. */
+  viewportWidth: integer("viewport_width"),
   lastCrawledAt: integer("last_crawled_at", { mode: "timestamp_ms" }),
   lastCrawlJobId: text("last_crawl_job_id"),
   lastCrawlRunId: integer("last_crawl_run_id"),

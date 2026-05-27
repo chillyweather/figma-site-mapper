@@ -1258,7 +1258,7 @@ export async function runCrawler(
   startUrl: string,
   publicUrl: string,
   maxRequestsPerCrawl?: number,
-  deviceScaleFactor: number = 1,
+  deviceScaleFactor: number = 2,
   jobId?: string,
   delay: number = 0,
   requestDelay: number = 1000,
@@ -1479,7 +1479,9 @@ export async function runCrawler(
       "Sec-Ch-Ua-Platform": '"macOS"',
       "Upgrade-Insecure-Requests": "1",
     });
-    await page.setViewportSize({ width: 1920, height: 1080 }).catch(() => undefined);
+    // Viewport + DPR are now set at the persistent-context level in
+    // launchContext.launchOptions, so we no longer call setViewportSize here.
+    // Calling it would reset DPR back to 1.
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
     }).catch(() => undefined);
@@ -1541,7 +1543,6 @@ export async function runCrawler(
       launchContext: {
         launchOptions: {
           args: [
-            ...(deviceScaleFactor > 1 ? ["--device-scale-factor=2"] : []),
             "--disable-infobars",
             "--disable-extensions-except=",
             "--disable-extensions",
@@ -1552,6 +1553,12 @@ export async function runCrawler(
           headless: !showBrowser,
           slowMo: 100,
           devtools: false,
+          // launchPersistentContext accepts BrowserContextOptions alongside
+          // LaunchOptions — this is the only place Crawlee gives us to set
+          // DPR + viewport at context creation. Per-page CDP overrides and
+          // the --device-scale-factor chromium flag are unreliable here.
+          deviceScaleFactor,
+          viewport: { width: 1920, height: 1080 },
         },
         userAgent: randomUserAgent,
       },
@@ -1879,7 +1886,7 @@ export async function runCrawler(
 
         const captureViewport = page.viewportSize();
         log.info(
-          `📸 Capturing ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"}`
+          `📸 Capturing ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${deviceScaleFactor}`
         );
 
         const readinessReport = await waitUntilStable(page);
@@ -1993,6 +2000,8 @@ export async function runCrawler(
           try {
             const now = new Date();
 
+            const cssViewportWidth = captureViewport?.width ?? null;
+
             const pageResult = db
               .insert(pages)
               .values({
@@ -2005,6 +2014,7 @@ export async function runCrawler(
                 globalStyles: styleData
                   ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                   : null,
+                viewportWidth: cssViewportWidth,
                 lastCrawledAt: now,
                 lastCrawlJobId: jobId ?? null,
                 lastCrawlRunId: crawlRunId ?? null,
@@ -2021,6 +2031,7 @@ export async function runCrawler(
                   globalStyles: styleData
                     ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                     : null,
+                  viewportWidth: cssViewportWidth,
                   lastCrawledAt: now,
                   lastCrawlJobId: jobId ?? null,
                   lastCrawlRunId: crawlRunId ?? null,

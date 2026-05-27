@@ -20,6 +20,7 @@ export interface PageRecord {
     text?: string;
   }>;
   globalStyles?: Record<string, unknown> | null;
+  viewportWidth?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -372,6 +373,7 @@ function buildTreeFromPages(
       screenshot: screenshotPaths,
       thumbnail: screenshotPaths[0] || "",
       pageId: page._id,
+      viewportWidth: page.viewportWidth ?? null,
       children: [],
       interactiveElements: interactive,
       styleData: {

@@ -139,6 +139,10 @@ export interface TreeNode {
   pageId?: string;
   children: TreeNode[];
   interactiveElements?: InteractiveElement[];
+  /** CSS viewport width recorded by the backend at capture time. Used to
+   * scale element bboxes against the on-canvas frame width. Distinct from
+   * the raw image pixel width (viewport × DPR). */
+  viewportWidth?: number | null;
   styleData?: {
     elements?: ExtractedElement[];
     cssVariables?: Record<string, unknown> | null;

@@ -18,8 +18,8 @@ export function parseScreenshotWidth(screenshotWidth: string): number {
 
 export function parseDeviceScaleFactor(deviceScaleFactor: string): number {
   const value =
-    deviceScaleFactor.trim() === "" ? 1 : parseInt(deviceScaleFactor);
-  return isNaN(value) || value < 1 || value > 2 ? 1 : value;
+    deviceScaleFactor.trim() === "" ? 2 : parseInt(deviceScaleFactor);
+  return isNaN(value) || value < 1 || value > 2 ? 2 : value;
 }
 
 export function parseDelay(delay: string): number {

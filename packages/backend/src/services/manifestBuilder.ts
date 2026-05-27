@@ -25,6 +25,7 @@ function serializePage(row: typeof pages.$inferSelect): Record<string, unknown> 
     annotatedScreenshotPath: row.annotatedScreenshotPath ?? null,
     interactiveElements: parseJson<unknown[]>(row.interactiveElements, []),
     globalStyles: parseJson<Record<string, unknown> | null>(row.globalStyles, null),
+    viewportWidth: row.viewportWidth ?? null,
     lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
     lastCrawlJobId: row.lastCrawlJobId ?? null,
     createdAt: row.createdAt.toISOString(),
