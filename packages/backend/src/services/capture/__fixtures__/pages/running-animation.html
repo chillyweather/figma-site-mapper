@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Running animation fixture</title>
+    <style>
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        background: red;
+        animation: spin 10s linear infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="spinner" data-testid="spinner"></div>
+  </body>
+</html>

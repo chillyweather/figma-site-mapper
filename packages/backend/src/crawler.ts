@@ -9,6 +9,7 @@ import { eq, and, notInArray, inArray } from "drizzle-orm";
 import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
+import { waitUntilStable } from "./services/capture/pageReadyDetector.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -1888,6 +1889,14 @@ export async function runCrawler(
         log.info(
           `📸 Capturing ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"}`
         );
+
+        const readinessReport = await waitUntilStable(page);
+        log.info(
+          `🟢 Readiness for ${finalUrl}: ${Object.entries(readinessReport)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ")}`
+        );
+
         const fullPageBuffer = await page.screenshot({ fullPage: true });
 
         await updateProgress("processing", currentPage, totalPages, finalUrl);

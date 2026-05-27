@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Slow font fixture</title>
+    <style>
+      @font-face {
+        font-family: "FixtureFont";
+        src: url("/test.font?delay=400") format("woff2");
+        font-display: block;
+      }
+      .needs-font {
+        font-family: "FixtureFont", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <span class="needs-font" data-testid="text">webfont sample</span>
+  </body>
+</html>

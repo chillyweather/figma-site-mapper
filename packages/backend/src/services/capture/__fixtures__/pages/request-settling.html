@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Request settling fixture</title>
+  </head>
+  <body>
+    <div data-testid="ready">request settling</div>
+    <script>
+      (async () => {
+        // Burst of three short responses ~200ms apart. After the last one,
+        // there is no more traffic — the request-settling signal should
+        // resolve a configurable quiet window later.
+        for (let i = 0; i < 3; i++) {
+          await fetch(`/test.png?delay=100&size=8x8&n=${i}`);
+        }
+        // Long-polling request that never responds — the detector must NOT
+        // block on this, because in-flight requests do not affect the
+        // request-settling quiet window.
+        fetch("/__never__").catch(() => {});
+      })();
+    </script>
+  </body>
+</html>

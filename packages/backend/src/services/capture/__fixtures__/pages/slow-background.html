@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Slow CSS background fixture</title>
+    <style>
+      .hero {
+        width: 320px;
+        height: 200px;
+        background-image: url("/test.png?delay=500&size=320x200");
+        background-size: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hero" data-testid="hero"></div>
+  </body>
+</html>
