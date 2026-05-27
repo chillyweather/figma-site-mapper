@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Combined capture fixture</title>
+    <style>
+      body { margin: 0; font-family: "FixtureFont", sans-serif; }
+
+      /* Slow web font — exercises the fonts signal. */
+      @font-face {
+        font-family: "FixtureFont";
+        src: url("/test.font?delay=300") format("woff2");
+        font-display: block;
+      }
+
+      /* Running CSS animation — exercises the animations signal. */
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        background: red;
+        animation: spin 10s linear infinite;
+      }
+
+      /* Sticky banners. The orchestrator filters by `.sticky`/`.fixed`
+         class names and inline position:sticky/fixed styles, so we use
+         those literal class names to match the existing selector. */
+      .sticky {
+        position: sticky;
+        top: 0;
+        padding: 8px;
+        background: yellow;
+      }
+
+      .row {
+        height: 600px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sticky" data-testid="banner-1">sticky 1</div>
+    <div class="sticky" data-testid="banner-2">sticky 2</div>
+
+    <div class="spinner" data-testid="spinner"></div>
+
+    <!-- Lazy images further down the page — exercises the lazy-trigger
+         + image-decode signals. -->
+    <div class="row"><img loading="lazy" src="/test.png?size=120x120&n=0" /></div>
+    <div class="row"><img loading="lazy" src="/test.png?size=120x120&n=1" /></div>
+    <div class="row"><img loading="lazy" src="/test.png?size=120x120&n=2" /></div>
+    <div class="row"><img loading="lazy" src="/test.png?size=120x120&n=3" /></div>
+
+    <span style="font-family: FixtureFont">webfont sample</span>
+  </body>
+</html>

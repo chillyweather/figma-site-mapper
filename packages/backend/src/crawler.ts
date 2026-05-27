@@ -9,8 +9,7 @@ import { eq, and, notInArray, inArray } from "drizzle-orm";
 import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
-import { waitUntilStable } from "./services/capture/pageReadyDetector.js";
-import { triggerLazyContent } from "./services/capture/lazyContentTrigger.js";
+import { captureHighFidelity } from "./services/capture/highFidelityCapture.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -1717,65 +1716,28 @@ export async function runCrawler(
           await page.waitForTimeout(delay);
         }
 
-        await handleCookieConsentBanner(
-          page,
-          cookieBannerHandling,
-          log,
-          finalUrl
-        );
-
-        // Hide extra sticky/fixed elements
-        try {
-          await page.evaluate(() => {
-            const stickyElements = document.querySelectorAll(
-              '[style*="position: fixed"], [style*="position: sticky"], .sticky, .fixed'
-            );
-            stickyElements.forEach((el, index) => {
-              if (index > 0) (el as HTMLElement).style.display = "none";
-            });
-            document.documentElement.style.transform = "none";
-            document.body.style.transform = "none";
-          });
-        } catch { log.info(`Could not handle sticky elements for ${finalUrl}`); }
-
-        // Trigger lazy-loaded content via settle-based scroll-then-wait.
-        try {
-          await triggerLazyContent(page);
-          log.info(`Completed lazy-content trigger for ${finalUrl}`);
-        } catch (error) {
-          log.info(
-            `Lazy-content trigger failed for ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-
-        await handleCookieConsentBanner(
-          page,
-          cookieBannerHandling,
-          log,
-          finalUrl
-        );
-
         const title = await page.title();
         log.info(`Crawled ${finalUrl} - Title: ${title}`);
 
         await updateProgress("screenshot", currentPage, totalPages, finalUrl);
 
-        // Ensure page is at the top before screenshot
-        try {
-          await page.evaluate(() => {
-            window.scrollTo({ top: 0, behavior: "instant" });
-            document.documentElement.scrollTop = 0;
-            document.body.scrollTop = 0;
-            if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-          });
-          await page.waitForTimeout(300);
-        } catch { log.info(`⚠️ Could not ensure top position for ${finalUrl}`); }
-
-        await handleCookieConsentBanner(
-          page,
-          cookieBannerHandling,
-          log,
-          finalUrl
+        // Orchestrated visual capture: cookie banners (3 passes) + sticky
+        // element hide + lazy-content trigger + scroll-to-top + readiness
+        // wait + screenshot. See services/capture/highFidelityCapture.ts.
+        const captureResult = await captureHighFidelity(page, {
+          dismissBanners: async () => {
+            await handleCookieConsentBanner(
+              page,
+              cookieBannerHandling,
+              log,
+              finalUrl
+            );
+          },
+        });
+        log.info(
+          `🟢 Readiness for ${finalUrl}: ${Object.entries(captureResult.readinessReport)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ")}`
         );
 
         // Interactive elements
@@ -1886,17 +1848,10 @@ export async function runCrawler(
 
         const captureViewport = page.viewportSize();
         log.info(
-          `📸 Capturing ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${deviceScaleFactor}`
+          `📸 Captured ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${deviceScaleFactor} (raster ${captureResult.width}x${captureResult.height})`
         );
 
-        const readinessReport = await waitUntilStable(page);
-        log.info(
-          `🟢 Readiness for ${finalUrl}: ${Object.entries(readinessReport)
-            .map(([k, v]) => `${k}=${v}`)
-            .join(" ")}`
-        );
-
-        const fullPageBuffer = await page.screenshot({ fullPage: true });
+        const fullPageBuffer = captureResult.buffer;
 
         await updateProgress("processing", currentPage, totalPages, finalUrl);
         const screenshotSlices = await sliceScreenshot(fullPageBuffer, finalUrl, publicUrl);
