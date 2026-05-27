@@ -159,6 +159,23 @@ describe("PageReadyDetector", () => {
     await page.close();
   }, 15_000);
 
+  it("returns quickly when the page has constant DOM noise but no pending images", async () => {
+    const page = await browser.newPage();
+    await page.goto(`${server.baseUrl}/noisy-dom.html`, { waitUntil: "commit" });
+
+    const start = Date.now();
+    const report = await waitUntilStable(page, { domQuietWindowMs: 400 });
+    const elapsedMs = Date.now() - start;
+
+    // Constant unrelated DOM mutations must not keep the image-decode signal
+    // open. Anything well below the 15s per-signal timeout proves the quiet
+    // window is converging.
+    expect(elapsedMs).toBeLessThan(3_000);
+    expect(report.images).toBe("fired");
+
+    await page.close();
+  }, 15_000);
+
   it("waits for images whose src is populated late by JS (DOM mutations)", async () => {
     const page = await browser.newPage();
     await page.goto(`${server.baseUrl}/late-set-src.html`, { waitUntil: "commit" });

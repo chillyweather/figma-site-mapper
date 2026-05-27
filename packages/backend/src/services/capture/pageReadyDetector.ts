@@ -232,11 +232,38 @@ async function waitForAllImages(page: Page, domQuietWindowMs: number): Promise<v
     // picked up. Pure addEventListener-based waiting binds to the elements
     // present at start, which misses React-style reconciliation that
     // replaces nodes wholesale.
+    //
+    // The observer only treats *image-relevant* mutations as activity — an
+    // <img> being added/removed, or its src/srcset attribute changing.
+    // Unrelated DOM churn (analytics tickers, framework idle work) does not
+    // reset the quiet window, otherwise pages with any background activity
+    // would never converge.
     let lastChangeAt = Date.now();
-    const bump = () => {
-      lastChangeAt = Date.now();
+    const involvesImage = (node: Node): boolean => {
+      if (node.nodeType !== 1 /* Node.ELEMENT_NODE */) return false;
+      const el = node as Element;
+      return el.tagName === "IMG" || !!el.querySelector?.("img");
     };
-    const observer = new MutationObserver(bump);
+    const observer = new MutationObserver((records) => {
+      for (const r of records) {
+        if (r.type === "attributes") {
+          // attributeFilter restricts us to src/srcset, so any hit here is
+          // an image mutation.
+          lastChangeAt = Date.now();
+          return;
+        }
+        if (r.type === "childList") {
+          for (const n of r.addedNodes) if (involvesImage(n)) {
+            lastChangeAt = Date.now();
+            return;
+          }
+          for (const n of r.removedNodes) if (involvesImage(n)) {
+            lastChangeAt = Date.now();
+            return;
+          }
+        }
+      }
+    });
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true,

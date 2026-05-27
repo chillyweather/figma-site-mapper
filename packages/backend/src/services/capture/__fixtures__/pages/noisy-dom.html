@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Noisy DOM fixture</title>
+  </head>
+  <body>
+    <h1>This page has constant DOM churn but no pending images</h1>
+    <div id="ticker"></div>
+    <script>
+      // Simulates analytics/idle-loop DOM activity that should NOT block the
+      // image-decode signal — the mutations don't touch any <img>.
+      const ticker = document.getElementById("ticker");
+      let i = 0;
+      setInterval(() => {
+        ticker.innerHTML = "<span>tick " + i++ + "</span>";
+      }, 50);
+    </script>
+  </body>
+</html>
