@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Late-set src fixture</title>
+  </head>
+  <body>
+    <!-- This mimics atera.com's customer-logo pattern: <img src=""> with a
+         meaningful alt, and a script that swaps in the real src after page
+         "hydration". -->
+    <img id="hero" src="" alt="Logo=Acme, Color=White" />
+    <script>
+      setTimeout(() => {
+        const img = document.getElementById("hero");
+        img.src = "/test.png?delay=200&size=200x100";
+      }, 350);
+    </script>
+  </body>
+</html>

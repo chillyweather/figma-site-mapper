@@ -20,6 +20,10 @@ export interface WaitUntilStableOptions {
   requestsTimeoutMs?: number;
   /** Quiet window for request-settling — resolves N ms after last response. */
   requestSettleQuietWindowMs?: number;
+  /** Quiet window for DOM stability — the image-decode signal waits for the
+   * DOM to be free of mutations for this long before declaring images
+   * settled, so late-hydrated <img> elements get picked up. */
+  domQuietWindowMs?: number;
   /** Overall ceiling. Every per-signal timeout is clamped to this value, so
    * the whole call returns within roughly this budget even if a signal hangs. */
   overallTimeoutMs?: number;
@@ -28,6 +32,7 @@ export interface WaitUntilStableOptions {
 const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
 const DEFAULT_OVERALL_TIMEOUT_MS = 60_000;
 const DEFAULT_REQUEST_QUIET_WINDOW_MS = 500;
+const DEFAULT_DOM_QUIET_WINDOW_MS = 500;
 
 export async function waitUntilStable(
   page: Page,
@@ -50,9 +55,11 @@ export async function waitUntilStable(
   );
   const requestQuietWindowMs =
     opts.requestSettleQuietWindowMs ?? DEFAULT_REQUEST_QUIET_WINDOW_MS;
+  const domQuietWindowMs =
+    opts.domQuietWindowMs ?? DEFAULT_DOM_QUIET_WINDOW_MS;
 
   const [images, fonts, backgroundImages, animations, videos, requests] = await Promise.all([
-    runSignal(() => waitForAllImages(page), imagesTimeoutMs),
+    runSignal(() => waitForAllImages(page, domQuietWindowMs), imagesTimeoutMs),
     runSignal(() => waitForFonts(page), fontsTimeoutMs),
     runSignal(() => waitForBackgroundImages(page), backgroundImagesTimeoutMs),
     runSignal(() => settleAnimations(page), animationsTimeoutMs),
@@ -219,26 +226,71 @@ async function waitForFonts(page: Page): Promise<void> {
   });
 }
 
-async function waitForAllImages(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const imgs = Array.from(document.images);
-    await Promise.all(
-      imgs.map(async (img) => {
-        if (!(img.complete && img.naturalWidth > 0)) {
-          await new Promise<void>((resolveImg) => {
-            const settle = () => resolveImg();
-            img.addEventListener("load", settle, { once: true });
-            img.addEventListener("error", settle, { once: true });
-          });
+async function waitForAllImages(page: Page, domQuietWindowMs: number): Promise<void> {
+  await page.evaluate(async (quietWindowMs) => {
+    // Poll-and-observe loop so that late-inserted or late-src'd images are
+    // picked up. Pure addEventListener-based waiting binds to the elements
+    // present at start, which misses React-style reconciliation that
+    // replaces nodes wholesale.
+    let lastChangeAt = Date.now();
+    const bump = () => {
+      lastChangeAt = Date.now();
+    };
+    const observer = new MutationObserver(bump);
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src", "srcset"],
+    });
+
+    const isPending = (img: HTMLImageElement): boolean => {
+      // An <img src=""> has complete=true but naturalWidth=0 because the
+      // browser never issued a request. We treat it as "not pending" — there
+      // is nothing concrete to wait for; the DOM-quiet window will catch it
+      // if JS later sets the src.
+      if (!img.getAttribute("src") && !img.getAttribute("srcset")) return false;
+      return !(img.complete && img.naturalWidth > 0);
+    };
+
+    try {
+      while (true) {
+        const pending = Array.from(document.images).filter(isPending);
+        if (pending.length > 0) {
+          await Promise.all(
+            pending.map(
+              (img) =>
+                new Promise<void>((settle) => {
+                  const done = () => settle();
+                  img.addEventListener("load", done, { once: true });
+                  img.addEventListener("error", done, { once: true });
+                })
+            )
+          );
+          continue; // re-check; new images may have appeared during the wait
         }
-        if (typeof img.decode === "function") {
-          try {
-            await img.decode();
-          } catch {
-            // decode rejects for broken images; treat as settled
+        if (Date.now() - lastChangeAt >= quietWindowMs) break;
+        await new Promise((tick) => setTimeout(tick, 50));
+      }
+
+      // Decode pass on every loaded image so the bitmap is in the raster
+      // before screenshot.
+      const loaded = Array.from(document.images).filter(
+        (img) => img.complete && img.naturalWidth > 0
+      );
+      await Promise.all(
+        loaded.map(async (img) => {
+          if (typeof img.decode === "function") {
+            try {
+              await img.decode();
+            } catch {
+              /* ignore decode errors */
+            }
           }
-        }
-      })
-    );
-  });
+        })
+      );
+    } finally {
+      observer.disconnect();
+    }
+  }, domQuietWindowMs);
 }

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Late-inserted image fixture</title>
+  </head>
+  <body>
+    <div id="container"></div>
+    <script>
+      // Mimics React hydration: an empty wrapper at page-load time gets a
+      // child <img> inserted later. Listeners bound to elements that exist
+      // when the detector starts won't fire for this new node.
+      setTimeout(() => {
+        const img = document.createElement("img");
+        img.id = "hydrated";
+        img.src = "/test.png?delay=200&size=300x200";
+        document.getElementById("container").appendChild(img);
+      }, 400);
+    </script>
+  </body>
+</html>

@@ -139,6 +139,43 @@ describe("PageReadyDetector", () => {
     await page.close();
   }, 15_000);
 
+  it("waits for images inserted into the DOM after page load (React-style hydration)", async () => {
+    const page = await browser.newPage();
+    await page.goto(`${server.baseUrl}/late-inserted-image.html`, { waitUntil: "commit" });
+
+    // domQuietWindowMs is the maximum window the detector waits with no DOM
+    // mutations before declaring the page settled.
+    await waitUntilStable(page, { domQuietWindowMs: 500 });
+
+    const imgState = await page.evaluate(() => {
+      const img = document.getElementById("hydrated") as HTMLImageElement | null;
+      return img ? { complete: img.complete, naturalWidth: img.naturalWidth } : null;
+    });
+
+    expect(imgState).not.toBeNull();
+    expect(imgState!.complete).toBe(true);
+    expect(imgState!.naturalWidth).toBeGreaterThan(0);
+
+    await page.close();
+  }, 15_000);
+
+  it("waits for images whose src is populated late by JS (DOM mutations)", async () => {
+    const page = await browser.newPage();
+    await page.goto(`${server.baseUrl}/late-set-src.html`, { waitUntil: "commit" });
+
+    await waitUntilStable(page, { domQuietWindowMs: 500 });
+
+    const imgState = await page.evaluate(() => {
+      const img = document.getElementById("hero") as HTMLImageElement;
+      return { complete: img.complete, naturalWidth: img.naturalWidth };
+    });
+
+    expect(imgState.complete).toBe(true);
+    expect(imgState.naturalWidth).toBeGreaterThan(0);
+
+    await page.close();
+  }, 15_000);
+
   it("waits for delayed <img> elements to load and decode before resolving", async () => {
     const page = await browser.newPage();
     // The fixture image is delayed by the server (?delay=500). If the detector
