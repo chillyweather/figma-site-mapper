@@ -24,6 +24,7 @@ import { getMappingInputs, saveMappingInputs, } from "./services/mappingInputs.j
 import { InventoryOverviewSchema, InventoryDecisionsSchema, InventoryRenderDataSchema, MappingContextSummarySchema, MappingSuggestionsSchema, } from "@sitemapper/shared";
 import { getMappingContextSummary } from "./services/mappingContext/summary.js";
 import { deriveSuggestionsFromDisk } from "./services/mappingContext/suggestions.js";
+import { getMappingOverview, getMappingRenderData, getMappingDecisions } from "./services/mapping/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 function isValidId(id) {
@@ -835,6 +836,69 @@ export async function buildServer() {
         catch (error) {
             request.log.error(`Failed to build inventory tokens: ${error instanceof Error ? error.message : String(error)}`);
             return reply.status(500).send({ error: "Failed to build inventory tokens" });
+        }
+    });
+    // ── Mapping ───────────────────────────────────────────────────────────────
+    server.post("/mapping/prepare/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        const job = await crawlQueue.add("mapping-prepare", {
+            type: "mapping-prepare",
+            projectId,
+        });
+        return {
+            message: "Mapping workspace prepare job queued.",
+            type: "mapping-prepare",
+            projectId,
+            jobId: job.id,
+        };
+    });
+    server.get("/mapping/overview/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        try {
+            const payload = await getMappingOverview(projectId);
+            return payload;
+        }
+        catch (error) {
+            request.log.error(`Failed to get mapping overview: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to get mapping overview" });
+        }
+    });
+    server.get("/mapping/decisions/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        try {
+            const payload = await getMappingDecisions(projectId);
+            return payload;
+        }
+        catch (error) {
+            request.log.error(`Failed to get mapping decisions: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to get mapping decisions" });
+        }
+    });
+    server.get("/mapping/render-data/:projectId", async (request, reply) => {
+        const { projectId } = request.params;
+        if (!isValidId(projectId))
+            return reply.status(400).send({ error: "Invalid projectId" });
+        if (!projectExists(projectId))
+            return reply.status(404).send({ error: "Project not found" });
+        try {
+            const payload = await getMappingRenderData(projectId);
+            return payload;
+        }
+        catch (error) {
+            request.log.error(`Failed to get mapping render data: ${error instanceof Error ? error.message : String(error)}`);
+            return reply.status(500).send({ error: "Failed to get mapping render data" });
         }
     });
     // ── Flows ─────────────────────────────────────────────────────────────────

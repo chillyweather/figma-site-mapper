@@ -43,6 +43,8 @@ import {
 } from "./inventoryHandlers";
 import { dispatchInventoryMessage } from "./inventoryMessageDispatcher";
 import { isInventoryUiMessage } from "../../messages/inventoryMessages";
+import { isMappingUiMessage } from "../../messages/mappingMessages";
+import { handleLoadMappingRequest, handlePrepareMappingRequest, handleRenderMappingRequest } from "./mappingHandlers";
 import {
   handleGetActiveScreenshotPage,
   handlePreviewFlowElement,
@@ -1190,6 +1192,21 @@ export async function handleUIMessage(msg: any): Promise<void> {
   if (isInventoryUiMessage(msg)) {
     await dispatchInventoryMessage(msg);
     return;
+  }
+
+  // Route typed mapping messages
+  if (isMappingUiMessage(msg)) {
+    switch (msg.type) {
+      case "mapping/load":
+        await handleLoadMappingRequest({ projectId: msg.projectId });
+        return;
+      case "mapping/prepare":
+        await handlePrepareMappingRequest({ projectId: msg.projectId });
+        return;
+      case "mapping/render":
+        await handleRenderMappingRequest({ projectId: msg.projectId });
+        return;
+    }
   }
 
   switch (msg.type) {

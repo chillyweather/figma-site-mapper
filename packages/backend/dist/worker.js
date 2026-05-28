@@ -6,8 +6,12 @@ import { connectDB } from "./db.js";
 import { createJobDispatcher } from "./workers/jobDispatcher.js";
 import { crawlJobHandler } from "./workers/handlers/crawlJobHandler.js";
 import { inventoryPrepareHandler } from "./workers/handlers/inventoryPrepareHandler.js";
+import { mappingPrepareHandler } from "./workers/handlers/mappingPrepareHandler.js";
 await connectDB();
-const dispatch = createJobDispatcher({ "inventory-prepare": inventoryPrepareHandler }, crawlJobHandler);
+const dispatch = createJobDispatcher({
+    "inventory-prepare": inventoryPrepareHandler,
+    "mapping-prepare": mappingPrepareHandler,
+}, crawlJobHandler);
 const worker = new Worker("crawl-jobs", dispatch, {
     connection,
     autorun: true,

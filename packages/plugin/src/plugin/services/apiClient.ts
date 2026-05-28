@@ -343,6 +343,32 @@ export async function prepareInventory(
   };
 }
 
+// ── Mapping API ─────────────────────────────────────────────────────────────
+
+export async function fetchMappingOverview(projectId: string): Promise<any> {
+  return client.get(`/mapping/overview/${encodeURIComponent(projectId)}`);
+}
+
+export async function prepareMappingWorkspace(
+  projectId: string
+): Promise<{ jobId: string; projectId: string; type: "mapping-prepare" }> {
+  const data = await client.post(
+    `/mapping/prepare/${encodeURIComponent(projectId)}`
+  ) as any;
+  if (!data || typeof data.jobId !== "string") {
+    throw new Error("Backend did not return a mapping prepare job id");
+  }
+  return {
+    jobId: data.jobId,
+    projectId: String(data.projectId ?? projectId),
+    type: "mapping-prepare",
+  };
+}
+
+export async function fetchMappingRenderData(projectId: string): Promise<any> {
+  return client.get(`/mapping/render-data/${encodeURIComponent(projectId)}`);
+}
+
 // ── Flow API ────────────────────────────────────────────────────────────────
 
 export async function fetchFlows(projectId: string): Promise<FlowRecord[]> {
