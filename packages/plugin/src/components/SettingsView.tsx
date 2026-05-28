@@ -13,6 +13,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleScreenshotWidthChange,
   deviceScaleFactor,
   handleDeviceScaleFactorChange,
+  screenshotLayout,
+  handleScreenshotLayoutChange,
+  singleCanvasColumns,
+  handleSingleCanvasColumnsChange,
+  singleCanvasHorizontalGap,
+  handleSingleCanvasHorizontalGapChange,
   delay,
   handleDelayChange,
   requestDelay,
@@ -197,6 +203,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </div>
+
+    <div id="canvas-layout-section" className="settings-section">
+      <label className="form-label">
+        Canvas Layout
+      </label>
+      <select
+        id="screenshot-layout-select"
+        value={screenshotLayout}
+        onChange={(e) => handleScreenshotLayoutChange(e.target.value as "per-page" | "single-canvas")}
+        disabled={isLoading || !!jobId}
+        className="form-select"
+      >
+        <option value="per-page">Per page (default)</option>
+        <option value="single-canvas">Single canvas</option>
+      </select>
+      <div className="settings-description">
+        Single canvas places all screenshots on one Figma page in a grid.
+      </div>
+      {screenshotLayout === "single-canvas" && (
+        <>
+          <FocusedInput
+            id="single-canvas-columns-input"
+            key="single-canvas-columns-input"
+            type="number"
+            value={String(singleCanvasColumns)}
+            onChange={handleSingleCanvasColumnsChange}
+            placeholder="Columns (5)"
+            disabled={isLoading || !!jobId}
+            className="form-input"
+            min="1"
+            max="10"
+          />
+          <div className="settings-description">
+            Number of columns in the grid (1–10). More columns reduce vertical height.
+          </div>
+          <FocusedInput
+            id="single-canvas-h-gap-input"
+            key="single-canvas-h-gap-input"
+            type="number"
+            value={String(singleCanvasHorizontalGap)}
+            onChange={handleSingleCanvasHorizontalGapChange}
+            placeholder="Horizontal gap (100)"
+            disabled={isLoading || !!jobId}
+            className="form-input"
+            min="0"
+            max="2000"
+          />
+          <div className="settings-description">
+            Horizontal spacing between screenshots in pixels.
+          </div>
+        </>
+      )}
+    </div>
 
     <div id="screenshot-settings-section" className="settings-section">
       <label className="form-label">

@@ -148,6 +148,33 @@ export const App: React.FC = () => {
     [updateSetting]
   );
 
+  const handleScreenshotLayoutChange = useCallback(
+    (value: "per-page" | "single-canvas") => {
+      updateSetting("screenshotLayout", value);
+    },
+    [updateSetting]
+  );
+
+  const handleSingleCanvasColumnsChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value, 10);
+      if (Number.isFinite(val) && val >= 1 && val <= 10) {
+        updateSetting("singleCanvasColumns", val);
+      }
+    },
+    [updateSetting]
+  );
+
+  const handleSingleCanvasHorizontalGapChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = parseInt(e.target.value, 10);
+      if (Number.isFinite(val) && val >= 0) {
+        updateSetting("singleCanvasHorizontalGap", val);
+      }
+    },
+    [updateSetting]
+  );
+
   // Note: Project persistence is handled by useProjects.setActiveProjectId
   // via the 'save-project' message, so no separate useEffect needed here
 
@@ -174,6 +201,12 @@ export const App: React.FC = () => {
       handleAuthMethodChange={handleAuthMethodChange}
       cookieBannerHandling={settings.cookieBannerHandling}
       handleCookieBannerHandlingChange={handleCookieBannerHandlingChange}
+      screenshotLayout={settings.screenshotLayout}
+      handleScreenshotLayoutChange={handleScreenshotLayoutChange}
+      singleCanvasColumns={settings.singleCanvasColumns}
+      handleSingleCanvasColumnsChange={handleSingleCanvasColumnsChange}
+      singleCanvasHorizontalGap={settings.singleCanvasHorizontalGap}
+      handleSingleCanvasHorizontalGapChange={handleSingleCanvasHorizontalGapChange}
       authStatus={authStatus}
       isLoading={isLoading}
       jobId={jobId}

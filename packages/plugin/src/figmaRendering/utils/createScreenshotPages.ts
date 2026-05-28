@@ -1,6 +1,7 @@
 import { TreeNode, InteractiveElement } from "../../types";
 import type { ElementFilters, ElementType } from "../../types/index";
 import { categorizeElementType } from "../../utils/elementCategorization";
+import { computeGridPositions } from "./computeGridPositions";
 
 interface RGB {
   r: number;
@@ -167,6 +168,41 @@ function findExistingPageByUrl(url: string, projectId?: string): PageNode | null
 function clearPageContents(page: PageNode): void {
   while (page.children.length > 0) {
     page.children[0]?.remove();
+  }
+}
+
+export const SINGLE_CANVAS_H_GAP = 100;
+export const SINGLE_CANVAS_V_GAP = 200;
+export const SINGLE_CANVAS_ROW_HEIGHT = 8000;
+
+function findOrCreateSitemapCanvasPage(): PageNode {
+  for (const page of figma.root.children) {
+    if (page.type === "PAGE" && page.getPluginData("SITEMAP_ROLE") === "canvas") {
+      return page as PageNode;
+    }
+  }
+  const page = figma.createPage();
+  page.name = "Sitemap";
+  page.setPluginData("SITEMAP_ROLE", "canvas");
+  return page;
+}
+
+function findExistingFrameByUrl(
+  sitemapPage: PageNode,
+  url: string,
+  projectId?: string
+): FrameNode | null {
+  for (const child of sitemapPage.children) {
+    if (child.type !== "FRAME") continue;
+    if (projectId && child.getPluginData("PROJECT_ID") !== projectId) continue;
+    if (child.getPluginData("URL") === url) return child as FrameNode;
+  }
+  return null;
+}
+
+function clearFrameContents(frame: FrameNode): void {
+  while (frame.children.length > 0) {
+    frame.children[0]?.remove();
   }
 }
 
@@ -524,7 +560,10 @@ export async function createScreenshotPages(
   highlightAllElements: boolean = false,
   highlightElementFilters?: any,
   projectId?: string,
-  removeStaleProjectPages: boolean = false
+  removeStaleProjectPages: boolean = false,
+  layoutMode: "per-page" | "single-canvas" = "per-page",
+  singleCanvasColumns: number = 5,
+  singleCanvasHorizontalGap: number = SINGLE_CANVAS_H_GAP
 ): Promise<Map<string, string>> {
   console.log(`Creating screenshot pages for ${pages.length} pages`);
   console.log(
@@ -533,12 +572,66 @@ export async function createScreenshotPages(
   console.log(
     `Highlight all elements: ${highlightAllElements ? "enabled" : "disabled"}`
   );
+  console.log(`Layout mode: ${layoutMode}`);
   const pageIdMap = new Map<string, string>();
   const originalPage = figma.currentPage;
   const originalPageId = originalPage.id;
   let originalPageWasRemoved = false;
 
-  if (removeStaleProjectPages && projectId) {
+  // ── Single-canvas mode setup ──────────────────────────────────────────────
+  let sitemapPage: PageNode | null = null;
+  let gridPositionMap = new Map<string, { x: number; y: number }>();
+
+  if (layoutMode === "single-canvas") {
+    sitemapPage = findOrCreateSitemapCanvasPage();
+    figma.currentPage = sitemapPage;
+
+    const gridResult = computeGridPositions(
+      pages.map((p) => ({ url: p.url })),
+      {
+        columns: Math.max(1, singleCanvasColumns),
+        frameWidth: screenshotWidth,
+        rowHeight: SINGLE_CANVAS_ROW_HEIGHT,
+        horizontalGap: singleCanvasHorizontalGap,
+        verticalGap: SINGLE_CANVAS_V_GAP,
+      }
+    );
+
+    for (const pos of gridResult.positions) {
+      gridPositionMap.set(pos.url, { x: pos.x, y: pos.y });
+    }
+
+    if (gridResult.projectedHeightWarning) {
+      figma.notify(
+        "Canvas height may exceed Figma's safe zone — consider increasing the column count.",
+        { timeout: 6000 }
+      );
+    }
+
+    // Remove stale frames in single-canvas mode
+    if (removeStaleProjectPages && projectId) {
+      const currentUrls = new Set(
+        pages
+          .map((p) => p.url)
+          .filter((url): url is string => typeof url === "string" && url.length > 0)
+      );
+      for (const child of [...sitemapPage.children]) {
+        if (child.type !== "FRAME") continue;
+        const childProjectId = child.getPluginData("PROJECT_ID");
+        const childUrl = child.getPluginData("URL");
+        if (childProjectId === projectId && childUrl && !currentUrls.has(childUrl)) {
+          try {
+            child.remove();
+            console.log(`Removed stale frame from canvas: ${childUrl}`);
+          } catch (error) {
+            console.warn(`Failed to remove stale frame ${childUrl}:`, error instanceof Error ? error.message : String(error));
+          }
+        }
+      }
+    }
+  }
+
+  if (layoutMode === "per-page" && removeStaleProjectPages && projectId) {
     const currentUrls = new Set(
       pages
         .map((page) => page.url)
@@ -632,20 +725,46 @@ export async function createScreenshotPages(
   }
 
   for (const page of pages) {
-    const existingPage = findExistingPageByUrl(page.url, projectId);
-    const newPage = existingPage !== null ? existingPage : figma.createPage();
+    // Resolve the content container: PageNode in per-page mode, FrameNode in single-canvas.
+    // Both types share the interfaces needed here (name, setPluginData, appendChild, children).
+    let newPage: any;
 
-    newPage.name = page.title.substring(0, 50);
-    newPage.setPluginData("URL", page.url);
-    newPage.setPluginData("PROJECT_ID", projectId || "");
-    if (page.pageId) {
-      newPage.setPluginData("PAGE_ID", page.pageId);
+    if (layoutMode === "single-canvas" && sitemapPage) {
+      const existingFrame = findExistingFrameByUrl(sitemapPage, page.url, projectId);
+      const frame: FrameNode = existingFrame ?? figma.createFrame();
+      if (!existingFrame) {
+        sitemapPage.appendChild(frame);
+      }
+
+      const pos = gridPositionMap.get(page.url) ?? { x: 0, y: 0 };
+      frame.x = pos.x;
+      frame.y = pos.y;
+      frame.resize(screenshotWidth, SINGLE_CANVAS_ROW_HEIGHT);
+      frame.clipsContent = false;
+      frame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+
+      frame.name = page.title.substring(0, 50);
+      frame.setPluginData("URL", page.url);
+      frame.setPluginData("PROJECT_ID", projectId || "");
+      frame.setPluginData("PAGE_ID", page.pageId ?? "");
+      clearFrameContents(frame);
+      pageIdMap.set(page.url, frame.id);
+      newPage = frame;
     } else {
-      newPage.setPluginData("PAGE_ID", "");
+      const existingPage = findExistingPageByUrl(page.url, projectId);
+      const page_ = existingPage !== null ? existingPage : figma.createPage();
+      page_.name = page.title.substring(0, 50);
+      page_.setPluginData("URL", page.url);
+      page_.setPluginData("PROJECT_ID", projectId || "");
+      if (page.pageId) {
+        page_.setPluginData("PAGE_ID", page.pageId);
+      } else {
+        page_.setPluginData("PAGE_ID", "");
+      }
+      clearPageContents(page_);
+      pageIdMap.set(page.url, page_.id);
+      newPage = page_;
     }
-    clearPageContents(newPage);
-
-    pageIdMap.set(page.url, newPage.id);
 
     try {
       const screenshots = Array.isArray(page.screenshot) ? page.screenshot : [];
@@ -1250,10 +1369,12 @@ export async function createScreenshotPages(
     }
   }
 
-  if (!originalPageWasRemoved) {
+  if (layoutMode === "single-canvas" && sitemapPage) {
+    figma.currentPage = sitemapPage;
+  } else if (!originalPageWasRemoved) {
     figma.currentPage = originalPage;
   } else if (figma.root.children.length > 0) {
-    figma.currentPage = figma.root.children[0];
+    figma.currentPage = figma.root.children[0] as PageNode;
   }
 
   console.log(`Created ${pageIdMap.size} screenshot pages`);
@@ -1261,23 +1382,35 @@ export async function createScreenshotPages(
   return pageIdMap;
 }
 
-// Function to update navigation links with index page ID
-export function updateNavigationLinks(indexPageId: string) {
-  // Find all pages that contain navigation frames
+// Update navigation links with index node ID (works for both per-page and single-canvas).
+// In per-page mode, indexNodeId is a PageNode ID; in single-canvas it's a FrameNode ID.
+export function updateNavigationLinks(indexNodeId: string) {
   for (const page of figma.root.children) {
-    if (page.name === "Index") continue;
+    if (page.type !== "PAGE") continue;
 
-    const navFrame = page.findOne(
-      (node) => node.name === "Navigation"
-    ) as FrameNode;
-    if (navFrame) {
+    if (page.getPluginData("SITEMAP_ROLE") === "canvas") {
+      // Single-canvas: update navigation inside each screenshot FrameNode
+      for (const child of page.children) {
+        if (child.type !== "FRAME") continue;
+        const navFrame = child.findOne((n) => n.name === "Navigation") as FrameNode | null;
+        if (!navFrame) continue;
+        const backText = navFrame.findOne(
+          (n) => n.type === "TEXT" && (n as TextNode).characters.includes("← Back to Index")
+        ) as TextNode | null;
+        if (backText) {
+          backText.hyperlink = { type: "NODE", value: indexNodeId };
+        }
+      }
+    } else {
+      // Per-page: update navigation inside the page
+      if (page.name === "Index") continue;
+      const navFrame = page.findOne((n) => n.name === "Navigation") as FrameNode | null;
+      if (!navFrame) continue;
       const backText = navFrame.findOne(
-        (node) =>
-          node.type === "TEXT" && node.characters.includes("← Back to Index")
-      ) as TextNode;
-
+        (n) => n.type === "TEXT" && (n as TextNode).characters.includes("← Back to Index")
+      ) as TextNode | null;
       if (backText) {
-        backText.hyperlink = { type: "NODE", value: indexPageId };
+        backText.hyperlink = { type: "NODE", value: indexNodeId };
       }
     }
   }

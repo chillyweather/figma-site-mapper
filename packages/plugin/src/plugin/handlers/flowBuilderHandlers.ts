@@ -8,6 +8,7 @@
 
 import { renderFlowBoard } from "../../figmaRendering/renderFlowBoard";
 import type { FlowDraftStep } from "../../types";
+import { getActiveScreenshotTarget, findScreenshotTargetByPageId } from "./screenshotTarget";
 
 const PAGE_ID_KEY = "PAGE_ID";
 const PROJECT_ID_KEY = "PROJECT_ID";
@@ -31,56 +32,38 @@ function getPluginData(
  * Find the current screenshot page by checking plugin data on each page.
  */
 export async function handleGetActiveScreenshotPage(): Promise<void> {
-  const pages = figma.root.children;
-  const currentPage = figma.currentPage;
+  const target = getActiveScreenshotTarget();
 
-  console.log(`${TAG} getActiveScreenshotPage — current page: "${currentPage.name}" (id=${currentPage.id})`);
+  if (!target) {
+    console.log(`${TAG} getActiveScreenshotPage — no screenshot target detected`);
+    figma.ui.postMessage({ type: "active-screenshot-page", payload: null });
+    return;
+  }
 
-  const pageId = getPluginData(currentPage, PAGE_ID_KEY);
-  const pageUrl = getPluginData(currentPage, URL_KEY);
-  const projectId = getPluginData(currentPage, PROJECT_ID_KEY);
+  const pageId = getPluginData(target as any, PAGE_ID_KEY);
+  const pageUrl = getPluginData(target as any, URL_KEY);
+  const projectId = getPluginData(target as any, PROJECT_ID_KEY);
 
   if (pageId && pageUrl && projectId) {
-    console.log(`${TAG} getActiveScreenshotPage — current page IS a screenshot page:`, { pageId, pageUrl, projectId });
+    console.log(`${TAG} getActiveScreenshotPage — found target:`, { pageId, pageUrl, projectId });
     figma.ui.postMessage({
       type: "active-screenshot-page",
-      payload: {
-        pageId,
-        pageUrl,
-        pageName: currentPage.name,
-        projectId,
-      },
+      payload: { pageId, pageUrl, pageName: target.name, projectId },
     });
     return;
   }
 
-  console.log(`${TAG} getActiveScreenshotPage — current page has no screenshot plugin data (PAGE_ID=${pageId ?? "none"}, URL=${pageUrl ?? "none"}, PROJECT_ID=${projectId ?? "none"})`);
-
-  // Check other pages (best-effort)
-  for (const page of pages) {
-    if (page.id === currentPage.id) continue;
-    const pid = getPluginData(page, PAGE_ID_KEY);
-    const purl = getPluginData(page, URL_KEY);
-    const projId = getPluginData(page, PROJECT_ID_KEY);
-    if (pid && purl && projId) {
-      // This page is a screenshot page but it is not the current page —
-      // logged here for diagnostics only, not selected.
-      console.log(`${TAG} getActiveScreenshotPage — other screenshot page found: "${page.name}" (${pid} / ${purl})`);
-    }
-  }
-
-  console.log(`${TAG} getActiveScreenshotPage — no screenshot page detected; posting null`);
-  figma.ui.postMessage({
-    type: "active-screenshot-page",
-    payload: null,
-  });
+  console.log(`${TAG} getActiveScreenshotPage — target has incomplete plugin data; posting null`);
+  figma.ui.postMessage({ type: "active-screenshot-page", payload: null });
 }
 
 /**
  * Find or create the overlay container on a page.
  */
-function findOrCreateOverlay(page: PageNode): FrameNode | null {
-  let overlay = page.findOne((n) => n.name === OVERLAY_CHILD_NAME) as FrameNode | null;
+type ScreenshotContainer = PageNode | FrameNode;
+
+function findOrCreateOverlay(page: ScreenshotContainer): FrameNode | null {
+  let overlay = (page as any).findOne((n: SceneNode) => n.name === OVERLAY_CHILD_NAME) as FrameNode | null;
   if (!overlay) {
     console.log(`${TAG} findOrCreateOverlay — creating new overlay on "${page.name}"`);
     overlay = figma.createFrame();
@@ -88,7 +71,7 @@ function findOrCreateOverlay(page: PageNode): FrameNode | null {
     overlay.resize(100, 100);
     overlay.clipsContent = false;
     overlay.fills = [];
-    page.appendChild(overlay);
+    (page as any).appendChild(overlay);
   } else {
     console.log(`${TAG} findOrCreateOverlay — reusing existing overlay on "${page.name}"`);
   }
@@ -98,9 +81,9 @@ function findOrCreateOverlay(page: PageNode): FrameNode | null {
 /**
  * Get the scale factor for mapping element coordinates to canvas coordinates.
  */
-function getScaleFactor(page: PageNode): number {
-  const screenshotWidth = getPluginData(page, SCREENSHOT_WIDTH_KEY);
-  const viewportWidth = getPluginData(page, ORIGINAL_VIEWPORT_WIDTH_KEY);
+function getScaleFactor(page: ScreenshotContainer): number {
+  const screenshotWidth = getPluginData(page as any, SCREENSHOT_WIDTH_KEY);
+  const viewportWidth = getPluginData(page as any, ORIGINAL_VIEWPORT_WIDTH_KEY);
   if (screenshotWidth && viewportWidth) {
     const sw = parseFloat(screenshotWidth);
     const vw = parseFloat(viewportWidth);
@@ -117,8 +100,8 @@ function getScaleFactor(page: PageNode): number {
 /**
  * Clear any existing flow preview from a page.
  */
-function clearPreviewFromPage(page: PageNode): void {
-  const overlay = page.findOne((n) => n.name === OVERLAY_CHILD_NAME) as FrameNode | null;
+function clearPreviewFromPage(page: ScreenshotContainer): void {
+  const overlay = (page as any).findOne((n: SceneNode) => n.name === OVERLAY_CHILD_NAME) as FrameNode | null;
   if (!overlay) {
     console.log(`${TAG} clearPreviewFromPage — no overlay on "${page.name}"; nothing to clear`);
     return;
@@ -141,7 +124,7 @@ export async function handlePreviewFlowElement(msg: {
   label?: string | null;
   targetUrl?: string | null;
 }): Promise<void> {
-  const currentPage = figma.currentPage;
+  const currentPage = getActiveScreenshotTarget() ?? figma.currentPage;
 
   console.log(`${TAG} previewFlowElement — element: ${msg.elementId}`, {
     pageId: msg.pageId,
@@ -166,7 +149,7 @@ export async function handlePreviewFlowElement(msg: {
   const scale = getScaleFactor(currentPage);
 
   // Find the top-level screenshot frame(s) to determine vertical offset
-  const frames = currentPage.findAll((n) => n.type === "FRAME" && n.parent === currentPage);
+  const frames = (currentPage as any).findAll((n: SceneNode) => n.type === "FRAME" && n.parent === currentPage);
   let offsetY = 0;
   if (frames.length > 0) {
     offsetY = frames[0].y;
@@ -238,8 +221,9 @@ export async function handlePreviewFlowElement(msg: {
  * Clear the flow preview from the current page.
  */
 export async function handleClearFlowPreview(): Promise<void> {
-  console.log(`${TAG} clearFlowPreview — clearing from "${figma.currentPage.name}"`);
-  clearPreviewFromPage(figma.currentPage);
+  const target = getActiveScreenshotTarget() ?? figma.currentPage;
+  console.log(`${TAG} clearFlowPreview — clearing from "${target.name}"`);
+  clearPreviewFromPage(target);
   figma.ui.postMessage({ type: "flow-preview-cleared" });
 }
 
@@ -252,35 +236,55 @@ export async function handleContinueFromTarget(msg: {
 }): Promise<void> {
   console.log(`${TAG} continueFromTarget — looking for pageId="${msg.targetPageId}" url="${msg.targetUrl ?? "none"}"`);
 
-  const pages = figma.root.children;
-  for (const page of pages) {
-    const pid = getPluginData(page, PAGE_ID_KEY);
-    if (pid === msg.targetPageId) {
-      console.log(`${TAG} continueFromTarget — found page by ID: "${page.name}"`);
-      await figma.setCurrentPageAsync(page);
-      await handleGetActiveScreenshotPage();
-      figma.ui.postMessage({ type: "flow-switch-page-result", success: true });
-      return;
+  // Use the compat shim to find by PAGE_ID (searches both per-page and single-canvas)
+  const target = findScreenshotTargetByPageId(msg.targetPageId);
+  if (target) {
+    console.log(`${TAG} continueFromTarget — found target by ID: "${target.name}"`);
+    if (target.type === "PAGE") {
+      await figma.setCurrentPageAsync(target as PageNode);
+    } else {
+      // Single-canvas: switch to the Sitemap canvas page and select the frame
+      const parent = (target as FrameNode).parent;
+      if (parent && parent.type === "PAGE") {
+        await figma.setCurrentPageAsync(parent as PageNode);
+        figma.currentPage.selection = [target as FrameNode];
+      }
     }
+    await handleGetActiveScreenshotPage();
+    figma.ui.postMessage({ type: "flow-switch-page-result", success: true });
+    return;
   }
 
-  console.log(`${TAG} continueFromTarget — page not found by ID; trying URL fallback`);
+  console.log(`${TAG} continueFromTarget — not found by ID; trying URL fallback`);
 
   if (msg.targetUrl) {
-    for (const page of pages) {
-      const url = getPluginData(page, URL_KEY);
-      if (url === msg.targetUrl) {
-        console.log(`${TAG} continueFromTarget — found page by URL: "${page.name}"`);
-        await figma.setCurrentPageAsync(page);
+    // URL fallback: search per-page and single-canvas
+    for (const page of figma.root.children) {
+      if (page.type !== "PAGE") continue;
+      if (page.getPluginData("URL") === msg.targetUrl) {
+        console.log(`${TAG} continueFromTarget — found per-page match by URL: "${page.name}"`);
+        await figma.setCurrentPageAsync(page as PageNode);
         await handleGetActiveScreenshotPage();
         figma.ui.postMessage({ type: "flow-switch-page-result", success: true });
         return;
+      }
+      if (page.getPluginData("SITEMAP_ROLE") === "canvas") {
+        for (const child of page.children) {
+          if (child.type === "FRAME" && child.getPluginData("URL") === msg.targetUrl) {
+            console.log(`${TAG} continueFromTarget — found single-canvas match by URL: "${child.name}"`);
+            await figma.setCurrentPageAsync(page as PageNode);
+            figma.currentPage.selection = [child as FrameNode];
+            await handleGetActiveScreenshotPage();
+            figma.ui.postMessage({ type: "flow-switch-page-result", success: true });
+            return;
+          }
+        }
       }
     }
     console.warn(`${TAG} continueFromTarget — URL fallback also failed for "${msg.targetUrl}"`);
   }
 
-  console.warn(`${TAG} continueFromTarget — target page not found on canvas (id=${msg.targetPageId})`);
+  console.warn(`${TAG} continueFromTarget — target not found on canvas (id=${msg.targetPageId})`);
   figma.notify("Target page not found in the canvas. Capture or render it first.", { error: true });
   figma.ui.postMessage({ type: "flow-switch-page-result", success: false });
 }

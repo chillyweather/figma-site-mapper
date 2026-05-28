@@ -58,7 +58,7 @@ pnpm --filter backend run inventory:export <projectId>
 
 **Two-process backend.** The API server (`src/index.ts`) and job worker (`src/worker.ts`) are separate Node processes. The API enqueues jobs to Redis/BullMQ; the worker consumes them and runs the crawler. They share the same SQLite DB file (WAL mode enabled, safe for concurrent access).
 
-**SQLite via Drizzle ORM.** Schema lives in `src/schema.ts`. Tables are created with `CREATE TABLE IF NOT EXISTS` in `src/db.ts` at startup — no migration tool needed. JSON columns (`screenshotPaths`, `interactiveElements`, `globalStyles`, `styles`, `classes`, `bbox`, `styleTokens`) are stored as TEXT and must be `JSON.parse`/`JSON.stringify`d at the DB boundary. Integer IDs, not ObjectIds.
+**SQLite via Drizzle ORM.** Schema lives in `src/schema.ts`. Tables are created with `CREATE TABLE IF NOT EXISTS` in `src/db.ts` at startup — no migration tool needed. JSON columns (`screenshotPaths`, `interactiveElements`, `globalStyles`, `styles`, `classes`, `bbox`, `styleTokens`, `captureQualityJson`) are stored as TEXT and must be `JSON.parse`/`JSON.stringify`d at the DB boundary. Integer IDs, not ObjectIds.
 
 **API response shape.** All responses include `_id: String(row.id)` alongside `id: number` so the plugin (which checks `_id`) stays compatible. Serialization helpers `serializePage` and `serializeElement` in `services/manifestBuilder.ts` handle this.
 
@@ -84,7 +84,7 @@ Current required plugin-data keys are `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHO
 2. Exact URLs mode: Plugin creates a minimal discovery run from the pasted URLs and approves those URLs through the same approval path.
 3. Approved capture calls `POST /crawl/approved` with an explicit approved URL list. This path sets `maxRequestsPerCrawl` to the approved URL count and disables automatic interactive highlight rendering.
 4. API validates project/run IDs in SQLite and enqueues a BullMQ job.
-5. Worker calls `runCrawler()` → Playwright crawls only allowed URLs when an approved allowlist is present → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` → old elements deleted → new elements batch-inserted in chunks of 200.
+5. Worker calls `runCrawler()` → Playwright crawls only allowed URLs when an approved allowlist is present → `captureHighFidelity` orchestrates the screenshot (cookie-banner dismissal, sticky-element hide, lazy-content trigger, scroll-to-top, readiness wait, blank-region score + optional retry) → screenshots sliced to ≤4096px → page upserted via `INSERT ... ON CONFLICT DO UPDATE` on `(project_id, url)` with `captureQualityJson` → old elements deleted → new elements batch-inserted in chunks of 200.
 6. Worker writes `visitedPageIds` (integer strings), `visitedUrls`, and `pageCount` back to the BullMQ job.
 7. Plugin polls `GET /status/:jobId` → fetches only the job subset from `GET /pages/by-ids` → renders Figma pages → stores `PROJECT_ID`, `URL`, and `PAGE_ID` in Figma plugin data.
 8. If the job was a full refresh, backend removes stale SQLite pages and the plugin removes stale generated Figma pages for the same project.
@@ -130,6 +130,14 @@ packages/backend/src/
   queue.ts          BullMQ queue + Redis connection
   services/
     manifestBuilder.ts  page/element queries + serialization to API shape
+    capture/            high-fidelity screenshot pipeline:
+      highFidelityCapture.ts   orchestrator (sticky-hide → lazy-trigger → readiness → screenshot → blank-region retry)
+      pageReadyDetector.ts     7-signal readiness wait (images, fonts, backgroundImages, animations, videos, requests, visualStability) + imagesDiagnostic on timeout
+      blankRegionDetector.ts   scoreSuspiciousRegions() — detects large uniform regions in a screenshot (0–1 score)
+      lazyContentTrigger.ts    scroll-based lazy-content activation
+      stealthLauncher.ts       stealth browser launcher (rebrowser-patches + puppeteer-extra-stealth)
+      blockClassifier.ts       classifies pages as ok / bot-wall / captcha / etc.
+      __fixtures__/            local HTTP server + HTML pages for capture unit tests
     workspace/           workspace generator, manifests, contact sheets, token images, decisions/meta helpers
     inventory/           deterministic primitives and raw token frequency tables
 
@@ -154,6 +162,13 @@ packages/plugin/src/
   - full-mode discovery now reports warnings when sitemap/homepage fetches are blocked and no extra URLs can be discovered
   - approved capture preserves interactive data but does not draw old interactive highlight overlays
   - full refresh removes stale generated Figma pages for the active project
+- High-fidelity capture quality pipeline is implemented:
+  - `captureHighFidelity` orchestrates a 7-signal readiness wait before screenshotting
+  - Visual stability signal (7th signal) polls viewport bounding rects; settles when geometry is quiet for 800ms
+  - Blank-region detector scores the screenshot; retries once (re-trigger lazy + readiness + re-screenshot) if score > 0.20
+  - `captureQualityJson` persisted on every page row: `readinessSignals`, `suspiciousRegionScore`, `retryCount`, `qualityStatus` (clean / suspicious / retry_improved / retry_unchanged)
+  - `captureQuality` exposed in page API responses
+  - Images signal now treats errored/CORS-blocked images (`complete=true, naturalWidth=0`) as settled to avoid permanent hangs; `imagesDiagnostic` field populated on timeout
 - Phases A-D of the agent-driven inventory pivot are complete.
 - Inventory rendering is implemented:
   - plugin renders a `DS Inventory` page from decisions
@@ -173,6 +188,7 @@ packages/backend/screenshots/
 packages/backend/storage/
 packages/backend/logs/
 packages/backend/workspace/
+packages/backend/tmp/
 packages/plugin/dist/
 ```
 
