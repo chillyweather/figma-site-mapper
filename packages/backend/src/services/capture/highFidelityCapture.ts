@@ -71,23 +71,40 @@ export async function captureHighFidelity(
   return { buffer, width: dims.width, height: dims.height, readinessReport };
 }
 
-// Limitation: keeps the first match in DOM order, not the visually-topmost
-// sticky. A late-in-DOM sticky that paints at y=0 will be hidden while an
-// early-in-DOM sticky lower on the page is kept. Selector also only matches
-// `.sticky`, `.fixed`, or inline position:fixed/sticky — computed-style
-// stickies on real sites slip through. Preserved from the legacy inline flow.
+// Hide repeating top-pinned header bands so they don't duplicate down a
+// long-page screenshot. Only short, top-pinned bands qualify — scroll-pinned
+// hero layers (tall, often viewport-height) are preserved. Uses computed
+// style and bounding-box geometry rather than selectors, so utility-class
+// stickies (e.g. Tailwind `.sticky`) and inline styles both flow through
+// the same gate.
+const HEADER_BAND_MAX_HEIGHT_PX = 200;
+
 async function hideRedundantStickyElements(page: Page): Promise<void> {
   await page
-    .evaluate(() => {
-      const stickyElements = document.querySelectorAll(
-        '[style*="position: fixed"], [style*="position: sticky"], .sticky, .fixed'
-      );
-      stickyElements.forEach((el, index) => {
-        if (index > 0) (el as HTMLElement).style.display = "none";
+    .evaluate((maxBandHeight: number) => {
+      const candidates: HTMLElement[] = [];
+      const all = document.querySelectorAll<HTMLElement>("*");
+      all.forEach((el) => {
+        const cs = window.getComputedStyle(el);
+        if (cs.position !== "fixed" && cs.position !== "sticky") return;
+        const rect = el.getBoundingClientRect();
+        if (rect.height === 0 || rect.height > maxBandHeight) return;
+        // CSS `top` near 0 means the element intends to pin to the
+        // viewport top — the shape of a header/banner, not a hero pin.
+        const topPx = parseFloat(cs.top);
+        if (!Number.isFinite(topPx) || topPx > 8) return;
+        candidates.push(el);
       });
+
+      // Keep the first header band in DOM order, hide subsequent ones so
+      // they don't repeat down the stitched screenshot.
+      candidates.forEach((el, index) => {
+        if (index > 0) el.style.display = "none";
+      });
+
       document.documentElement.style.transform = "none";
       document.body.style.transform = "none";
-    })
+    }, HEADER_BAND_MAX_HEIGHT_PX)
     .catch(() => undefined);
 }
 

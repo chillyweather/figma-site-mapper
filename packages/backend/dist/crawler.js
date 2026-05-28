@@ -8,6 +8,9 @@ import { eq, and, notInArray, inArray } from "drizzle-orm";
 import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
+import { captureHighFidelity } from "./services/capture/highFidelityCapture.js";
+import { classifyPage } from "./services/capture/blockClassifier.js";
+import { applyStealthContextDefaults, getStealthLauncher, pickStealthUserAgent, } from "./services/capture/stealthLauncher.js";
 // CSS properties that we want to capture on every element.
 const ELEMENT_STYLE_PROPERTIES = [
     "color",
@@ -526,6 +529,8 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
     try {
         const image = sharp(imageBuffer);
         const metadata = await image.metadata();
+        const assetVersion = Date.now();
+        const screenshotUrl = (fileName) => `${publicUrl}/screenshots/${fileName}?v=${assetVersion}`;
         if (!metadata.height || !metadata.width)
             throw new Error("Could not get image dimensions");
         const { width, height } = metadata;
@@ -536,14 +541,14 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
             const safeFileName = getSafeFilename(url);
             const screenshotFileName = `${safeFileName}.png`;
             await image.toFile(path.join(screenshotDir, screenshotFileName));
-            return [`${publicUrl}/screenshots/${screenshotFileName}`];
+            return [screenshotUrl(screenshotFileName)];
         }
         if (height <= overlap) {
             console.log(`⚠️  Image height (${height}) <= overlap (${overlap}), saving as single slice`);
             const safeFileName = getSafeFilename(url);
             const screenshotFileName = `${safeFileName}.png`;
             await image.toFile(path.join(screenshotDir, screenshotFileName));
-            return [`${publicUrl}/screenshots/${screenshotFileName}`];
+            return [screenshotUrl(screenshotFileName)];
         }
         const numSlices = Math.max(1, Math.ceil((height - maxHeight) / (maxHeight - overlap)) + 1);
         const slices = [];
@@ -572,7 +577,7 @@ async function sliceScreenshot(imageBuffer, url, publicUrl, maxHeight = 4096, ov
             const slicePath = path.join(screenshotDir, sliceFileName);
             try {
                 await image.clone().extract({ left: 0, top: sliceTop, width, height: sliceHeight }).toFile(slicePath);
-                slices.push(`${publicUrl}/screenshots/${sliceFileName}`);
+                slices.push(screenshotUrl(sliceFileName));
                 console.log(`📸 Created slice ${i + 1}/${numSlices}: ${width}x${sliceHeight}px at y=${sliceTop}`);
             }
             catch (error) {
@@ -978,7 +983,7 @@ async function handleCookieConsentBanner(page, mode, log, url) {
         log.info(`Cookie banner handling failed for ${url}: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
-export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 1, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling = "auto") {
+export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, deviceScaleFactor = 2, jobId, delay = 0, requestDelay = 1000, maxDepth, defaultLanguageOnly = false, sampleSize = 3, showBrowser = false, detectInteractiveElements = true, captureOnlyVisibleElements = true, highlightAllElements = false, fullRefresh = false, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling = "auto") {
     console.log("🚀 Starting the crawler with URL:", startUrl);
     console.log("📊 Crawler settings:", {
         maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth,
@@ -998,11 +1003,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
         ? path.join(process.cwd(), "storage", `job-${jobId}`)
         : path.join(process.cwd(), "storage", "default");
     console.log(`📁 Using storage directory: ${storageDir}`);
-    const userAgents = [
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    ];
-    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    const randomUserAgent = pickStealthUserAgent();
     const urlObj = new URL(startUrl);
     urlObj.hash = "";
     const canonicalStartUrl = urlObj.toString();
@@ -1136,28 +1137,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             return false;
         }
     }
+    let stealthContextInitialized = false;
     async function applyBrowserFingerprint(page) {
-        await page.setExtraHTTPHeaders({
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-            "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"macOS"',
-            "Upgrade-Insecure-Requests": "1",
-        });
-        await page.setViewportSize({ width: 1440, height: 900 }).catch(() => undefined);
-        await page.addInitScript(() => {
-            Object.defineProperty(navigator, "webdriver", { get: () => false });
-        }).catch(() => undefined);
-    }
-    async function isBlockedByCloudflare(page) {
-        return page.evaluate(() => {
-            const title = document.title.toLowerCase();
-            const bodyText = (document.body?.innerText || document.body?.textContent || "").toLowerCase();
-            return (title.includes("attention required") && title.includes("cloudflare")) || (bodyText.includes("sorry, you have been blocked") &&
-                bodyText.includes("cloudflare")) || Boolean(document.querySelector(".cf-error-details, #cf-error-details"));
-        });
+        if (stealthContextInitialized)
+            return;
+        await applyStealthContextDefaults(page.context()).catch(() => undefined);
+        stealthContextInitialized = true;
     }
     let progressUpdateWarned = false;
     const updateProgress = async (stage, currentPage, totalPages, currentUrl) => {
@@ -1189,9 +1174,9 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
     });
     crawler = new PlaywrightCrawler({
         launchContext: {
+            launcher: getStealthLauncher(),
             launchOptions: {
                 args: [
-                    ...(deviceScaleFactor > 1 ? ["--device-scale-factor=2"] : []),
                     "--disable-infobars",
                     "--disable-extensions-except=",
                     "--disable-extensions",
@@ -1202,6 +1187,12 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 headless: !showBrowser,
                 slowMo: 100,
                 devtools: false,
+                // launchPersistentContext accepts BrowserContextOptions alongside
+                // LaunchOptions — this is the only place Crawlee gives us to set
+                // DPR + viewport at context creation. Per-page CDP overrides and
+                // the --device-scale-factor chromium flag are unreliable here.
+                deviceScaleFactor,
+                viewport: { width: 1920, height: 1080 },
             },
             userAgent: randomUserAgent,
         },
@@ -1275,127 +1266,80 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {
                 log.info("Network idle timeout, continuing anyway");
             });
-            if (await isBlockedByCloudflare(page)) {
-                throw new Error(`Cloudflare block page detected for ${finalUrl}`);
-            }
-            // CAPTCHA detection
-            const captchaDetection = await page.evaluate(() => {
-                const captchaSelectors = [
-                    '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
-                    '[src*="shieldsquare"]', '[class*="shieldsquare"]',
-                    'iframe[src*="recaptcha"]', ".g-recaptcha", '[src*="hcaptcha"]', ".h-captcha",
-                ];
-                const cloudflareSelectors = [
-                    '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]',
-                    ".cf-im-under-attack", ".cf-browser-verification",
-                ];
-                const foundElements = [];
-                captchaSelectors.forEach((s) => { if (document.querySelector(s))
-                    foundElements.push(s); });
-                const foundCloudflare = [];
-                cloudflareSelectors.forEach((s) => { if (document.querySelector(s))
-                    foundCloudflare.push(s); });
-                let hasSpecificText = false;
-                let hasCaptchaTitle = false;
-                if (foundElements.length > 0 || foundCloudflare.length > 0) {
-                    const bodyText = document.body.textContent?.toLowerCase() || "";
-                    hasSpecificText = [
-                        "verify you are human", "prove you are not a robot",
-                        "please complete the security check", "robot check", "i'm not a robot",
-                    ].some((t) => bodyText.includes(t));
-                    hasCaptchaTitle = [
-                        "security check", "human verification", "captcha", "are you a robot",
-                    ].some((t) => document.title.toLowerCase().includes(t));
-                }
-                return {
-                    hasCaptcha: (foundElements.length > 0 || foundCloudflare.length > 0) && (hasSpecificText || hasCaptchaTitle),
-                    foundElements, foundCloudflare, hasSpecificText, hasCaptchaTitle,
-                    pageTitle: document.title,
-                };
+            const classification = await classifyPage(page).catch((error) => {
+                log.info(`Classifier failed for ${finalUrl}; treating as ok: ${error instanceof Error ? error.message : String(error)}`);
+                return { kind: "ok", reason: null };
             });
-            if (captchaDetection.hasCaptcha) {
-                log.info(`🚨 CAPTCHA detected on ${finalUrl}`);
-                log.info(`👤 Please solve CAPTCHA manually. Waiting up to 2 minutes...`);
-                try {
-                    await Promise.race([
-                        page.waitForNavigation({ timeout: 120000 }),
-                        page.waitForFunction(() => {
-                            const captchaElements = document.querySelectorAll('[src*="captcha"],[class*="captcha"],[id*="captcha"],[src*="shieldsquare"],[class*="shieldsquare"],iframe[src*="recaptcha"],.g-recaptcha,[src*="hcaptcha"],.h-captcha,[class*="cf-browser-verification"],[id*="cf-wrapper"]');
-                            const bodyText = document.body.textContent?.toLowerCase() || "";
-                            const stillHasText = [
-                                "verify you are human", "prove you are not a robot", "security check",
-                            ].some((t) => bodyText.includes(t));
-                            return captchaElements.length === 0 && !stillHasText;
-                        }, { timeout: 120000 }),
-                        page.waitForTimeout(120000),
-                    ]);
-                    log.info(`✅ CAPTCHA appears to be resolved, continuing`);
-                    await page.waitForTimeout(2000);
+            if (classification.kind !== "ok") {
+                const reasonText = classification.reason ?? classification.kind;
+                log.info(`🚧 Block detected on ${finalUrl}: kind=${classification.kind}${classification.provider ? ` provider=${classification.provider}` : ""} — ${reasonText}`);
+                if (projectNumId !== null) {
+                    try {
+                        const now = new Date();
+                        const blockedTitle = await page.title().catch(() => "");
+                        db.insert(pages)
+                            .values({
+                            projectId: projectNumId,
+                            url: finalUrl,
+                            title: blockedTitle,
+                            screenshotPaths: "[]",
+                            annotatedScreenshotPath: null,
+                            interactiveElements: "[]",
+                            globalStyles: null,
+                            viewportWidth: page.viewportSize()?.width ?? null,
+                            blockReason: reasonText,
+                            lastCrawledAt: now,
+                            lastCrawlJobId: jobId ?? null,
+                            lastCrawlRunId: crawlRunId ?? null,
+                            createdAt: now,
+                            updatedAt: now,
+                        })
+                            .onConflictDoUpdate({
+                            target: [pages.projectId, pages.url],
+                            set: {
+                                title: blockedTitle,
+                                screenshotPaths: "[]",
+                                annotatedScreenshotPath: null,
+                                interactiveElements: "[]",
+                                globalStyles: null,
+                                viewportWidth: page.viewportSize()?.width ?? null,
+                                blockReason: reasonText,
+                                lastCrawledAt: now,
+                                lastCrawlJobId: jobId ?? null,
+                                lastCrawlRunId: crawlRunId ?? null,
+                                updatedAt: now,
+                            },
+                        })
+                            .returning({ id: pages.id })
+                            .get();
+                    }
+                    catch (error) {
+                        log.error(`Failed to persist block reason for ${finalUrl}: ${error instanceof Error ? error.message : String(error)}`);
+                    }
                 }
-                catch {
-                    log.info(`⏰ CAPTCHA timeout on ${finalUrl}, continuing capture instead of omitting approved page`);
-                }
+                crawledUrls.add(finalUrl);
+                existingSectionUrls.push(finalUrl);
+                sectionUrlMap.set(sectionKey, existingSectionUrls);
+                return;
             }
             if (delay > 0) {
                 log.info(`Waiting ${delay}ms for dynamic content to load`);
                 await page.waitForTimeout(delay);
             }
-            await handleCookieConsentBanner(page, cookieBannerHandling, log, finalUrl);
-            // Hide extra sticky/fixed elements
-            try {
-                await page.evaluate(() => {
-                    const stickyElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"], .sticky, .fixed');
-                    stickyElements.forEach((el, index) => {
-                        if (index > 0)
-                            el.style.display = "none";
-                    });
-                    document.documentElement.style.transform = "none";
-                    document.body.style.transform = "none";
-                });
-            }
-            catch {
-                log.info(`Could not handle sticky elements for ${finalUrl}`);
-            }
-            // Scroll to trigger lazy loading
-            try {
-                await page.evaluate(async () => {
-                    const scrollHeight = document.documentElement.scrollHeight;
-                    const viewportHeight = window.innerHeight;
-                    let pos = 0;
-                    while (pos < scrollHeight) {
-                        pos += viewportHeight;
-                        window.scrollTo(0, pos);
-                        await new Promise((r) => setTimeout(r, Math.min(500, 500)));
-                    }
-                    window.scrollTo(0, 0);
-                    document.documentElement.scrollTop = 0;
-                    document.body.scrollTop = 0;
-                });
-                await page.waitForTimeout(delay > 0 ? Math.min(2000, delay / 2) : 1000);
-                log.info(`Completed scrolling through ${finalUrl}`);
-            }
-            catch {
-                log.info(`Scrolling failed or not needed for ${finalUrl}`);
-            }
-            await handleCookieConsentBanner(page, cookieBannerHandling, log, finalUrl);
             const title = await page.title();
             log.info(`Crawled ${finalUrl} - Title: ${title}`);
             await updateProgress("screenshot", currentPage, totalPages, finalUrl);
-            // Ensure page is at the top before screenshot
-            try {
-                await page.evaluate(() => {
-                    window.scrollTo({ top: 0, behavior: "instant" });
-                    document.documentElement.scrollTop = 0;
-                    document.body.scrollTop = 0;
-                    if (document.scrollingElement)
-                        document.scrollingElement.scrollTop = 0;
-                });
-                await page.waitForTimeout(300);
-            }
-            catch {
-                log.info(`⚠️ Could not ensure top position for ${finalUrl}`);
-            }
-            await handleCookieConsentBanner(page, cookieBannerHandling, log, finalUrl);
+            // Orchestrated visual capture: cookie banners (3 passes) + sticky
+            // element hide + lazy-content trigger + scroll-to-top + readiness
+            // wait + screenshot. See services/capture/highFidelityCapture.ts.
+            const captureResult = await captureHighFidelity(page, {
+                dismissBanners: async () => {
+                    await handleCookieConsentBanner(page, cookieBannerHandling, log, finalUrl);
+                },
+            });
+            log.info(`🟢 Readiness for ${finalUrl}: ${Object.entries(captureResult.readinessReport)
+                .map(([k, v]) => `${k}=${v}`)
+                .join(" ")}`);
             // Interactive elements
             let interactiveElements = [];
             if (detectInteractiveElements) {
@@ -1495,7 +1439,17 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 });
                 log.info(`Extracted ${styleData.elements.length} elements and ${Object.keys(styleData.cssVariables).length} CSS variables`);
             }
-            const fullPageBuffer = await page.screenshot({ fullPage: true });
+            const captureViewport = page.viewportSize();
+            // Read the DPR actually in effect from the page itself — the
+            // `deviceScaleFactor` parameter is what we asked for, but Crawlee's
+            // context lifecycle has bitten us before (per-page CDP overrides and
+            // chromium flags both lose to context defaults). Logging the applied
+            // value makes regressions visible instead of silently mislogging.
+            const appliedDpr = await page
+                .evaluate(() => window.devicePixelRatio)
+                .catch(() => deviceScaleFactor);
+            log.info(`📸 Captured ${finalUrl} at viewport ${captureViewport?.width ?? "?"}x${captureViewport?.height ?? "?"} @ DPR ${appliedDpr} (raster ${captureResult.width}x${captureResult.height})`);
+            const fullPageBuffer = captureResult.buffer;
             await updateProgress("processing", currentPage, totalPages, finalUrl);
             const screenshotSlices = await sliceScreenshot(fullPageBuffer, finalUrl, publicUrl);
             log.info(`Generated ${screenshotSlices.length} screenshot slice(s) for ${finalUrl}`);
@@ -1558,6 +1512,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
             if (projectNumId !== null) {
                 try {
                     const now = new Date();
+                    const cssViewportWidth = captureViewport?.width ?? null;
                     const pageResult = db
                         .insert(pages)
                         .values({
@@ -1570,6 +1525,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                         globalStyles: styleData
                             ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                             : null,
+                        viewportWidth: cssViewportWidth,
                         lastCrawledAt: now,
                         lastCrawlJobId: jobId ?? null,
                         lastCrawlRunId: crawlRunId ?? null,
@@ -1586,6 +1542,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             globalStyles: styleData
                                 ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                                 : null,
+                            viewportWidth: cssViewportWidth,
                             lastCrawledAt: now,
                             lastCrawlJobId: jobId ?? null,
                             lastCrawlRunId: crawlRunId ?? null,
@@ -1954,7 +1911,7 @@ export async function openAuthSession(url) {
     });
     const context = await browser.newContext({
         userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        viewport: { width: 1440, height: 900 },
+        viewport: { width: 1920, height: 1080 },
         locale: "en-US",
         timezoneId: "America/New_York",
     });

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sticky-hero fixture</title>
+    <style>
+      body { margin: 0; font-family: sans-serif; }
+
+      /* Header band — short, pinned to top. Mimics a real site header. */
+      .site-header {
+        position: sticky;
+        top: 0;
+        height: 60px;
+        background: navy;
+        color: white;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        z-index: 10;
+      }
+
+      /* Scroll-pinned hero: outer reserves vertical space, inner layers
+         are position:sticky and stack on top of each other while the
+         outer scrolls past. Mimics atera.com's scroll-driven hero. */
+      .hero-section {
+        position: relative;
+        height: 1080px;
+        background: #f6f5f0;
+      }
+      .hero-section .sticky {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .hero-section .sticky--background { background: #e8e3d8; }
+      .hero-section .sticky--text {
+        background: transparent;
+        font-size: 48px;
+        font-weight: bold;
+        color: #222;
+        pointer-events: none;
+      }
+
+      .below-hero {
+        height: 800px;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header" data-testid="header">Site Header</header>
+
+    <section class="hero-section" data-testid="hero">
+      <div class="sticky sticky--background" data-testid="hero-bg">background layer</div>
+      <div class="sticky sticky--text" data-testid="hero-text">Hero headline</div>
+    </section>
+
+    <div class="below-hero" data-testid="below">After the hero</div>
+  </body>
+</html>

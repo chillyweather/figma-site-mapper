@@ -26,7 +26,8 @@
     "discovery:validate": "tsx src/cli/validateDiscoveryPersistence.ts",
     "discovery:recommendations": "tsx src/cli/validateRecommendations.ts",
     "discovery:api": "tsx src/cli/validateDiscoveryApi.ts",
-    "discovery:approved": "tsx src/cli/validateApprovedCapture.ts"
+    "discovery:approved": "tsx src/cli/validateApprovedCapture.ts",
+    "crawl:smoke": "tsx src/cli/crawlSmoke.ts"
   },
   "keywords": [],
   "author": "",
@@ -55,6 +56,8 @@
     "pino": "^10.3.1",
     "pino-roll": "^4.0.0",
     "playwright": "^1.54.2",
+    "playwright-extra": "4.3.6",
+    "puppeteer-extra-plugin-stealth": "2.11.2",
     "sharp": "^0.34.3"
   }
 }

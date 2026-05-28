@@ -233,6 +233,7 @@ ensureColumn("elements", "is_global_chrome", "is_global_chrome INTEGER DEFAULT 0
 ensureColumn("pages", "annotated_screenshot_path", "annotated_screenshot_path TEXT");
 ensureColumn("pages", "last_crawl_run_id", "last_crawl_run_id INTEGER");
 ensureColumn("pages", "viewport_width", "viewport_width INTEGER");
+ensureColumn("pages", "block_reason", "block_reason TEXT");
 ensureColumn("crawl_runs", "discovery_run_id", "discovery_run_id INTEGER");
 ensureColumn("crawl_runs", "approved_urls_json", "approved_urls_json TEXT");
 ensureColumn("discovery_runs", "warnings_json", "warnings_json TEXT NOT NULL DEFAULT '[]'");

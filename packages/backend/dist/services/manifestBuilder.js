@@ -19,6 +19,8 @@ function serializePage(row) {
         annotatedScreenshotPath: row.annotatedScreenshotPath ?? null,
         interactiveElements: parseJson(row.interactiveElements, []),
         globalStyles: parseJson(row.globalStyles, null),
+        viewportWidth: row.viewportWidth ?? null,
+        blockReason: row.blockReason ?? null,
         lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
         lastCrawlJobId: row.lastCrawlJobId ?? null,
         createdAt: row.createdAt.toISOString(),

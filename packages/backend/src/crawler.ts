@@ -10,6 +10,12 @@ import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
 import { captureHighFidelity } from "./services/capture/highFidelityCapture.js";
+import { classifyPage } from "./services/capture/blockClassifier.js";
+import {
+  applyStealthContextDefaults,
+  getStealthLauncher,
+  pickStealthUserAgent,
+} from "./services/capture/stealthLauncher.js";
 
 interface InteractiveElement {
   type: "link" | "button";
@@ -701,6 +707,9 @@ async function sliceScreenshot(
   try {
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
+    const assetVersion = Date.now();
+    const screenshotUrl = (fileName: string) =>
+      `${publicUrl}/screenshots/${fileName}?v=${assetVersion}`;
 
     if (!metadata.height || !metadata.width) throw new Error("Could not get image dimensions");
 
@@ -713,7 +722,7 @@ async function sliceScreenshot(
       const safeFileName = getSafeFilename(url);
       const screenshotFileName = `${safeFileName}.png`;
       await image.toFile(path.join(screenshotDir, screenshotFileName));
-      return [`${publicUrl}/screenshots/${screenshotFileName}`];
+      return [screenshotUrl(screenshotFileName)];
     }
 
     if (height <= overlap) {
@@ -721,7 +730,7 @@ async function sliceScreenshot(
       const safeFileName = getSafeFilename(url);
       const screenshotFileName = `${safeFileName}.png`;
       await image.toFile(path.join(screenshotDir, screenshotFileName));
-      return [`${publicUrl}/screenshots/${screenshotFileName}`];
+      return [screenshotUrl(screenshotFileName)];
     }
 
     const numSlices = Math.max(1, Math.ceil((height - maxHeight) / (maxHeight - overlap)) + 1);
@@ -752,7 +761,7 @@ async function sliceScreenshot(
 
       try {
         await image.clone().extract({ left: 0, top: sliceTop, width, height: sliceHeight }).toFile(slicePath);
-        slices.push(`${publicUrl}/screenshots/${sliceFileName}`);
+        slices.push(screenshotUrl(sliceFileName));
         console.log(`📸 Created slice ${i + 1}/${numSlices}: ${width}x${sliceHeight}px at y=${sliceTop}`);
       } catch (error) {
         console.error(`❌ Failed to create slice ${i + 1}/${numSlices}:`, error instanceof Error ? error.message : String(error));
@@ -1328,11 +1337,7 @@ export async function runCrawler(
 
   console.log(`📁 Using storage directory: ${storageDir}`);
 
-  const userAgents = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  ];
-  const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+  const randomUserAgent = pickStealthUserAgent();
 
   const urlObj = new URL(startUrl);
   urlObj.hash = "";
@@ -1468,35 +1473,11 @@ export async function runCrawler(
     }
   }
 
+  let stealthContextInitialized = false;
   async function applyBrowserFingerprint(page: Page): Promise<void> {
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
-      "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-      "Sec-Ch-Ua-Mobile": "?0",
-      "Sec-Ch-Ua-Platform": '"macOS"',
-      "Upgrade-Insecure-Requests": "1",
-    });
-    // Viewport + DPR are now set at the persistent-context level in
-    // launchContext.launchOptions, so we no longer call setViewportSize here.
-    // Calling it would reset DPR back to 1.
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, "webdriver", { get: () => false });
-    }).catch(() => undefined);
-  }
-
-  async function isBlockedByCloudflare(page: Page): Promise<boolean> {
-    return page.evaluate(() => {
-      const title = document.title.toLowerCase();
-      const bodyText = (document.body?.innerText || document.body?.textContent || "").toLowerCase();
-      return (
-        title.includes("attention required") && title.includes("cloudflare")
-      ) || (
-        bodyText.includes("sorry, you have been blocked") &&
-        bodyText.includes("cloudflare")
-      ) || Boolean(document.querySelector(".cf-error-details, #cf-error-details"));
-    });
+    if (stealthContextInitialized) return;
+    await applyStealthContextDefaults(page.context()).catch(() => undefined);
+    stealthContextInitialized = true;
   }
 
   let progressUpdateWarned = false;
@@ -1540,6 +1521,7 @@ export async function runCrawler(
   crawler = new PlaywrightCrawler(
     {
       launchContext: {
+        launcher: getStealthLauncher(),
         launchOptions: {
           args: [
             "--disable-infobars",
@@ -1642,73 +1624,75 @@ export async function runCrawler(
           log.info("Network idle timeout, continuing anyway");
         });
 
-        if (await isBlockedByCloudflare(page)) {
-          throw new Error(`Cloudflare block page detected for ${finalUrl}`);
-        }
-
-        // CAPTCHA detection
-        const captchaDetection = await page.evaluate(() => {
-          const captchaSelectors = [
-            '[src*="captcha"]', '[class*="captcha"]', '[id*="captcha"]',
-            '[src*="shieldsquare"]', '[class*="shieldsquare"]',
-            'iframe[src*="recaptcha"]', ".g-recaptcha", '[src*="hcaptcha"]', ".h-captcha",
-          ];
-          const cloudflareSelectors = [
-            '[class*="cf-browser-verification"]', '[id*="cf-wrapper"]',
-            ".cf-im-under-attack", ".cf-browser-verification",
-          ];
-
-          const foundElements: string[] = [];
-          captchaSelectors.forEach((s) => { if (document.querySelector(s)) foundElements.push(s); });
-          const foundCloudflare: string[] = [];
-          cloudflareSelectors.forEach((s) => { if (document.querySelector(s)) foundCloudflare.push(s); });
-
-          let hasSpecificText = false;
-          let hasCaptchaTitle = false;
-          if (foundElements.length > 0 || foundCloudflare.length > 0) {
-            const bodyText = document.body.textContent?.toLowerCase() || "";
-            hasSpecificText = [
-              "verify you are human", "prove you are not a robot",
-              "please complete the security check", "robot check", "i'm not a robot",
-            ].some((t) => bodyText.includes(t));
-            hasCaptchaTitle = [
-              "security check", "human verification", "captcha", "are you a robot",
-            ].some((t) => document.title.toLowerCase().includes(t));
-          }
-
-          return {
-            hasCaptcha: (foundElements.length > 0 || foundCloudflare.length > 0) && (hasSpecificText || hasCaptchaTitle),
-            foundElements, foundCloudflare, hasSpecificText, hasCaptchaTitle,
-            pageTitle: document.title,
-          };
+        const classification = await classifyPage(page).catch((error) => {
+          log.info(
+            `Classifier failed for ${finalUrl}; treating as ok: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+          return { kind: "ok" as const, reason: null };
         });
 
-        if (captchaDetection.hasCaptcha) {
-          log.info(`🚨 CAPTCHA detected on ${finalUrl}`);
-          log.info(`👤 Please solve CAPTCHA manually. Waiting up to 2 minutes...`);
-          try {
-            await Promise.race([
-              page.waitForNavigation({ timeout: 120000 }),
-              page.waitForFunction(
-                () => {
-                  const captchaElements = document.querySelectorAll(
-                    '[src*="captcha"],[class*="captcha"],[id*="captcha"],[src*="shieldsquare"],[class*="shieldsquare"],iframe[src*="recaptcha"],.g-recaptcha,[src*="hcaptcha"],.h-captcha,[class*="cf-browser-verification"],[id*="cf-wrapper"]'
-                  );
-                  const bodyText = document.body.textContent?.toLowerCase() || "";
-                  const stillHasText = [
-                    "verify you are human", "prove you are not a robot", "security check",
-                  ].some((t) => bodyText.includes(t));
-                  return captchaElements.length === 0 && !stillHasText;
-                },
-                { timeout: 120000 }
-              ),
-              page.waitForTimeout(120000),
-            ]);
-            log.info(`✅ CAPTCHA appears to be resolved, continuing`);
-            await page.waitForTimeout(2000);
-          } catch {
-            log.info(`⏰ CAPTCHA timeout on ${finalUrl}, continuing capture instead of omitting approved page`);
+        if (classification.kind !== "ok") {
+          const reasonText = classification.reason ?? classification.kind;
+          log.info(
+            `🚧 Block detected on ${finalUrl}: kind=${classification.kind}${
+              classification.provider ? ` provider=${classification.provider}` : ""
+            } — ${reasonText}`
+          );
+
+          if (projectNumId !== null) {
+            try {
+              const now = new Date();
+              const blockedTitle = await page.title().catch(() => "");
+              db.insert(pages)
+                .values({
+                  projectId: projectNumId,
+                  url: finalUrl,
+                  title: blockedTitle,
+                  screenshotPaths: "[]",
+                  annotatedScreenshotPath: null,
+                  interactiveElements: "[]",
+                  globalStyles: null,
+                  viewportWidth: page.viewportSize()?.width ?? null,
+                  blockReason: reasonText,
+                  lastCrawledAt: now,
+                  lastCrawlJobId: jobId ?? null,
+                  lastCrawlRunId: crawlRunId ?? null,
+                  createdAt: now,
+                  updatedAt: now,
+                })
+                .onConflictDoUpdate({
+                  target: [pages.projectId, pages.url],
+                  set: {
+                    title: blockedTitle,
+                    screenshotPaths: "[]",
+                    annotatedScreenshotPath: null,
+                    interactiveElements: "[]",
+                    globalStyles: null,
+                    viewportWidth: page.viewportSize()?.width ?? null,
+                    blockReason: reasonText,
+                    lastCrawledAt: now,
+                    lastCrawlJobId: jobId ?? null,
+                    lastCrawlRunId: crawlRunId ?? null,
+                    updatedAt: now,
+                  },
+                })
+                .returning({ id: pages.id })
+                .get();
+            } catch (error) {
+              log.error(
+                `Failed to persist block reason for ${finalUrl}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+            }
           }
+
+          crawledUrls.add(finalUrl);
+          existingSectionUrls.push(finalUrl);
+          sectionUrlMap.set(sectionKey, existingSectionUrls);
+          return;
         }
 
         if (delay > 0) {

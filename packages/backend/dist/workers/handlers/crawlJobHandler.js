@@ -47,7 +47,7 @@ export async function crawlJobHandler(job) {
                 .all();
             crawlRunId = row?.id;
         }
-        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 1, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling);
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 2, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling);
         if (crawlRunId) {
             db.update(crawlRuns)
                 .set({

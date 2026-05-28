@@ -391,7 +391,7 @@ export async function buildServer() {
         const job = await crawlQueue.add("crawl", {
             url, publicUrl,
             maxRequestsPerCrawl,
-            deviceScaleFactor: deviceScaleFactor || 1,
+            deviceScaleFactor: deviceScaleFactor || 2,
             delay: delay || 0,
             requestDelay: requestDelay || 1000,
             maxDepth: maxDepth === undefined ? 0 : maxDepth,
@@ -431,7 +431,7 @@ export async function buildServer() {
         const job = await crawlQueue.add("recrawl-page", {
             url, publicUrl,
             maxRequestsPerCrawl: 1,
-            deviceScaleFactor: deviceScaleFactor || 1,
+            deviceScaleFactor: deviceScaleFactor || 2,
             delay: delay || 0,
             requestDelay: requestDelay || 1000,
             maxDepth: 0,
@@ -496,7 +496,7 @@ export async function buildServer() {
             url: startUrl,
             publicUrl,
             maxRequestsPerCrawl: normalizedApprovedUrls.length,
-            deviceScaleFactor: body.deviceScaleFactor || 1,
+            deviceScaleFactor: body.deviceScaleFactor || 2,
             requestDelay: 1000,
             maxDepth: 0,
             defaultLanguageOnly: false,

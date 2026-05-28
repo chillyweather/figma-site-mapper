@@ -71,7 +71,10 @@ async function fetchImageAsUint8Array(url: string): Promise<Uint8Array> {
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     if (!response.ok) {
       throw new Error(
         `Failed to fetch image: ${response.status} ${response.statusText}`
@@ -122,7 +125,10 @@ async function getImageDimensions(
 }
 
 function isImageTooLarge(imageBytes: Uint8Array): boolean {
-  const MAX_SIZE = 4 * 1024 * 1024; // 4MB limit for safety
+  // Full-width screenshot slices from image-heavy hero sections can exceed
+  // 4MB even when they are valid Figma image assets. Keep a guardrail for
+  // genuinely runaway files, but do not drop normal high-fidelity slices.
+  const MAX_SIZE = 32 * 1024 * 1024;
   return imageBytes.length > MAX_SIZE;
 }
 

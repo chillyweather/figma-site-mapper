@@ -80,4 +80,34 @@ describe("HighFidelityCapture", () => {
 
     await context.close();
   }, 30_000);
+
+  it("preserves tall scroll-pinned hero layers (atera-style)", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+    await page.goto(`${server.baseUrl}/sticky-hero.html`, { waitUntil: "commit" });
+
+    await captureHighFidelity(page, {
+      readiness: { domQuietWindowMs: 200 },
+    });
+
+    const visibility = await page.evaluate(() => {
+      const header = document.querySelector('[data-testid="header"]') as HTMLElement;
+      const heroBg = document.querySelector('[data-testid="hero-bg"]') as HTMLElement;
+      const heroText = document.querySelector('[data-testid="hero-text"]') as HTMLElement;
+      return {
+        headerDisplay: header?.style.display ?? "(unset)",
+        heroBgDisplay: heroBg?.style.display ?? "(unset)",
+        heroTextDisplay: heroText?.style.display ?? "(unset)",
+      };
+    });
+
+    expect(visibility.headerDisplay).not.toBe("none");
+    expect(visibility.heroBgDisplay).not.toBe("none");
+    expect(visibility.heroTextDisplay).not.toBe("none");
+
+    await context.close();
+  }, 30_000);
 });
