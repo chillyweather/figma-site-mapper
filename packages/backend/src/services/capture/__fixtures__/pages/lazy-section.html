@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lazy section fixture</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: linear-gradient(180deg, #1a1a2e 0%, #2d1b69 50%, #11998e 100%); }
+    .hero { height: 300px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 2rem; background: linear-gradient(135deg, #e05555 0%, #55a0e0 25%, #55e055 50%, #e0b055 75%, #9055e0 100%); }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px; }
+    .card {
+      height: 200px;
+      background: #cccccc;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: transparent;
+    }
+    .footer { height: 200px; background: linear-gradient(90deg, #e05555 0%, #55a0e0 33%, #55e055 66%, #e0b055 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="hero">Hero Section</div>
+  <div class="cards">
+    <div class="card" data-testid="card-0"></div>
+    <div class="card" data-testid="card-1"></div>
+    <div class="card" data-testid="card-2"></div>
+    <div class="card" data-testid="card-3"></div>
+    <div class="card" data-testid="card-4"></div>
+    <div class="card" data-testid="card-5"></div>
+  </div>
+  <div class="footer">Footer Section</div>
+  <script>
+    const COLORS = ['#e05555','#55a0e0','#55e055','#e0b055','#9055e0','#55e0d5'];
+    setTimeout(function() {
+      var cards = document.querySelectorAll('.card');
+      cards.forEach(function(card, i) {
+        card.style.background = 'linear-gradient(90deg, ' + COLORS[i] + ' 0%, ' + COLORS[(i+3)%6] + ' 100%)';
+        card.style.color = '#fff';
+        card.textContent = 'Card ' + i + ' loaded';
+      });
+      document.body.setAttribute('data-cards-loaded', 'true');
+    }, 600);
+  </script>
+</body>
+</html>

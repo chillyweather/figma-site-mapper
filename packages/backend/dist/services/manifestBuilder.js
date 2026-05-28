@@ -21,6 +21,7 @@ function serializePage(row) {
         globalStyles: parseJson(row.globalStyles, null),
         viewportWidth: row.viewportWidth ?? null,
         blockReason: row.blockReason ?? null,
+        captureQuality: parseJson(row.captureQualityJson, null),
         lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
         lastCrawlJobId: row.lastCrawlJobId ?? null,
         createdAt: row.createdAt.toISOString(),

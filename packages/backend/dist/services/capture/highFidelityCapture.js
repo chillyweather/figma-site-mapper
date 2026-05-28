@@ -1,5 +1,6 @@
 import { triggerLazyContent, } from "./lazyContentTrigger.js";
 import { waitUntilStable, } from "./pageReadyDetector.js";
+import { scoreSuspiciousRegions } from "./blankRegionDetector.js";
 // One-shot: this orchestrator freezes animations and zero-duration transitions
 // by injecting a <style> tag that is never removed. Discard the page after
 // calling this — reusing it for a second capture leaves the freeze in place
@@ -27,9 +28,37 @@ export async function captureHighFidelity(page, opts = {}) {
     //    open-ended timeout.
     const readinessReport = await waitUntilStable(page, opts.readiness);
     // 8. Take the screenshot.
-    const buffer = await page.screenshot({ fullPage: true, type: "png" });
-    const dims = await pngDimensions(buffer);
-    return { buffer, width: dims.width, height: dims.height, readinessReport };
+    const firstBuffer = await page.screenshot({ fullPage: true, type: "png" });
+    const firstScore = await scoreSuspiciousRegions(firstBuffer);
+    const threshold = opts.suspiciousRegionThreshold ?? 0.20;
+    // 9. If score exceeds threshold, retry: re-trigger lazy content, scroll to
+    //    top, re-run readiness wait, then re-screenshot. Skip banner dismissal
+    //    and sticky hide — those are already done.
+    let finalBuffer = firstBuffer;
+    let finalScore = firstScore;
+    let retryCount = 0;
+    if (firstScore > threshold) {
+        await triggerLazyContent(page, opts.lazy);
+        await scrollToTop(page);
+        await waitUntilStable(page, opts.readiness);
+        const retryBuffer = await page.screenshot({ fullPage: true, type: "png" });
+        const retryScore = await scoreSuspiciousRegions(retryBuffer);
+        retryCount = 1;
+        // Keep whichever buffer has the lower blank-region score.
+        if (retryScore < firstScore) {
+            finalBuffer = retryBuffer;
+            finalScore = retryScore;
+        }
+    }
+    const dims = await pngDimensions(finalBuffer);
+    return {
+        buffer: finalBuffer,
+        width: dims.width,
+        height: dims.height,
+        readinessReport,
+        suspiciousRegionScore: finalScore,
+        retryCount,
+    };
 }
 // Hide repeating top-pinned header bands so they don't duplicate down a
 // long-page screenshot. Only short, top-pinned bands qualify — scroll-pinned

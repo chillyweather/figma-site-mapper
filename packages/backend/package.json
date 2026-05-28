@@ -27,7 +27,8 @@
     "discovery:recommendations": "tsx src/cli/validateRecommendations.ts",
     "discovery:api": "tsx src/cli/validateDiscoveryApi.ts",
     "discovery:approved": "tsx src/cli/validateApprovedCapture.ts",
-    "crawl:smoke": "tsx src/cli/crawlSmoke.ts"
+    "crawl:smoke": "tsx src/cli/crawlSmoke.ts",
+    "capture:quality-smoke": "tsx src/cli/captureQualitySmoke.ts"
   },
   "keywords": [],
   "author": "",

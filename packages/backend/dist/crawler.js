@@ -1338,8 +1338,23 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                 },
             });
             log.info(`🟢 Readiness for ${finalUrl}: ${Object.entries(captureResult.readinessReport)
+                .filter(([k]) => k !== "imagesDiagnostic")
                 .map(([k, v]) => `${k}=${v}`)
                 .join(" ")}`);
+            if (captureResult.readinessReport.imagesDiagnostic?.length) {
+                log.info(`🖼️  Images signal timed out for ${finalUrl} — ${captureResult.readinessReport.imagesDiagnostic.length} image(s) still unresolved: ` +
+                    captureResult.readinessReport.imagesDiagnostic.join(" | "));
+            }
+            const QUALITY_THRESHOLD = 0.20;
+            const captureQuality = {
+                readinessSignals: captureResult.readinessReport,
+                suspiciousRegionScore: captureResult.suspiciousRegionScore,
+                retryCount: captureResult.retryCount,
+                qualityStatus: captureResult.retryCount === 0
+                    ? captureResult.suspiciousRegionScore > QUALITY_THRESHOLD ? "suspicious" : "clean"
+                    : captureResult.suspiciousRegionScore > QUALITY_THRESHOLD ? "retry_unchanged" : "retry_improved",
+            };
+            log.info(`📊 Capture quality for ${finalUrl}: status=${captureQuality.qualityStatus} suspiciousScore=${captureQuality.suspiciousRegionScore.toFixed(3)} retries=${captureQuality.retryCount}`);
             // Interactive elements
             let interactiveElements = [];
             if (detectInteractiveElements) {
@@ -1526,6 +1541,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                             ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                             : null,
                         viewportWidth: cssViewportWidth,
+                        captureQualityJson: JSON.stringify(captureQuality),
                         lastCrawledAt: now,
                         lastCrawlJobId: jobId ?? null,
                         lastCrawlRunId: crawlRunId ?? null,
@@ -1543,6 +1559,7 @@ export async function runCrawler(startUrl, publicUrl, maxRequestsPerCrawl, devic
                                 ? JSON.stringify({ cssVariables: styleData.cssVariables, tokens: styleData.tokens })
                                 : null,
                             viewportWidth: cssViewportWidth,
+                            captureQualityJson: JSON.stringify(captureQuality),
                             lastCrawledAt: now,
                             lastCrawlJobId: jobId ?? null,
                             lastCrawlRunId: crawlRunId ?? null,

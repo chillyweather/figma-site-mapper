@@ -13,6 +13,7 @@ function makeRow(overrides = {}) {
         annotatedScreenshotPath: null,
         viewportWidth: 1920,
         blockReason: null,
+        captureQualityJson: null,
         lastCrawledAt: now,
         lastCrawlJobId: null,
         lastCrawlRunId: null,

@@ -3,6 +3,7 @@ const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
 const DEFAULT_OVERALL_TIMEOUT_MS = 60_000;
 const DEFAULT_REQUEST_QUIET_WINDOW_MS = 500;
 const DEFAULT_DOM_QUIET_WINDOW_MS = 500;
+const DEFAULT_VISUAL_STABILITY_QUIET_WINDOW_MS = 800;
 export async function waitUntilStable(page, opts = {}) {
     const overall = opts.overallTimeoutMs ?? DEFAULT_OVERALL_TIMEOUT_MS;
     const cap = (t) => Math.min(t, overall);
@@ -14,15 +15,41 @@ export async function waitUntilStable(page, opts = {}) {
     const requestsTimeoutMs = cap(opts.requestsTimeoutMs ?? DEFAULT_SIGNAL_TIMEOUT_MS);
     const requestQuietWindowMs = opts.requestSettleQuietWindowMs ?? DEFAULT_REQUEST_QUIET_WINDOW_MS;
     const domQuietWindowMs = opts.domQuietWindowMs ?? DEFAULT_DOM_QUIET_WINDOW_MS;
-    const [images, fonts, backgroundImages, animations, videos, requests] = await Promise.all([
+    const visualStabilityQuietWindowMs = cap(opts.visualStabilityQuietWindowMs ?? DEFAULT_VISUAL_STABILITY_QUIET_WINDOW_MS);
+    const [images, fonts, backgroundImages, animations, videos, requests, visualStability] = await Promise.all([
         runSignal(() => waitForAllImages(page, domQuietWindowMs), imagesTimeoutMs),
         runSignal(() => waitForFonts(page), fontsTimeoutMs),
         runSignal(() => waitForBackgroundImages(page), backgroundImagesTimeoutMs),
         runSignal(() => settleAnimations(page), animationsTimeoutMs),
         runSignal(() => waitForVideos(page), videosTimeoutMs),
         runSignal(() => waitForRequestQuiet(page, requestQuietWindowMs), requestsTimeoutMs),
+        runSignal(() => waitForVisualStability(page, visualStabilityQuietWindowMs), overall),
     ]);
-    return { images, fonts, backgroundImages, animations, videos, requests };
+    const imagesDiagnostic = images === "timeout"
+        ? await collectImagesDiagnostic(page)
+        : undefined;
+    return { images, fonts, backgroundImages, animations, videos, requests, visualStability, imagesDiagnostic };
+}
+async function collectImagesDiagnostic(page) {
+    return page
+        .evaluate(() => {
+        return Array.from(document.images)
+            .filter((img) => {
+            const hasSrc = !!(img.getAttribute("src") || img.getAttribute("srcset"));
+            if (!hasSrc)
+                return false;
+            // complete=true covers both successfully loaded and errored images.
+            if (img.complete && img.naturalWidth > 0)
+                return false;
+            return true;
+        })
+            .slice(0, 20)
+            .map((img) => {
+            const src = (img.currentSrc || img.src || img.getAttribute("srcset") || "").slice(0, 120);
+            return `${src} complete=${img.complete} naturalWidth=${img.naturalWidth}`;
+        });
+    })
+        .catch(() => []);
 }
 async function runSignal(signal, timeoutMs) {
     return new Promise((resolveOutcome) => {
@@ -37,6 +64,55 @@ async function runSignal(signal, timeoutMs) {
             resolveOutcome("timeout");
         });
     });
+}
+async function waitForVisualStability(page, quietWindowMs) {
+    let lastSnapshot = "";
+    let lastChangeAt = Date.now();
+    while (true) {
+        const snapshot = await page
+            .evaluate(() => {
+            const all = document.querySelectorAll("*");
+            const visible = [];
+            const maxDocumentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight);
+            for (let i = 0; i < all.length && visible.length < 250; i++) {
+                const el = all[i];
+                if (!el)
+                    continue;
+                const r = el.getBoundingClientRect();
+                if (r.width <= 0 || r.height <= 0)
+                    continue;
+                const absoluteTop = r.top + window.scrollY;
+                if (absoluteTop > maxDocumentHeight)
+                    continue;
+                const style = window.getComputedStyle(el);
+                if (style.visibility === "hidden" || style.display === "none")
+                    continue;
+                const element = el;
+                const img = el instanceof HTMLImageElement ? el : null;
+                visible.push([
+                    element.tagName,
+                    Math.round(r.left + window.scrollX),
+                    Math.round(absoluteTop),
+                    Math.round(r.width),
+                    Math.round(r.height),
+                    style.opacity,
+                    style.color,
+                    style.backgroundColor,
+                    style.backgroundImage,
+                    img?.currentSrc || img?.src || "",
+                ].join(","));
+            }
+            return visible.join("|");
+        })
+            .catch(() => "");
+        if (snapshot !== lastSnapshot) {
+            lastSnapshot = snapshot;
+            lastChangeAt = Date.now();
+        }
+        if (Date.now() - lastChangeAt >= quietWindowMs)
+            break;
+        await sleep(100);
+    }
 }
 async function waitForRequestQuiet(page, quietWindowMs) {
     let lastResponseAt = Date.now();
@@ -219,13 +295,15 @@ async function waitForAllImages(page, domQuietWindowMs) {
             attributeFilter: ["src", "srcset"],
         });
         const isPending = (img) => {
-            // An <img src=""> has complete=true but naturalWidth=0 because the
-            // browser never issued a request. We treat it as "not pending" — there
-            // is nothing concrete to wait for; the DOM-quiet window will catch it
-            // if JS later sets the src.
             if (!img.getAttribute("src") && !img.getAttribute("srcset"))
                 return false;
-            return !(img.complete && img.naturalWidth > 0);
+            // complete=true means the browser is done — either successfully loaded
+            // (naturalWidth>0) or errored/blocked (naturalWidth=0). Both are
+            // terminal states: no further load/error events will fire, so adding
+            // listeners would block forever. Treat both as settled.
+            if (img.complete)
+                return false;
+            return true;
         };
         try {
             while (true) {

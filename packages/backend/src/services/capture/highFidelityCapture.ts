@@ -8,6 +8,7 @@ import {
   type ReadinessReport,
   type WaitUntilStableOptions,
 } from "./pageReadyDetector.js";
+import { scoreSuspiciousRegions } from "./blankRegionDetector.js";
 
 export interface CaptureOptions {
   /** Optional callback invoked at three points where cookie banners are
@@ -17,6 +18,10 @@ export interface CaptureOptions {
   dismissBanners?: () => Promise<void>;
   readiness?: WaitUntilStableOptions;
   lazy?: TriggerLazyContentOptions;
+  /** Fraction of image height that may be blank before triggering a retry.
+   * Default 0.20. Smoke-matrix data showed 0.10 produces false positives on
+   * modern marketing sites with large white/light-background design sections. */
+  suspiciousRegionThreshold?: number;
 }
 
 export interface CaptureResult {
@@ -24,6 +29,10 @@ export interface CaptureResult {
   width: number;
   height: number;
   readinessReport: ReadinessReport;
+  /** Blank-region score of the first capture (0–1). */
+  suspiciousRegionScore: number;
+  /** Number of retries performed (0 or 1). */
+  retryCount: number;
 }
 
 // One-shot: this orchestrator freezes animations and zero-duration transitions
@@ -64,11 +73,42 @@ export async function captureHighFidelity(
   const readinessReport = await waitUntilStable(page, opts.readiness);
 
   // 8. Take the screenshot.
-  const buffer = await page.screenshot({ fullPage: true, type: "png" });
+  const firstBuffer = await page.screenshot({ fullPage: true, type: "png" });
+  const firstScore = await scoreSuspiciousRegions(firstBuffer);
 
-  const dims = await pngDimensions(buffer);
+  const threshold = opts.suspiciousRegionThreshold ?? 0.20;
 
-  return { buffer, width: dims.width, height: dims.height, readinessReport };
+  // 9. If score exceeds threshold, retry: re-trigger lazy content, scroll to
+  //    top, re-run readiness wait, then re-screenshot. Skip banner dismissal
+  //    and sticky hide — those are already done.
+  let finalBuffer = firstBuffer;
+  let finalScore = firstScore;
+  let retryCount = 0;
+
+  if (firstScore > threshold) {
+    await triggerLazyContent(page, opts.lazy);
+    await scrollToTop(page);
+    await waitUntilStable(page, opts.readiness);
+    const retryBuffer = await page.screenshot({ fullPage: true, type: "png" });
+    const retryScore = await scoreSuspiciousRegions(retryBuffer);
+    retryCount = 1;
+    // Keep whichever buffer has the lower blank-region score.
+    if (retryScore < firstScore) {
+      finalBuffer = retryBuffer;
+      finalScore = retryScore;
+    }
+  }
+
+  const dims = await pngDimensions(finalBuffer);
+
+  return {
+    buffer: finalBuffer,
+    width: dims.width,
+    height: dims.height,
+    readinessReport,
+    suspiciousRegionScore: finalScore,
+    retryCount,
+  };
 }
 
 // Hide repeating top-pinned header bands so they don't duplicate down a
