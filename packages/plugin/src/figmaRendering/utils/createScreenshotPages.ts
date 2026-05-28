@@ -173,17 +173,28 @@ function clearPageContents(page: PageNode): void {
 
 export const SINGLE_CANVAS_H_GAP = 100;
 export const SINGLE_CANVAS_V_GAP = 200;
-export const SINGLE_CANVAS_ROW_HEIGHT = 8000;
+const SINGLE_CANVAS_PLACEHOLDER_HEIGHT = 240;
 
-function findOrCreateSitemapCanvasPage(): PageNode {
+interface PreparedScreenshotPage {
+  loadedScreenshots: LoadedScreenshot[];
+  failedScreenshots: string[];
+  measuredHeight: number;
+}
+
+function findOrCreateSitemapCanvasPage(projectId?: string): PageNode {
   for (const page of figma.root.children) {
-    if (page.type === "PAGE" && page.getPluginData("SITEMAP_ROLE") === "canvas") {
+    if (page.type !== "PAGE" || page.getPluginData("SITEMAP_ROLE") !== "canvas") {
+      continue;
+    }
+    const pageProjectId = page.getPluginData("PROJECT_ID");
+    if ((projectId && pageProjectId === projectId) || (!projectId && !pageProjectId)) {
       return page as PageNode;
     }
   }
   const page = figma.createPage();
-  page.name = "Sitemap";
+  page.name = projectId ? `Sitemap ${projectId}` : "Sitemap";
   page.setPluginData("SITEMAP_ROLE", "canvas");
+  page.setPluginData("PROJECT_ID", projectId || "");
   return page;
 }
 
@@ -289,6 +300,49 @@ async function loadScreenshotWithFallback(
   }
 
   return null;
+}
+
+function getScaledScreenshotHeight(
+  shot: LoadedScreenshot,
+  screenshotWidth: number
+): number {
+  const widthScale = screenshotWidth / shot.width;
+  return Math.max(1, Math.round(shot.height * widthScale));
+}
+
+async function prepareScreenshotPage(
+  page: TreeNode,
+  screenshotWidth: number
+): Promise<PreparedScreenshotPage> {
+  const screenshots = Array.isArray(page.screenshot) ? page.screenshot : [];
+  const loadedScreenshots: LoadedScreenshot[] = [];
+  const failedScreenshots: string[] = [];
+
+  for (let i = 0; i < screenshots.length; i++) {
+    const screenshotUrl = screenshots[i];
+    const loaded = await loadScreenshotWithFallback(screenshotUrl, page.thumbnail);
+
+    if (!loaded) {
+      failedScreenshots.push(screenshotUrl || `slice_${i + 1}`);
+      continue;
+    }
+
+    if (loaded.usedFallback) {
+      console.log(`Using thumbnail fallback for slice ${i + 1} on ${page.url}`);
+    }
+
+    loadedScreenshots.push(loaded);
+  }
+
+  const measuredHeight =
+    loadedScreenshots.length > 0
+      ? loadedScreenshots.reduce(
+          (sum, shot) => sum + getScaledScreenshotHeight(shot, screenshotWidth),
+          0
+        )
+      : SINGLE_CANVAS_PLACEHOLDER_HEIGHT;
+
+  return { loadedScreenshots, failedScreenshots, measuredHeight };
 }
 
 /**
@@ -581,32 +635,11 @@ export async function createScreenshotPages(
   // ── Single-canvas mode setup ──────────────────────────────────────────────
   let sitemapPage: PageNode | null = null;
   let gridPositionMap = new Map<string, { x: number; y: number }>();
+  const preparedPages = new Map<string, PreparedScreenshotPage>();
 
   if (layoutMode === "single-canvas") {
-    sitemapPage = findOrCreateSitemapCanvasPage();
+    sitemapPage = findOrCreateSitemapCanvasPage(projectId);
     figma.currentPage = sitemapPage;
-
-    const gridResult = computeGridPositions(
-      pages.map((p) => ({ url: p.url })),
-      {
-        columns: Math.max(1, singleCanvasColumns),
-        frameWidth: screenshotWidth,
-        rowHeight: SINGLE_CANVAS_ROW_HEIGHT,
-        horizontalGap: singleCanvasHorizontalGap,
-        verticalGap: SINGLE_CANVAS_V_GAP,
-      }
-    );
-
-    for (const pos of gridResult.positions) {
-      gridPositionMap.set(pos.url, { x: pos.x, y: pos.y });
-    }
-
-    if (gridResult.projectedHeightWarning) {
-      figma.notify(
-        "Canvas height may exceed Figma's safe zone — consider increasing the column count.",
-        { timeout: 6000 }
-      );
-    }
 
     // Remove stale frames in single-canvas mode
     if (removeStaleProjectPages && projectId) {
@@ -628,6 +661,50 @@ export async function createScreenshotPages(
           }
         }
       }
+    }
+
+    for (const page of pages) {
+      try {
+        preparedPages.set(
+          page.url,
+          await prepareScreenshotPage(page, screenshotWidth)
+        );
+      } catch (error) {
+        console.error(`Failed to load screenshots for ${page.url}:`, error);
+        preparedPages.set(page.url, {
+          loadedScreenshots: [],
+          failedScreenshots: [
+            error instanceof Error ? error.message : "Unable to load screenshots",
+          ],
+          measuredHeight: SINGLE_CANVAS_PLACEHOLDER_HEIGHT,
+        });
+      }
+    }
+
+    const gridResult = computeGridPositions(
+      pages.map((page) => ({
+        url: page.url,
+        height:
+          preparedPages.get(page.url)?.measuredHeight ??
+          SINGLE_CANVAS_PLACEHOLDER_HEIGHT,
+      })),
+      {
+        columns: Math.max(1, singleCanvasColumns),
+        frameWidth: screenshotWidth,
+        horizontalGap: singleCanvasHorizontalGap,
+        verticalGap: SINGLE_CANVAS_V_GAP,
+      }
+    );
+
+    for (const pos of gridResult.positions) {
+      gridPositionMap.set(pos.url, { x: pos.x, y: pos.y });
+    }
+
+    if (gridResult.projectedHeightWarning) {
+      figma.notify(
+        "Canvas height may exceed Figma's safe zone. Consider increasing columns or rendering fewer pages.",
+        { timeout: 6000 }
+      );
     }
   }
 
@@ -737,9 +814,12 @@ export async function createScreenshotPages(
       }
 
       const pos = gridPositionMap.get(page.url) ?? { x: 0, y: 0 };
+      const prepared = preparedPages.get(page.url);
+      const measuredHeight =
+        prepared?.measuredHeight ?? SINGLE_CANVAS_PLACEHOLDER_HEIGHT;
       frame.x = pos.x;
       frame.y = pos.y;
-      frame.resize(screenshotWidth, SINGLE_CANVAS_ROW_HEIGHT);
+      frame.resize(screenshotWidth, measuredHeight);
       frame.clipsContent = false;
       frame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
 
@@ -767,31 +847,16 @@ export async function createScreenshotPages(
     }
 
     try {
-      const screenshots = Array.isArray(page.screenshot) ? page.screenshot : [];
-
-      const loadedScreenshots: LoadedScreenshot[] = [];
-      const failedScreenshots: string[] = [];
-
-      for (let i = 0; i < screenshots.length; i++) {
-        const screenshotUrl = screenshots[i];
-        const loaded = await loadScreenshotWithFallback(
-          screenshotUrl,
-          page.thumbnail
-        );
-
-        if (!loaded) {
-          failedScreenshots.push(screenshotUrl || `slice_${i + 1}`);
-          continue;
-        }
-
-        if (loaded.usedFallback) {
-          console.log(
-            `Using thumbnail fallback for slice ${i + 1} on ${page.url}`
-          );
-        }
-
-        loadedScreenshots.push(loaded);
-      }
+      const prepared =
+        layoutMode === "single-canvas"
+          ? preparedPages.get(page.url) ??
+            ({
+              loadedScreenshots: [],
+              failedScreenshots: [],
+              measuredHeight: SINGLE_CANVAS_PLACEHOLDER_HEIGHT,
+            } satisfies PreparedScreenshotPage)
+          : await prepareScreenshotPage(page, screenshotWidth);
+      const { loadedScreenshots, failedScreenshots } = prepared;
 
       if (loadedScreenshots.length === 0) {
         console.warn(`No screenshots available for ${page.url}`);
@@ -870,8 +935,7 @@ export async function createScreenshotPages(
       for (let i = 0; i < loadedScreenshots.length; i++) {
         const shot = loadedScreenshots[i];
         const imageHash = figma.createImage(shot.bytes).hash;
-        const widthScale = screenshotWidth / shot.width;
-        const scaledHeight = Math.max(1, Math.round(shot.height * widthScale));
+        const scaledHeight = getScaledScreenshotHeight(shot, screenshotWidth);
 
         const rect = figma.createRectangle();
         rect.resize(screenshotWidth, scaledHeight);
@@ -902,9 +966,7 @@ export async function createScreenshotPages(
 
       // Calculate the total height needed for the overlay (screenshots only, nav is above)
       const totalHeight = loadedScreenshots.reduce((sum, shot) => {
-        const widthScale = screenshotWidth / shot.width;
-        const scaledHeight = Math.max(1, Math.round(shot.height * widthScale));
-        return sum + scaledHeight;
+        return sum + getScaledScreenshotHeight(shot, screenshotWidth);
       }, 0);
 
       overlayContainer.resize(screenshotWidth, Math.max(totalHeight, 1));
@@ -1384,14 +1446,26 @@ export async function createScreenshotPages(
 
 // Update navigation links with index node ID (works for both per-page and single-canvas).
 // In per-page mode, indexNodeId is a PageNode ID; in single-canvas it's a FrameNode ID.
-export function updateNavigationLinks(indexNodeId: string) {
+export function updateNavigationLinks(indexNodeId: string, projectId?: string) {
   for (const page of figma.root.children) {
     if (page.type !== "PAGE") continue;
 
     if (page.getPluginData("SITEMAP_ROLE") === "canvas") {
+      if (
+        (projectId && page.getPluginData("PROJECT_ID") !== projectId) ||
+        (!projectId && page.getPluginData("PROJECT_ID"))
+      ) {
+        continue;
+      }
       // Single-canvas: update navigation inside each screenshot FrameNode
       for (const child of page.children) {
         if (child.type !== "FRAME") continue;
+        if (
+          (projectId && child.getPluginData("PROJECT_ID") !== projectId) ||
+          (!projectId && child.getPluginData("PROJECT_ID"))
+        ) {
+          continue;
+        }
         const navFrame = child.findOne((n) => n.name === "Navigation") as FrameNode | null;
         if (!navFrame) continue;
         const backText = navFrame.findOne(

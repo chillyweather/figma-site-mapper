@@ -47,20 +47,27 @@ function findExistingIndexPage(): PageNode | null {
 async function createIndexFrameOnCanvas(
   tree: TreeNode,
   pageIdMap: Map<string, string>,
-  indexFrameWidth: number
+  indexFrameWidth: number,
+  projectId?: string
 ): Promise<string> {
   // Find the Sitemap canvas page
   let sitemapPage: PageNode | null = null;
   for (const p of figma.root.children) {
-    if (p.type === "PAGE" && p.getPluginData("SITEMAP_ROLE") === "canvas") {
+    if (
+      p.type === "PAGE" &&
+      p.getPluginData("SITEMAP_ROLE") === "canvas" &&
+      ((projectId && p.getPluginData("PROJECT_ID") === projectId) ||
+        (!projectId && !p.getPluginData("PROJECT_ID")))
+    ) {
       sitemapPage = p as PageNode;
       break;
     }
   }
   if (!sitemapPage) {
     sitemapPage = figma.createPage();
-    sitemapPage.name = "Sitemap";
+    sitemapPage.name = projectId ? `Sitemap ${projectId}` : "Sitemap";
     sitemapPage.setPluginData("SITEMAP_ROLE", "canvas");
+    sitemapPage.setPluginData("PROJECT_ID", projectId || "");
   }
 
   figma.currentPage = sitemapPage;
@@ -159,11 +166,12 @@ async function createIndexPage(
   tree: TreeNode,
   pageIdMap: Map<string, string>,
   layoutMode: "per-page" | "single-canvas" = "per-page",
-  indexFrameWidth: number = 400
+  indexFrameWidth: number = 400,
+  projectId?: string
 ): Promise<string> {
   // ── Single-canvas mode: place Index as a FrameNode on the Sitemap canvas page ──
   if (layoutMode === "single-canvas") {
-    return createIndexFrameOnCanvas(tree, pageIdMap, indexFrameWidth);
+    return createIndexFrameOnCanvas(tree, pageIdMap, indexFrameWidth, projectId);
   }
 
   // ── Per-page mode (original behavior) ────────────────────────────────────────
@@ -351,7 +359,13 @@ export async function renderSitemap(
   // Create index page after screenshot pages, so we can link to them
   let indexPageId: string | undefined;
   if (manifestData.tree) {
-    indexPageId = await createIndexPage(manifestData.tree, pageIdMap, layoutMode);
+    indexPageId = await createIndexPage(
+      manifestData.tree,
+      pageIdMap,
+      layoutMode,
+      400,
+      manifestData.projectId
+    );
   }
 
   // Notify progress: Updating navigation links (90-100%)
@@ -359,7 +373,7 @@ export async function renderSitemap(
 
   // Update navigation links with index node ID
   if (indexPageId) {
-    updateNavigationLinks(indexPageId);
+    updateNavigationLinks(indexPageId, manifestData.projectId);
 
     if (layoutMode === "per-page") {
       const indexPageNode = figma.getNodeById(indexPageId);
