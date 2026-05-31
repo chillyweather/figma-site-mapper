@@ -455,6 +455,9 @@ export async function handleGetStatus(
 
         let highlightAllElements = false;
         let highlightElementFilters = null;
+        let screenshotLayout: "per-page" | "single-canvas" = "per-page";
+        let singleCanvasColumns = 5;
+        let singleCanvasHGap = 100;
         try {
           const storedSettings = await figma.clientStorage.getAsync("settings");
           const merged = storedSettings
@@ -462,12 +465,18 @@ export async function handleGetStatus(
             : DEFAULT_SETTINGS;
           highlightAllElements = !!merged.highlightAllElements;
           highlightElementFilters = merged.highlightElementFilters || null;
+          screenshotLayout = merged.screenshotLayout === "single-canvas" ? "single-canvas" : "per-page";
+          singleCanvasColumns = Number.isFinite(Number(merged.singleCanvasColumns)) && Number(merged.singleCanvasColumns) >= 1
+            ? Number(merged.singleCanvasColumns) : 5;
+          singleCanvasHGap = Number.isFinite(Number(merged.singleCanvasHorizontalGap)) && Number(merged.singleCanvasHorizontalGap) >= 0
+            ? Number(merged.singleCanvasHorizontalGap) : 100;
           console.log(
-            `� Highlight all elements setting: ${highlightAllElements}`
+            `🏗 Highlight all elements setting: ${highlightAllElements}`
           );
-          console.log(`� Element filters:`, highlightElementFilters);
+          console.log(`🏗 Element filters:`, highlightElementFilters);
+          console.log(`🏗 Layout mode: ${screenshotLayout}, columns: ${singleCanvasColumns}, hGap: ${singleCanvasHGap}`);
         } catch (e) {
-          console.log("Could not load settings for highlightAllElements");
+          console.log("Could not load settings for renderSitemap");
         }
 
         await renderSitemap(
@@ -487,7 +496,10 @@ export async function handleGetStatus(
             });
           },
           highlightElementFilters,
-          fullRefreshFromJob
+          fullRefreshFromJob,
+          screenshotLayout,
+          singleCanvasColumns,
+          singleCanvasHGap
         );
 
         figma.ui.postMessage({
@@ -821,6 +833,9 @@ async function handleRenderProjectSnapshot(msg: {
 
     let highlightAllElements = false;
     let highlightElementFilters = null as null | Record<string, any>;
+    let snapshotLayout: "per-page" | "single-canvas" = "per-page";
+    let snapshotColumns = 5;
+    let snapshotHGap = 100;
 
     try {
       const storedSettings = await figma.clientStorage.getAsync("settings");
@@ -829,8 +844,13 @@ async function handleRenderProjectSnapshot(msg: {
         : DEFAULT_SETTINGS;
       highlightAllElements = !!mergedSettings.highlightAllElements;
       highlightElementFilters = mergedSettings.highlightElementFilters || null;
+      snapshotLayout = mergedSettings.screenshotLayout === "single-canvas" ? "single-canvas" : "per-page";
+      snapshotColumns = Number.isFinite(Number(mergedSettings.singleCanvasColumns)) && Number(mergedSettings.singleCanvasColumns) >= 1
+        ? Number(mergedSettings.singleCanvasColumns) : 5;
+      snapshotHGap = Number.isFinite(Number(mergedSettings.singleCanvasHorizontalGap)) && Number(mergedSettings.singleCanvasHorizontalGap) >= 0
+        ? Number(mergedSettings.singleCanvasHorizontalGap) : 100;
     } catch (error) {
-      console.warn("Unable to load highlight settings for snapshot", error);
+      console.warn("Unable to load settings for snapshot", error);
     }
 
     hasRenderedSitemap = true;
@@ -850,7 +870,11 @@ async function handleRenderProjectSnapshot(msg: {
           },
         });
       },
-      highlightElementFilters
+      highlightElementFilters,
+      false,
+      snapshotLayout,
+      snapshotColumns,
+      snapshotHGap
     );
 
     figma.ui.postMessage({

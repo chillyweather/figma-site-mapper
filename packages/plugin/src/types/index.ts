@@ -8,6 +8,9 @@ export interface PluginSettings {
   maxDepth: string;
   defaultLanguageOnly: boolean;
   fullRefresh: boolean;
+  screenshotLayout: "per-page" | "single-canvas";
+  singleCanvasColumns: number;
+  singleCanvasHorizontalGap: number;
   sampleSize: string;
   showBrowser: boolean;
   detectInteractiveElements: boolean;
@@ -227,6 +230,12 @@ export interface SettingsViewProps {
   handleDeviceScaleFactorChange: (
     e: React.ChangeEvent<HTMLSelectElement>
   ) => void;
+  screenshotLayout: "per-page" | "single-canvas";
+  handleScreenshotLayoutChange: (value: "per-page" | "single-canvas") => void;
+  singleCanvasColumns: number;
+  handleSingleCanvasColumnsChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  singleCanvasHorizontalGap: number;
+  handleSingleCanvasHorizontalGapChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   delay: string;
   handleDelayChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   requestDelay: string;

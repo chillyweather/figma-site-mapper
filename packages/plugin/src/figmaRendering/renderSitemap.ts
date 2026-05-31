@@ -3,6 +3,7 @@ import { flattenTree } from "./utils/flattenTree";
 import {
   createScreenshotPages,
   updateNavigationLinks,
+  SINGLE_CANVAS_H_GAP,
 } from "./utils/createScreenshotPages";
 
 function findExistingIndexPage(): PageNode | null {
@@ -43,10 +44,137 @@ function findExistingIndexPage(): PageNode | null {
   return matches.length > 0 ? matches[0] : null;
 }
 
+async function createIndexFrameOnCanvas(
+  tree: TreeNode,
+  pageIdMap: Map<string, string>,
+  indexFrameWidth: number,
+  projectId?: string
+): Promise<string> {
+  // Find the Sitemap canvas page
+  let sitemapPage: PageNode | null = null;
+  for (const p of figma.root.children) {
+    if (
+      p.type === "PAGE" &&
+      p.getPluginData("SITEMAP_ROLE") === "canvas" &&
+      ((projectId && p.getPluginData("PROJECT_ID") === projectId) ||
+        (!projectId && !p.getPluginData("PROJECT_ID")))
+    ) {
+      sitemapPage = p as PageNode;
+      break;
+    }
+  }
+  if (!sitemapPage) {
+    sitemapPage = figma.createPage();
+    sitemapPage.name = projectId ? `Sitemap ${projectId}` : "Sitemap";
+    sitemapPage.setPluginData("SITEMAP_ROLE", "canvas");
+    sitemapPage.setPluginData("PROJECT_ID", projectId || "");
+  }
+
+  figma.currentPage = sitemapPage;
+
+  // Find or create the Index frame
+  let indexFrame = sitemapPage.children.find(
+    (child): child is FrameNode =>
+      child.type === "FRAME" &&
+      (child.getPluginData("SITEMAP_INDEX_FRAME") === "true" ||
+        child.name === "Site Index")
+  ) ?? null;
+
+  if (!indexFrame) {
+    indexFrame = figma.createFrame();
+    sitemapPage.appendChild(indexFrame);
+  }
+
+  // Position to the left of the homepage frame (x=0)
+  indexFrame.x = -(indexFrameWidth + SINGLE_CANVAS_H_GAP);
+  indexFrame.y = 0;
+
+  indexFrame.name = "Site Index";
+  indexFrame.setPluginData("SITEMAP_INDEX_FRAME", "true");
+  indexFrame.layoutMode = "VERTICAL";
+  indexFrame.primaryAxisAlignItems = "MIN";
+  indexFrame.counterAxisAlignItems = "MIN";
+  indexFrame.paddingTop = 40;
+  indexFrame.paddingLeft = 40;
+  indexFrame.paddingRight = 40;
+  indexFrame.paddingBottom = 40;
+  indexFrame.itemSpacing = 14;
+  indexFrame.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+  indexFrame.primaryAxisSizingMode = "AUTO";
+  indexFrame.counterAxisSizingMode = "FIXED";
+  indexFrame.resize(indexFrameWidth, 600);
+
+  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+
+  // Rebuild entries (same logic as per-page Index)
+  const existingEntries = new Map<string, TextNode>();
+  for (const child of indexFrame.children) {
+    if (child.type !== "TEXT") continue;
+    const textNode = child as TextNode;
+    let url = textNode.getPluginData("SITEMAP_PAGE_URL");
+    if (!url) {
+      const hl = textNode.hyperlink as HyperlinkTarget | null;
+      if (hl && hl.type === "NODE") {
+        const target = figma.getNodeById(hl.value);
+        if (target) {
+          const storedUrl = target.getPluginData("URL");
+          if (storedUrl) {
+            url = storedUrl;
+            textNode.setPluginData("SITEMAP_PAGE_URL", storedUrl);
+          }
+        }
+      }
+    }
+    if (url) existingEntries.set(url, textNode);
+  }
+
+  const pagesFlat = flattenTree(tree);
+  const seenUrls = new Set<string>();
+  let newEntries = 0;
+
+  for (const page of pagesFlat) {
+    if (!page.url || seenUrls.has(page.url)) continue;
+    seenUrls.add(page.url);
+
+    const title = page.title || page.url;
+    const frameId = pageIdMap.get(page.url);
+    const entry = existingEntries.get(page.url);
+
+    if (entry) {
+      entry.fontName = { family: "Inter", style: "Regular" };
+      entry.fontSize = 16;
+      if (entry.characters !== title) entry.characters = title;
+      if (frameId) entry.hyperlink = { type: "NODE", value: frameId };
+      entry.setPluginData("SITEMAP_PAGE_URL", page.url);
+    } else {
+      const textNode = figma.createText();
+      textNode.fontName = { family: "Inter", style: "Regular" };
+      textNode.fontSize = 16;
+      textNode.characters = title;
+      if (frameId) textNode.hyperlink = { type: "NODE", value: frameId };
+      textNode.setPluginData("SITEMAP_PAGE_URL", page.url);
+      indexFrame.appendChild(textNode);
+      newEntries += 1;
+    }
+  }
+
+  console.log(`Index frame (canvas) now has ${newEntries} new entries`);
+  return indexFrame.id;
+}
+
 async function createIndexPage(
   tree: TreeNode,
-  pageIdMap: Map<string, string>
+  pageIdMap: Map<string, string>,
+  layoutMode: "per-page" | "single-canvas" = "per-page",
+  indexFrameWidth: number = 400,
+  projectId?: string
 ): Promise<string> {
+  // ── Single-canvas mode: place Index as a FrameNode on the Sitemap canvas page ──
+  if (layoutMode === "single-canvas") {
+    return createIndexFrameOnCanvas(tree, pageIdMap, indexFrameWidth, projectId);
+  }
+
+  // ── Per-page mode (original behavior) ────────────────────────────────────────
   const existingIndexPage = findExistingIndexPage();
   const indexPage =
     existingIndexPage !== null ? existingIndexPage : figma.createPage();
@@ -98,13 +226,16 @@ async function createIndexPage(
 
     const textNode = child as TextNode;
     let url = textNode.getPluginData("SITEMAP_PAGE_URL");
-    if (!url && textNode.hyperlink?.type === "NODE") {
-      const target = figma.getNodeById(textNode.hyperlink.value);
-      if (target && target.type === "PAGE") {
-        const storedUrl = target.getPluginData("URL");
-        if (storedUrl) {
-          url = storedUrl;
-          textNode.setPluginData("SITEMAP_PAGE_URL", storedUrl);
+    if (!url) {
+      const hl = textNode.hyperlink as HyperlinkTarget | null;
+      if (hl && hl.type === "NODE") {
+        const target = figma.getNodeById(hl.value);
+        if (target && target.type === "PAGE") {
+          const storedUrl = target.getPluginData("URL");
+          if (storedUrl) {
+            url = storedUrl;
+            textNode.setPluginData("SITEMAP_PAGE_URL", storedUrl);
+          }
         }
       }
     }
@@ -185,7 +316,10 @@ export async function renderSitemap(
   highlightAllElements: boolean = false,
   onProgress?: (stage: string, progress: number) => void,
   highlightElementFilters?: any,
-  removeStaleProjectPages: boolean = false
+  removeStaleProjectPages: boolean = false,
+  layoutMode: "per-page" | "single-canvas" = "per-page",
+  singleCanvasColumns: number = 5,
+  singleCanvasHorizontalGap: number = 100
 ) {
   console.log("Rendering sitemap for tree:", manifestData.tree);
   console.log("Detect interactive elements:", detectInteractiveElements);
@@ -213,7 +347,10 @@ export async function renderSitemap(
     highlightAllElements,
     highlightElementFilters,
     manifestData.projectId,
-    removeStaleProjectPages
+    removeStaleProjectPages,
+    layoutMode,
+    singleCanvasColumns,
+    singleCanvasHorizontalGap
   );
 
   // Notify progress: Creating index page (80-90%)
@@ -222,20 +359,29 @@ export async function renderSitemap(
   // Create index page after screenshot pages, so we can link to them
   let indexPageId: string | undefined;
   if (manifestData.tree) {
-    indexPageId = await createIndexPage(manifestData.tree, pageIdMap);
+    indexPageId = await createIndexPage(
+      manifestData.tree,
+      pageIdMap,
+      layoutMode,
+      400,
+      manifestData.projectId
+    );
   }
 
   // Notify progress: Updating navigation links (90-100%)
   if (onProgress) onProgress("Finalizing...", 95);
 
-  // Update navigation links with index page ID
+  // Update navigation links with index node ID
   if (indexPageId) {
-    updateNavigationLinks(indexPageId);
+    updateNavigationLinks(indexPageId, manifestData.projectId);
 
-    const indexPageNode = figma.getNodeById(indexPageId);
-    if (indexPageNode && indexPageNode.type === "PAGE") {
-      figma.currentPage = indexPageNode;
+    if (layoutMode === "per-page") {
+      const indexPageNode = figma.getNodeById(indexPageId);
+      if (indexPageNode && indexPageNode.type === "PAGE") {
+        figma.currentPage = indexPageNode;
+      }
     }
+    // In single-canvas mode, figma.currentPage is already the Sitemap canvas page
   }
 
   if (onProgress) onProgress("Complete!", 100);

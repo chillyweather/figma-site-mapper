@@ -26,19 +26,10 @@ type ClearMarkupRequest = {
 
 const MARKUP_CONTAINER_NAME = "Markup Highlights";
 
-function findPageByStoredId(pageId: string | null): PageNode | null {
-  if (!pageId) {
-    return null;
-  }
-
-  for (const child of figma.root.children) {
-    if (child.type === "PAGE" && child.getPluginData("PAGE_ID") === pageId) {
-      return child as PageNode;
-    }
-  }
-
-  return null;
-}
+import {
+  getActiveScreenshotTarget,
+  findScreenshotTargetByPageId,
+} from "./screenshotTarget";
 
 function ensureMarkupContainer(overlay: FrameNode): FrameNode {
   let container: FrameNode | null = null;
@@ -124,11 +115,14 @@ export async function handleRenderMarkupRequest({
 
   const filterMap: ElementFilters = Object.assign({}, elementFilters);
 
-  const currentPageId = figma.currentPage.getPluginData("PAGE_ID") || null;
+  const activeTarget = getActiveScreenshotTarget();
+  const currentPageId = activeTarget?.getPluginData("PAGE_ID") ?? null;
   const pageId = requestedPageId ?? currentPageId;
-  const targetPage = pageId ? findPageByStoredId(pageId) : figma.currentPage;
+  const targetPage = pageId
+    ? (findScreenshotTargetByPageId(pageId) ?? activeTarget)
+    : activeTarget;
 
-  if (!targetPage || targetPage.type !== "PAGE") {
+  if (!targetPage) {
     figma.ui.postMessage({
       type: "markup-render-error",
       error: "Open a generated screenshot page before rendering markup.",
@@ -139,7 +133,7 @@ export async function handleRenderMarkupRequest({
     return;
   }
 
-  const overlay = getOverlayContainer(targetPage);
+  const overlay = getOverlayContainer(targetPage as any);
 
   if (!overlay) {
     figma.ui.postMessage({
@@ -398,11 +392,14 @@ export async function handleRenderMarkupRequest({
 export async function handleClearMarkupRequest({
   pageId: requestedPageId,
 }: ClearMarkupRequest): Promise<void> {
-  const currentPageId = figma.currentPage.getPluginData("PAGE_ID") || null;
+  const activeTarget = getActiveScreenshotTarget();
+  const currentPageId = activeTarget?.getPluginData("PAGE_ID") ?? null;
   const pageId = requestedPageId ?? currentPageId;
-  const targetPage = pageId ? findPageByStoredId(pageId) : figma.currentPage;
+  const targetPage = pageId
+    ? (findScreenshotTargetByPageId(pageId) ?? activeTarget)
+    : activeTarget;
 
-  if (!targetPage || targetPage.type !== "PAGE") {
+  if (!targetPage) {
     figma.ui.postMessage({
       type: "markup-clear-error",
       error: "Open a generated screenshot page before clearing highlights.",
@@ -416,7 +413,7 @@ export async function handleClearMarkupRequest({
     return;
   }
 
-  const overlay = getOverlayContainer(targetPage);
+  const overlay = getOverlayContainer(targetPage as any);
 
   if (!overlay) {
     figma.ui.postMessage({
