@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Lottie region fixture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { background: #1a1a2e; color: #fff; font-family: sans-serif; padding: 20px; }
+    h2 { margin-bottom: 8px; }
+    .region { margin-bottom: 32px; }
+    /* Simulate a Lottie player custom element */
+    .lottie-like {
+      display: block;
+      width: 300px;
+      height: 200px;
+      background: #cccccc;
+      border: 2px solid #9055e0;
+    }
+    .lottie-like.loaded {
+      background: linear-gradient(135deg, #9055e0 0%, #55a0e0 100%);
+    }
+  </style>
+</head>
+<body>
+  <div class="region">
+    <h2>Lottie-like element (starts blank, becomes graphical after warm-up)</h2>
+    <!-- Custom element that simulates lottie-player behaviour -->
+    <div class="lottie lottie-like" id="lottie-player-sim" data-lottie="true"
+      data-loaded="false"
+      style="animation: fadeIn 1s ease-in-out 0.5s forwards;"
+      data-testid="lottie-player">
+    </div>
+  </div>
+  <style>
+    @keyframes fadeIn {
+      from { background: #cccccc; }
+      to { background: linear-gradient(135deg, #9055e0 0%, #55a0e0 100%); }
+    }
+  </style>
+  <script>
+    // Simulate the lottie player becoming loaded after a delay.
+    setTimeout(function() {
+      var el = document.getElementById('lottie-player-sim');
+      el.classList.add('loaded');
+      el.setAttribute('data-loaded', 'true');
+    }, 400);
+  </script>
+</body>
+</html>

@@ -27,6 +27,7 @@ export async function crawlJobHandler(job: Job): Promise<unknown> {
     styleExtraction,
     approvedUrls,
     discoveryRunId,
+    captureProfile,
   } = job.data;
 
   console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
@@ -65,6 +66,7 @@ export async function crawlJobHandler(job: Job): Promise<unknown> {
             captureOnlyVisibleElements,
             highlightAllElements,
             fullRefresh,
+            captureProfile: captureProfile ?? "standard",
           }),
           discoveryRunId: discoveryRunId ? parseInt(discoveryRunId, 10) : null,
           approvedUrlsJson:
@@ -98,7 +100,8 @@ export async function crawlJobHandler(job: Job): Promise<unknown> {
       styleExtraction,
       crawlRunId,
       approvedUrls,
-      cookieBannerHandling
+      cookieBannerHandling,
+      captureProfile ?? "standard"
     );
 
     if (crawlRunId) {

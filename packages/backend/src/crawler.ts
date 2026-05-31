@@ -10,6 +10,7 @@ import { categorizeElement } from "./services/inventory/elementCategory.js";
 import { normalizeStyleValue } from "./services/inventory/normalizeStyles.js";
 import { bucketDimension } from "./services/inventory/signatureBuilders.js";
 import { captureHighFidelity } from "./services/capture/highFidelityCapture.js";
+import { captureTiled } from "./services/capture/tiledCapture.js";
 import { classifyPage } from "./services/capture/blockClassifier.js";
 import {
   applyStealthContextDefaults,
@@ -1305,7 +1306,8 @@ export async function runCrawler(
   },
   crawlRunId?: number,
   approvedUrls?: string[],
-  cookieBannerHandling: CookieBannerHandling = "auto"
+  cookieBannerHandling: CookieBannerHandling = "auto",
+  captureProfile: "standard" | "visual-complete" = "standard"
 ): Promise<{
   visitedUrls: string[];
   visitedPageIds: string[];
@@ -1707,8 +1709,9 @@ export async function runCrawler(
 
         // Orchestrated visual capture: cookie banners (3 passes) + sticky
         // element hide + lazy-content trigger + scroll-to-top + readiness
-        // wait + screenshot. See services/capture/highFidelityCapture.ts.
-        const captureResult = await captureHighFidelity(page, {
+        // wait + screenshot. visual-complete uses tiled capture for
+        // below-the-fold lazy content. See services/capture/*.ts.
+        const captureOpts = {
           dismissBanners: async () => {
             await handleCookieConsentBanner(
               page,
@@ -1717,7 +1720,34 @@ export async function runCrawler(
               finalUrl
             );
           },
-        });
+        };
+        const captureResult = captureProfile === "visual-complete"
+          ? await captureTiled(page, {
+              ...captureOpts,
+              onProgress: (stage: string) => {
+                log.info(`🖼️  Tiled capture stage for ${finalUrl}: ${stage}`);
+                const readableStage =
+                  stage.startsWith("capturing-tile-")
+                    ? stage.replace("capturing-tile-", "Capturing tile ")
+                    : stage === "stitching"
+                    ? "Stitching tiles"
+                    : stage === "media-diagnostics"
+                    ? "Analysing media regions"
+                    : stage === "processing"
+                    ? "Processing screenshot"
+                    : stage === "planning-tiles"
+                    ? "Planning capture tiles"
+                    : stage === "waiting-readiness"
+                    ? "Waiting for page readiness"
+                    : stage === "triggering-lazy"
+                    ? "Triggering lazy content"
+                    : stage;
+                updateProgress(readableStage, currentPage, totalPages, finalUrl).catch(
+                  () => undefined
+                );
+              },
+            })
+          : await captureHighFidelity(page, captureOpts);
         log.info(
           `🟢 Readiness for ${finalUrl}: ${Object.entries(captureResult.readinessReport)
             .filter(([k]) => k !== "imagesDiagnostic")
@@ -1731,7 +1761,12 @@ export async function runCrawler(
           );
         }
         const QUALITY_THRESHOLD = 0.20;
+        type TiledResult = import("./services/capture/tiledCapture.js").TiledCaptureResult;
+        const tiledResult = captureProfile === "visual-complete"
+          ? (captureResult as TiledResult)
+          : null;
         const captureQuality = {
+          captureProfile,
           readinessSignals: captureResult.readinessReport,
           suspiciousRegionScore: captureResult.suspiciousRegionScore,
           retryCount: captureResult.retryCount,
@@ -1739,8 +1774,20 @@ export async function runCrawler(
             captureResult.retryCount === 0
               ? captureResult.suspiciousRegionScore > QUALITY_THRESHOLD ? "suspicious" : "clean"
               : captureResult.suspiciousRegionScore > QUALITY_THRESHOLD ? "retry_unchanged" : "retry_improved",
+          ...(tiledResult?.mediaDiagnostics
+            ? { mediaDiagnostics: tiledResult.mediaDiagnostics }
+            : {}),
         };
-        log.info(`📊 Capture quality for ${finalUrl}: status=${captureQuality.qualityStatus} suspiciousScore=${captureQuality.suspiciousRegionScore.toFixed(3)} retries=${captureQuality.retryCount}`);
+        if (tiledResult?.mediaDiagnostics) {
+          const md = tiledResult.mediaDiagnostics;
+          log.info(
+            `🎬 Media diagnostics for ${finalUrl}: video=${md.videoCount} canvas=${md.canvasCount} lottie=${md.lottieCount} blank=${md.blankCount} blocked=${md.blockedCount}`
+          );
+          if (md.warnings.length > 0) {
+            log.info(`⚠️  Media warnings for ${finalUrl}: ${md.warnings.join(" | ")}`);
+          }
+        }
+        log.info(`📊 Capture quality for ${finalUrl}: profile=${captureQuality.captureProfile} status=${captureQuality.qualityStatus} suspiciousScore=${captureQuality.suspiciousRegionScore.toFixed(3)} retries=${captureQuality.retryCount}`);
 
         // Interactive elements
         let interactiveElements: InteractiveElement[] = [];

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Canvas region fixture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { background: #1a1a2e; color: #fff; font-family: sans-serif; padding: 20px; }
+    h2 { margin-bottom: 8px; }
+    .region { margin-bottom: 32px; }
+    canvas { display: block; border: 2px solid #55e055; }
+  </style>
+</head>
+<body>
+  <div class="region">
+    <h2>Canvas that paints only after it enters viewport</h2>
+    <canvas id="lazy-canvas" width="400" height="200" data-painted="false"></canvas>
+  </div>
+
+  <div class="region">
+    <h2>Forever-animated canvas (never settles)</h2>
+    <canvas id="animated-canvas" width="200" height="200" data-animated="true"></canvas>
+  </div>
+
+  <script>
+    // Lazy canvas: paints a colorful gradient once it enters viewport.
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (!entry.isIntersecting) return;
+        var canvas = entry.target;
+        var ctx = canvas.getContext('2d');
+        var grad = ctx.createLinearGradient(0, 0, 400, 200);
+        grad.addColorStop(0, '#55e055');
+        grad.addColorStop(0.5, '#55a0e0');
+        grad.addColorStop(1, '#e0b055');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 400, 200);
+        ctx.fillStyle = '#fff';
+        ctx.font = '18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Canvas painted on scroll', 200, 105);
+        canvas.setAttribute('data-painted', 'true');
+        observer.unobserve(canvas);
+      });
+    }, { threshold: 0.1 });
+    observer.observe(document.getElementById('lazy-canvas'));
+
+    // Forever-animated canvas — keeps drawing a moving bar.
+    (function animateForever() {
+      var canvas = document.getElementById('animated-canvas');
+      var ctx = canvas.getContext('2d');
+      var x = 0;
+      function draw() {
+        ctx.clearRect(0, 0, 200, 200);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, 200, 200);
+        ctx.fillStyle = '#9055e0';
+        ctx.fillRect(x % 200, 80, 40, 40);
+        x += 2;
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
+  </script>
+</body>
+</html>

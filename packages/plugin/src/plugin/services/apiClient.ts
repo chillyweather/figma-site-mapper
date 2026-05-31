@@ -69,6 +69,7 @@ interface RecrawlParams {
   requestDelay?: number;
   auth?: CrawlParams["auth"];
   cookieBannerHandling?: CrawlParams["cookieBannerHandling"];
+  captureProfile?: CrawlParams["captureProfile"];
   styleExtraction?: CrawlParams["styleExtraction"];
 }
 
@@ -109,6 +110,7 @@ export async function recrawlPage(params: RecrawlParams): Promise<{ jobId: strin
     requestDelay: params.requestDelay || 1000,
     auth: params.auth,
     cookieBannerHandling: params.cookieBannerHandling ?? "auto",
+    captureProfile: params.captureProfile ?? "visual-complete",
     styleExtraction: params.styleExtraction,
   }) as Promise<{ jobId: string }>;
 }
@@ -308,6 +310,7 @@ export async function startApprovedCrawl(params: {
   deviceScaleFactor?: number;
   auth?: CrawlParams["auth"];
   cookieBannerHandling?: CrawlParams["cookieBannerHandling"];
+  captureProfile?: CrawlParams["captureProfile"];
   styleExtraction?: Record<string, unknown>;
 }): Promise<{ jobId: string }> {
   const data = await client.post("/crawl/approved", {
@@ -319,6 +322,7 @@ export async function startApprovedCrawl(params: {
     deviceScaleFactor: params.deviceScaleFactor ?? 2,
     auth: params.auth,
     cookieBannerHandling: params.cookieBannerHandling ?? "auto",
+    captureProfile: params.captureProfile ?? "visual-complete",
     styleExtraction: params.styleExtraction,
   }) as any;
   if (!data || typeof data.jobId !== "string") {

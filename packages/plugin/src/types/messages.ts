@@ -57,6 +57,7 @@ export interface CrawlStartMessage {
   showBrowser: boolean;
   detectInteractiveElements: boolean;
   cookieBannerHandling?: "auto" | "hide" | "off";
+  captureProfile?: "standard" | "visual-complete";
   captureOnlyVisibleElements: boolean;
   auth: AuthData | null;
   styleExtraction?: StyleExtractionSettings;

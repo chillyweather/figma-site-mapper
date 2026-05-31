@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Media regions fixture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { background: #1a1a2e; color: #fff; font-family: sans-serif; padding: 20px; }
+    h2 { margin-bottom: 8px; font-size: 1rem; }
+    .region { margin-bottom: 24px; }
+    /* Normal canvas — painted with colors */
+    #normal-canvas { display: block; border: 2px solid #55a0e0; }
+    /* Blank canvas — never drawn on */
+    #blank-canvas { display: block; border: 2px solid #e05555; background: #fff; }
+    /* SVG with animation */
+    #svg-anim { border: 2px solid #55e055; }
+    /* Video with poster */
+    #video-poster { border: 2px solid #e0b055; }
+  </style>
+</head>
+<body>
+  <div class="region">
+    <h2>Normal Canvas (painted)</h2>
+    <canvas id="normal-canvas" width="300" height="150"></canvas>
+  </div>
+
+  <div class="region">
+    <h2>Blank Canvas (never drawn)</h2>
+    <canvas id="blank-canvas" width="300" height="150"></canvas>
+  </div>
+
+  <div class="region">
+    <h2>Animated SVG</h2>
+    <svg id="svg-anim" width="300" height="150" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="10" width="80" height="80" fill="#55e055">
+        <animate attributeName="width" from="80" to="200" dur="2s" repeatCount="indefinite" />
+      </rect>
+    </svg>
+  </div>
+
+  <div class="region">
+    <h2>Video with poster (synthetic)</h2>
+    <video id="video-poster" width="300" height="150"
+      poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='150'%3E%3Crect width='300' height='150' fill='%23e0b055'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='20'%3EVideo Poster%3C/text%3E%3C/svg%3E"
+      muted>
+    </video>
+  </div>
+
+  <script>
+    // Paint the normal canvas with colorful gradient.
+    var canvas = document.getElementById('normal-canvas');
+    var ctx = canvas.getContext('2d');
+    var grad = ctx.createLinearGradient(0, 0, 300, 150);
+    grad.addColorStop(0, '#55a0e0');
+    grad.addColorStop(0.5, '#55e055');
+    grad.addColorStop(1, '#9055e0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 300, 150);
+    ctx.fillStyle = '#fff';
+    ctx.font = '18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Normal Canvas', 150, 80);
+    document.getElementById('normal-canvas').setAttribute('data-painted', 'true');
+  </script>
+</body>
+</html>

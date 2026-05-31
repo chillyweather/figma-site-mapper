@@ -492,6 +492,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction,
       captureOnlyVisibleElements,
       cookieBannerHandling,
+      captureProfile,
     } = request.body as any;
 
     if (!url || !publicUrl) {
@@ -531,6 +532,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       projectId,
       auth,
       styleExtraction,
+      captureProfile: captureProfile ?? "visual-complete",
     });
 
     return { message: "Recrawl job queued", jobId: job.id };
@@ -547,6 +549,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       deviceScaleFactor?: number;
       auth?: unknown;
       cookieBannerHandling?: "auto" | "hide" | "off";
+      captureProfile?: "standard" | "visual-complete";
     };
 
     const { projectId, discoveryRunId, approvedUrls } = body;
@@ -622,6 +625,7 @@ export async function buildServer(): Promise<FastifyInstance> {
       styleExtraction: body.styleExtraction ?? defaultInventoryStyleExtraction(),
       approvedUrls: normalizedApprovedUrls,
       discoveryRunId,
+      captureProfile: body.captureProfile ?? "visual-complete",
     });
 
     return {

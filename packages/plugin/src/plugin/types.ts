@@ -107,6 +107,7 @@ export interface CrawlParams {
   captureOnlyVisibleElements?: boolean;
   auth: any;
   cookieBannerHandling?: "auto" | "hide" | "off";
+  captureProfile?: "standard" | "visual-complete";
   styleExtraction?: StyleExtractionSettings;
   projectId: string;
 }
