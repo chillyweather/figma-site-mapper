@@ -79,6 +79,27 @@ describe("TiledCapture", () => {
     await context.close();
   }, 45_000);
 
+  it("returns the page scrolled to the top so later bbox extraction uses document coordinates", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 1200, height: 500 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+    await page.goto(`${server.baseUrl}/tiled-lazy-below-fold.html`, { waitUntil: "commit" });
+
+    await captureTiled(page, {
+      detectMedia: false,
+      readiness: { visualStabilityQuietWindowMs: 600 },
+      lazy: { quietWindowMs: 50, maxSteps: 5, overallTimeoutMs: 5_000 },
+      tileStabilityMs: 200,
+    });
+
+    const scrollY = await page.evaluate(() => window.scrollY);
+    expect(scrollY).toBe(0);
+
+    await context.close();
+  }, 45_000);
+
   it("keeps the primary sticky header in the first tile without repeating it", async () => {
     const context = await browser.newContext({
       viewport: { width: 800, height: 400 },

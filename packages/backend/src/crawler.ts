@@ -533,8 +533,8 @@ async function extractStyleData(
               : [],
           id: el.id || undefined,
           boundingBox: {
-            x: Math.round(rect.x),
-            y: Math.round(rect.y),
+            x: Math.round(rect.x + window.scrollX),
+            y: Math.round(rect.y + window.scrollY),
             width: Math.round(rect.width),
             height: Math.round(rect.height),
           },

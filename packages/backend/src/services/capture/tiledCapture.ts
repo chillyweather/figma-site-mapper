@@ -261,6 +261,11 @@ export async function captureTiled(
     }
   }
 
+  // Leave the page in the same coordinate anchor expected by the crawler's
+  // post-capture DOM extraction. Without this, bbox extraction can inherit the
+  // last tile's scroll offset and produce viewport-relative component slices.
+  await scrollToTop(page);
+
   return {
     buffer: finalBuffer,
     width: widthPx,
