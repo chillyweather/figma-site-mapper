@@ -48,8 +48,13 @@ export async function detectMediaRegions(
   fullPageBuffer: Buffer
 ): Promise<MediaDiagnostics> {
   const discovered = await discoverSurfaces(page);
+  const [bufferDimensions, pageDimensions] = await Promise.all([
+    getBufferDimensions(fullPageBuffer),
+    getPageDimensions(page),
+  ]);
+  const scale = getCssToImageScale(bufferDimensions, pageDimensions);
 
-  const scored = await scoreRegions(fullPageBuffer, discovered);
+  const scored = await scoreRegions(fullPageBuffer, discovered, scale);
 
   const videoCount = scored.filter((s) => s.kind === "video").length;
   const canvasCount = scored.filter((s) => s.kind === "canvas").length;
@@ -235,7 +240,8 @@ async function discoverSurfaces(page: Page): Promise<MediaSurface[]> {
 // content. Uses the same blank-region scorer but restricted to the surface bbox.
 async function scoreRegions(
   fullBuffer: Buffer,
-  surfaces: MediaSurface[]
+  surfaces: MediaSurface[],
+  scale: { x: number; y: number }
 ): Promise<MediaSurface[]> {
   const { width: totalWidth, height: totalHeight } = await getBufferDimensions(fullBuffer);
   const results: MediaSurface[] = [];
@@ -246,8 +252,8 @@ async function scoreRegions(
       continue;
     }
 
-    const { x, y, width, height } = surface.bbox;
-    const area = width * height;
+    const { x, y, width, height } = scaleBbox(surface.bbox, scale);
+    const area = surface.bbox.width * surface.bbox.height;
     if (area < MIN_AREA_PX) {
       results.push({ ...surface, status: "ok" });
       continue;
@@ -266,13 +272,13 @@ async function scoreRegions(
 
     try {
       const cropBuffer = await cropRegion(fullBuffer, clampedX, clampedY, clampedW, clampedH);
-      const blankScore = await scoreSuspiciousRegions(cropBuffer);
+      const blankScore = await scoreMediaCrop(cropBuffer);
       const isBlank = blankScore > 0.7;
       results.push({
         ...surface,
         status: isBlank ? "blank" : "ok",
         warning: isBlank
-          ? `${surface.kind} region at (${x},${y}) appears blank (score=${blankScore.toFixed(2)})`
+          ? `${surface.kind} region at (${surface.bbox.x},${surface.bbox.y}) appears blank (score=${blankScore.toFixed(2)})`
           : surface.warning,
       });
     } catch {
@@ -281,6 +287,74 @@ async function scoreRegions(
   }
 
   return results;
+}
+
+async function getPageDimensions(page: Page): Promise<{
+  widthCss: number;
+  heightCss: number;
+  dpr: number;
+}> {
+  return page
+    .evaluate(() => ({
+      widthCss: window.innerWidth,
+      heightCss: Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+        document.documentElement.offsetHeight,
+        window.innerHeight
+      ),
+      dpr: window.devicePixelRatio || 1,
+    }))
+    .catch(() => ({ widthCss: 0, heightCss: 0, dpr: 1 }));
+}
+
+function getCssToImageScale(
+  bufferDimensions: { width: number; height: number },
+  pageDimensions: { widthCss: number; heightCss: number; dpr: number }
+): { x: number; y: number } {
+  const fallback = pageDimensions.dpr > 0 ? pageDimensions.dpr : 1;
+  const scaleX =
+    bufferDimensions.width > 0 && pageDimensions.widthCss > 0
+      ? bufferDimensions.width / pageDimensions.widthCss
+      : fallback;
+  const scaleY =
+    bufferDimensions.height > 0 && pageDimensions.heightCss > 0
+      ? bufferDimensions.height / pageDimensions.heightCss
+      : fallback;
+  return { x: scaleX || fallback, y: scaleY || fallback };
+}
+
+function scaleBbox(
+  bbox: MediaSurface["bbox"],
+  scale: { x: number; y: number }
+): MediaSurface["bbox"] {
+  return {
+    x: Math.round(bbox.x * scale.x),
+    y: Math.round(bbox.y * scale.y),
+    width: Math.round(bbox.width * scale.x),
+    height: Math.round(bbox.height * scale.y),
+  };
+}
+
+async function scoreMediaCrop(cropBuffer: Buffer): Promise<number> {
+  const fullScore = await scoreSuspiciousRegions(cropBuffer);
+  const centralCrop = await cropCentralRegion(cropBuffer);
+  if (!centralCrop) return fullScore;
+  const centralScore = await scoreSuspiciousRegions(centralCrop);
+  return Math.max(fullScore, centralScore);
+}
+
+async function cropCentralRegion(buffer: Buffer): Promise<Buffer | null> {
+  const { width, height } = await getBufferDimensions(buffer);
+  if (width < 16 || height < 16) return null;
+
+  const insetX = Math.max(4, Math.round(width * 0.05));
+  const insetY = Math.max(4, Math.round(height * 0.05));
+  const cropWidth = width - insetX * 2;
+  const cropHeight = height - insetY * 2;
+  if (cropWidth < 4 || cropHeight < 4) return null;
+
+  return cropRegion(buffer, insetX, insetY, cropWidth, cropHeight);
 }
 
 async function getBufferDimensions(

@@ -411,7 +411,7 @@ export async function buildServer() {
         return { message: "Crawl job successfully queued.", jobId: job.id };
     });
     server.post("/recrawl-page", async (request, reply) => {
-        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, captureOnlyVisibleElements, cookieBannerHandling, } = request.body;
+        const { url, publicUrl, projectId, deviceScaleFactor, delay, requestDelay, auth, styleExtraction, captureOnlyVisibleElements, cookieBannerHandling, captureProfile, } = request.body;
         if (!url || !publicUrl) {
             return reply.status(400).send({ error: "URL and publicUrl are required" });
         }
@@ -446,6 +446,7 @@ export async function buildServer() {
             projectId,
             auth,
             styleExtraction,
+            captureProfile: captureProfile ?? "visual-complete",
         });
         return { message: "Recrawl job queued", jobId: job.id };
     });
@@ -514,6 +515,7 @@ export async function buildServer() {
             styleExtraction: body.styleExtraction ?? defaultInventoryStyleExtraction(),
             approvedUrls: normalizedApprovedUrls,
             discoveryRunId,
+            captureProfile: body.captureProfile ?? "visual-complete",
         });
         return {
             message: "Approved capture crawl queued",

@@ -16,11 +16,14 @@ export async function waitUntilStable(page, opts = {}) {
     const requestQuietWindowMs = opts.requestSettleQuietWindowMs ?? DEFAULT_REQUEST_QUIET_WINDOW_MS;
     const domQuietWindowMs = opts.domQuietWindowMs ?? DEFAULT_DOM_QUIET_WINDOW_MS;
     const visualStabilityQuietWindowMs = cap(opts.visualStabilityQuietWindowMs ?? DEFAULT_VISUAL_STABILITY_QUIET_WINDOW_MS);
+    const shouldSettleAnimations = opts.settleAnimations !== false;
     const [images, fonts, backgroundImages, animations, videos, requests, visualStability] = await Promise.all([
         runSignal(() => waitForAllImages(page, domQuietWindowMs), imagesTimeoutMs),
         runSignal(() => waitForFonts(page), fontsTimeoutMs),
         runSignal(() => waitForBackgroundImages(page), backgroundImagesTimeoutMs),
-        runSignal(() => settleAnimations(page), animationsTimeoutMs),
+        shouldSettleAnimations
+            ? runSignal(() => settleAnimations(page), animationsTimeoutMs)
+            : Promise.resolve("fired"),
         runSignal(() => waitForVideos(page), videosTimeoutMs),
         runSignal(() => waitForRequestQuiet(page, requestQuietWindowMs), requestsTimeoutMs),
         runSignal(() => waitForVisualStability(page, visualStabilityQuietWindowMs), overall),

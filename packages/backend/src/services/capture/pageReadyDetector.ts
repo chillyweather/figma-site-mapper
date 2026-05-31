@@ -36,6 +36,10 @@ export interface WaitUntilStableOptions {
   /** Quiet window for visual stability — resolves when document-wide visual
    * signals have been unchanged for this many milliseconds. Default 800ms. */
   visualStabilityQuietWindowMs?: number;
+  /** Whether to pause CSS/Web Animations as part of readiness. Default true.
+   * Media-rich tiled capture disables this initial global freeze so media
+   * drivers can first seek/warm players to a useful representative frame. */
+  settleAnimations?: boolean;
 }
 
 const DEFAULT_SIGNAL_TIMEOUT_MS = 15_000;
@@ -70,12 +74,15 @@ export async function waitUntilStable(
   const visualStabilityQuietWindowMs = cap(
     opts.visualStabilityQuietWindowMs ?? DEFAULT_VISUAL_STABILITY_QUIET_WINDOW_MS
   );
+  const shouldSettleAnimations = opts.settleAnimations !== false;
 
   const [images, fonts, backgroundImages, animations, videos, requests, visualStability] = await Promise.all([
     runSignal(() => waitForAllImages(page, domQuietWindowMs), imagesTimeoutMs),
     runSignal(() => waitForFonts(page), fontsTimeoutMs),
     runSignal(() => waitForBackgroundImages(page), backgroundImagesTimeoutMs),
-    runSignal(() => settleAnimations(page), animationsTimeoutMs),
+    shouldSettleAnimations
+      ? runSignal(() => settleAnimations(page), animationsTimeoutMs)
+      : Promise.resolve("fired" as SignalOutcome),
     runSignal(() => waitForVideos(page), videosTimeoutMs),
     runSignal(() => waitForRequestQuiet(page, requestQuietWindowMs), requestsTimeoutMs),
     runSignal(() => waitForVisualStability(page, visualStabilityQuietWindowMs), overall),

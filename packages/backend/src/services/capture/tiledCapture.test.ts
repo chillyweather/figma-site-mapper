@@ -79,6 +79,50 @@ describe("TiledCapture", () => {
     await context.close();
   }, 45_000);
 
+  it("keeps the primary sticky header in the first tile without repeating it", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 800, height: 400 },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+    await page.goto(`${server.baseUrl}/sticky-hero.html`, { waitUntil: "commit" });
+    await page.evaluate(() => {
+      const action = document.createElement("button");
+      action.setAttribute("aria-label", "Header action");
+      Object.assign(action.style, {
+        position: "fixed",
+        top: "12px",
+        right: "20px",
+        width: "80px",
+        height: "36px",
+        background: "rgb(255, 0, 0)",
+        border: "0",
+        zIndex: "20",
+      });
+      document.body.appendChild(action);
+    });
+
+    const result = await captureTiled(page, {
+      detectMedia: false,
+      readiness: { overallTimeoutMs: 5_000, visualStabilityQuietWindowMs: 200 },
+      lazy: { quietWindowMs: 50, maxSteps: 5, overallTimeoutMs: 2_000 },
+      tileStabilityMs: 100,
+    });
+
+    const topHeaderPixel = await readPixel(result.buffer, 500, 30);
+    const secondTileHeaderPixel = await readPixel(result.buffer, 500, 430);
+    const topActionPixel = await readPixel(result.buffer, 740, 30);
+    const secondTileActionPixel = await readPixel(result.buffer, 740, 430);
+
+    expect(result.tileCount).toBeGreaterThan(1);
+    expect(topHeaderPixel).toEqual({ r: 0, g: 0, b: 128, a: 255 });
+    expect(secondTileHeaderPixel).not.toEqual({ r: 0, g: 0, b: 128, a: 255 });
+    expect(topActionPixel).toEqual({ r: 255, g: 0, b: 0, a: 255 });
+    expect(secondTileActionPixel).not.toEqual({ r: 255, g: 0, b: 0, a: 255 });
+
+    await context.close();
+  }, 45_000);
+
   it("returns tileCount=1 for a page that fits in one viewport", async () => {
     const context = await browser.newContext({
       viewport: { width: 1200, height: 4000 },
@@ -119,3 +163,21 @@ describe("TiledCapture", () => {
     await context.close();
   }, 30_000);
 });
+
+async function readPixel(
+  buffer: Buffer,
+  x: number,
+  y: number
+): Promise<{ r: number; g: number; b: number; a: number }> {
+  const { data, info } = await sharp(buffer)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const index = (y * info.width + x) * 4;
+  return {
+    r: data[index]!,
+    g: data[index + 1]!,
+    b: data[index + 2]!,
+    a: data[index + 3]!,
+  };
+}

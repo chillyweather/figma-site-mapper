@@ -49,8 +49,9 @@ export async function captureTiled(
   // 1. Pre-pass: dismiss banners.
   await dismiss();
 
-  // 2. Hide ALL sticky/fixed header bands so they don't repeat in each tile.
-  await hideAllStickyElements(page);
+  // 2. Prepare sticky/fixed header bands so top-pinned chrome appears only in
+  //    the first tile and does not repeat down the stitched screenshot.
+  await prepareStickyElementsForTiling(page);
 
   // 3. Trigger all lazy content by scrolling through the full page.
   progress("triggering-lazy");
@@ -65,7 +66,10 @@ export async function captureTiled(
 
   // 6. Readiness wait on the full page before tiling.
   progress("waiting-readiness");
-  const readinessReport = await waitUntilStable(page, opts.readiness);
+  const readinessReport = await waitUntilStable(page, {
+    ...opts.readiness,
+    settleAnimations: false,
+  });
 
   // 7. Plan tiles.
   progress("planning-tiles");
@@ -90,6 +94,7 @@ export async function captureTiled(
     await page.evaluate((y: number) => {
       window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior });
     }, tile.topCss);
+    await setStickyBandsVisibleForTile(page, i === 0);
 
     // Short pause for scroll paint + any intersection-observer triggered loads.
     await page.waitForTimeout(tileStabilityMs);
@@ -190,7 +195,7 @@ export async function captureTiled(
     // Retry: re-trigger lazy, scroll to top, re-readiness, re-tile.
     await triggerLazyContent(page, opts.lazy);
     await scrollToTop(page);
-    await waitUntilStable(page, opts.readiness);
+    await waitUntilStable(page, { ...opts.readiness, settleAnimations: false });
 
     const retryBuffers: Array<{ buffer: Buffer; topPx: number; heightPx: number }> = [];
     for (let i = 0; i < tiles.length; i++) {
@@ -198,6 +203,7 @@ export async function captureTiled(
       await page.evaluate((y: number) => {
         window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior });
       }, tile.topCss);
+      await setStickyBandsVisibleForTile(page, i === 0);
       await page.waitForTimeout(tileStabilityMs);
 
       const clipHeightCss = Math.min(tileHeightCss, scrollHeightCss - tile.topCss);
@@ -309,12 +315,15 @@ async function getPageDimensions(page: Page): Promise<{
 }
 
 const HEADER_BAND_MAX_HEIGHT_PX = 200;
+const HEADER_BAND_MAX_TOP_PX = 80;
 
-// Hide ALL sticky/fixed header bands (not just duplicates) so they don't
-// appear repeated in each tile of the stitched screenshot.
-async function hideAllStickyElements(page: Page): Promise<void> {
+// Mark top-pinned header bands so they can be kept for tile 0 and hidden for
+// later tiles. This preserves the source page's fixed/sticky chrome once while
+// avoiding the repeated-header tiling artifact.
+async function prepareStickyElementsForTiling(page: Page): Promise<void> {
   await page
-    .evaluate((maxBandHeight: number) => {
+    .evaluate(({ maxBandHeight, maxTop }: { maxBandHeight: number; maxTop: number }) => {
+      const candidates: HTMLElement[] = [];
       const all = document.querySelectorAll<HTMLElement>("*");
       all.forEach((el) => {
         const cs = window.getComputedStyle(el);
@@ -322,12 +331,40 @@ async function hideAllStickyElements(page: Page): Promise<void> {
         const rect = el.getBoundingClientRect();
         if (rect.height === 0 || rect.height > maxBandHeight) return;
         const topPx = parseFloat(cs.top);
-        if (!Number.isFinite(topPx) || topPx > 8) return;
-        el.style.display = "none";
+        if (!Number.isFinite(topPx) || topPx > maxTop || rect.top > maxTop) return;
+        candidates.push(el);
+      });
+
+      candidates.forEach((el) => {
+        if (!el.dataset.sitemapperTiledOriginalDisplay) {
+          el.dataset.sitemapperTiledOriginalDisplay = el.style.display || "__unset__";
+        }
+        el.dataset.sitemapperTiledStickyBand = "true";
       });
       document.documentElement.style.transform = "none";
       document.body.style.transform = "none";
-    }, HEADER_BAND_MAX_HEIGHT_PX)
+    }, { maxBandHeight: HEADER_BAND_MAX_HEIGHT_PX, maxTop: HEADER_BAND_MAX_TOP_PX })
+    .catch(() => undefined);
+}
+
+async function setStickyBandsVisibleForTile(page: Page, visible: boolean): Promise<void> {
+  await page
+    .evaluate((show: boolean) => {
+      document
+        .querySelectorAll<HTMLElement>("[data-sitemapper-tiled-sticky-band='true']")
+        .forEach((el) => {
+          if (!show) {
+            el.style.display = "none";
+            return;
+          }
+          const original = el.dataset.sitemapperTiledOriginalDisplay;
+          if (!original || original === "__unset__") {
+            el.style.removeProperty("display");
+          } else {
+            el.style.display = original;
+          }
+        });
+    }, visible)
     .catch(() => undefined);
 }
 
@@ -445,4 +482,3 @@ async function scoreTileMediaRegions(
     return 0;
   }
 }
-

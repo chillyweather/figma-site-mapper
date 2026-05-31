@@ -50,6 +50,21 @@ describe("PageReadyDetector", () => {
         expect(report.animations).toBe("fired");
         await page.close();
     }, 15_000);
+    it("can wait for readiness without globally freezing animations", async () => {
+        const page = await browser.newPage();
+        await page.goto(`${server.baseUrl}/running-animation.html`, { waitUntil: "commit" });
+        const beforeRunning = await page.evaluate(() => document.getAnimations().filter((a) => a.playState === "running").length);
+        expect(beforeRunning).toBeGreaterThan(0);
+        const report = await waitUntilStable(page, {
+            settleAnimations: false,
+            overallTimeoutMs: 1_000,
+            visualStabilityQuietWindowMs: 100,
+        });
+        const afterRunning = await page.evaluate(() => document.getAnimations().filter((a) => a.playState === "running").length);
+        expect(afterRunning).toBeGreaterThan(0);
+        expect(report.animations).toBe("fired");
+        await page.close();
+    }, 15_000);
     it("waits for delayed <video> poster images before resolving", async () => {
         const page = await browser.newPage();
         await page.goto(`${server.baseUrl}/video-poster.html`, { waitUntil: "commit" });

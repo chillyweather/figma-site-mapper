@@ -3,7 +3,7 @@ import { db } from "../../db.js";
 import { crawlRuns } from "../../schema.js";
 import { runCrawler } from "../../crawler.js";
 export async function crawlJobHandler(job) {
-    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, renderInteractiveHighlights, cookieBannerHandling, captureOnlyVisibleElements, highlightAllElements, projectId, auth, styleExtraction, approvedUrls, discoveryRunId, } = job.data;
+    const { url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor, delay, requestDelay, maxDepth, defaultLanguageOnly, fullRefresh, sampleSize, showBrowser, detectInteractiveElements, renderInteractiveHighlights, cookieBannerHandling, captureOnlyVisibleElements, highlightAllElements, projectId, auth, styleExtraction, approvedUrls, discoveryRunId, captureProfile, } = job.data;
     console.log(`👩‍🍳 Processing job ${job.id}: Crawling ${url}`);
     console.log(`📋 Job settings: maxDepth=${maxDepth}, defaultLanguageOnly=${defaultLanguageOnly}, fullRefresh=${fullRefresh}, sampleSize=${sampleSize}`);
     console.log(`🔗 Full job data:`, JSON.stringify(job.data, null, 2));
@@ -37,6 +37,7 @@ export async function crawlJobHandler(job) {
                     captureOnlyVisibleElements,
                     highlightAllElements,
                     fullRefresh,
+                    captureProfile: captureProfile ?? "standard",
                 }),
                 discoveryRunId: discoveryRunId ? parseInt(discoveryRunId, 10) : null,
                 approvedUrlsJson: approvedUrls && Array.isArray(approvedUrls) ? JSON.stringify(approvedUrls) : null,
@@ -47,7 +48,7 @@ export async function crawlJobHandler(job) {
                 .all();
             crawlRunId = row?.id;
         }
-        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 2, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling);
+        const result = await runCrawler(url, publicUrl, maxRequestsPerCrawl, deviceScaleFactor || 2, job.id, delay || 0, requestDelay || 1000, maxDepth === 0 ? undefined : maxDepth, defaultLanguageOnly, sampleSize, showBrowser, detectInteractiveElements, captureOnlyVisibleElements, highlightAllElements, fullRefresh === true, projectId, auth, styleExtraction, crawlRunId, approvedUrls, cookieBannerHandling, captureProfile ?? "standard");
         if (crawlRunId) {
             db.update(crawlRuns)
                 .set({

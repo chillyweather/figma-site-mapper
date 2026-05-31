@@ -73,6 +73,35 @@ describe("MediaRegionDetector", () => {
     // Normal (painted) canvas should be ok, blank canvas should be blank.
     const statuses = canvasSurfaces.map((s) => s.status);
     expect(statuses).toContain("ok");
+    expect(statuses).toContain("blank");
+    expect(md.blankCount).toBeGreaterThanOrEqual(1);
+
+    const blankCanvas = canvasSurfaces.find((s) => s.selector.includes("blank-canvas"));
+    expect(blankCanvas?.status).toBe("blank");
+
+    await context.close();
+  }, 30_000);
+
+  it("scores media regions against DPR-scaled screenshots", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 1200, height: 800 },
+      deviceScaleFactor: 2,
+    });
+    const page = await context.newPage();
+    await page.goto(`${server.baseUrl}/media-regions.html`, { waitUntil: "commit" });
+    await page.waitForTimeout(500);
+
+    const screenshotBuf = await page.screenshot({ fullPage: true, type: "png" });
+    const meta = await sharp(screenshotBuf).metadata();
+    expect(meta.width).toBe(2400);
+
+    const md = await detectMediaRegions(page, screenshotBuf);
+    const blankCanvas = md.surfaces.find((s) => s.selector.includes("blank-canvas"));
+    const paintedCanvas = md.surfaces.find((s) => s.selector.includes("normal-canvas"));
+
+    expect(blankCanvas?.status).toBe("blank");
+    expect(paintedCanvas?.status).toBe("ok");
+    expect(md.blankCount).toBeGreaterThanOrEqual(1);
 
     await context.close();
   }, 30_000);
