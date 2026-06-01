@@ -1,17 +1,11 @@
 import { ANCHOR_CONTAINER_NAME } from "./shared";
+import {
+  findScreenshotTargetByPageId,
+  getScreenshotTargetScale,
+} from "../../plugin/handlers/screenshotTarget";
 
-export function findRenderedPageByPageId(pageId: string | null | undefined): PageNode | null {
-  if (!pageId) return null;
-  for (const page of figma.root.children) {
-    if (page.type === "PAGE" && page.getPluginData("PAGE_ID") === pageId) {
-      return page;
-    }
-  }
-  return null;
-}
-
-export function getOrCreateAnchorContainer(page: PageNode): FrameNode {
-  const existing = page.findOne(
+export function getOrCreateAnchorContainer(page: PageNode | FrameNode): FrameNode {
+  const existing = (page as PageNode).findOne(
     (node) => node.type === "FRAME" && node.name === ANCHOR_CONTAINER_NAME
   ) as FrameNode | null;
   if (existing) return existing;
@@ -37,20 +31,13 @@ export function findOrCreateSampleAnchor(
   bbox: [number, number, number, number],
   kind: SampleAnchorKind = "component"
 ): FrameNode | null {
-  const targetPage = findRenderedPageByPageId(pageId);
+  const targetPage = findScreenshotTargetByPageId(pageId);
   if (!targetPage) return null;
 
   const [x, y, width, height] = bbox;
   if (![x, y, width, height].every((value) => Number.isFinite(value))) return null;
 
-  const storedScreenshotWidth = Number(targetPage.getPluginData("SCREENSHOT_WIDTH"));
-  const storedOriginalWidth = Number(targetPage.getPluginData("ORIGINAL_VIEWPORT_WIDTH"));
-  const scale =
-    Number.isFinite(storedScreenshotWidth) &&
-    Number.isFinite(storedOriginalWidth) &&
-    storedOriginalWidth > 0
-      ? storedScreenshotWidth / storedOriginalWidth
-      : 1;
+  const scale = getScreenshotTargetScale(targetPage);
 
   const container = getOrCreateAnchorContainer(targetPage);
   const anchorName = `DS Anchor / ${kind} / ${ownerId} / ${elementId}`;

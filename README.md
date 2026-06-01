@@ -2,15 +2,16 @@
 
 A Figma plugin + Node.js backend for turning a real website into design-system evidence inside Figma.
 
-The current workflow is not "crawl everything and hope it is useful." The plugin first helps the designer choose a meaningful page set, captures only the approved URLs, renders those pages into Figma, prepares an agent-readable inventory workspace, and then renders agent decisions back as a `DS Inventory` board.
+The plugin discovers meaningful website pages, captures only approved URLs, renders them as screenshot pages in Figma, and then runs an agent-driven mapping pipeline that detects component candidates across captured pages and renders them as per-component-type mapper pages — ready for designer review and manual refinement.
 
 ## Overview
 
-The app has three parts:
+The app has four parts:
 
-- **Figma plugin**: the designer-facing UI. It runs discovery/capture, renders screenshot pages, prepares inventory workspaces, and renders inventory boards.
-- **Backend API + worker**: Fastify API, BullMQ worker, Playwright crawler, SQLite storage, screenshot/style extraction, and inventory workspace generation.
-- **Claude Code inventory pass**: an agent reads the generated workspace and writes structured design-system decisions.
+- **Figma plugin**: the designer-facing UI. It runs discovery/capture, renders screenshot pages, prepares mapping workspaces, and renders mapper pages from agent decisions.
+- **Backend API + worker**: Fastify API, BullMQ worker, Playwright crawler, SQLite storage, screenshot/style extraction, and mapping workspace generation.
+- **Claude Code mapping pass**: an agent reads the prepared workspace and writes structured component-candidate decisions (`components.json`).
+- **Chrome extension** (optional): records user navigation flows for import into the plugin.
 
 The intended end-to-end process:
 
@@ -20,11 +21,9 @@ The intended end-to-end process:
 4. Approve the pages to capture.
 5. The backend captures only the approved URLs and stores screenshots, DOM/style data, elements, and crawl-run metadata in SQLite.
 6. The plugin renders an `Index` page plus one Figma page per captured URL.
-7. In the `Inventory` tab, optionally save mapping inputs such as repo path + branch, Storybook path or URL, UI library, token/theme paths, and notes.
-8. Rebuild the inventory workspace. The backend generates `mapping-context/`, `suggestions.json`, and the other inventory artifacts.
-9. Review the read-only `Suggestions` and `Agent Handoff` blocks in the plugin.
-10. Run `/ds-inventory <projectId>` in Claude Code from the repo root.
-11. Refresh the `Inventory` tab and render `DS Inventory` boards from the agent decisions.
+7. In the `Inventory` tab, click `Prepare Mapping` to generate the mapping workspace.
+8. Run `/ds-mapping <projectId>` in Claude Code from the repo root.
+9. Refresh the `Inventory` tab and click `Render Mapping` to create mapper pages in Figma.
 
 ## User Guide
 
@@ -67,7 +66,7 @@ pnpm dev:plugin
 Required running pieces:
 
 - API server on `http://localhost:3006`
-- Worker process for crawl and inventory jobs
+- Worker process for crawl and mapping jobs
 - Plugin watcher that writes `packages/plugin/dist`
 
 Sanity check:
@@ -102,7 +101,7 @@ You can:
 - set screenshot width and scale
 - set crawl defaults
 
-For design-system inventory work, keep **Extract DOM & Style Data** enabled.
+For design-system mapping work, keep **Extract DOM & Style Data** enabled.
 
 ### 4. Choose Pages To Capture
 
@@ -110,9 +109,7 @@ The `Crawling` tab has two capture modes.
 
 **Recommended**
 
-Use this for normal design-system discovery. Enter the website URL and optional seed URLs. Choose either **Fast** discovery or **Full site exploration**. Fast discovery uses the current shallow sources. Full site exploration also follows sitemap indexes and internal links up to configured limits, which makes larger budgets meaningful. Review the candidates, select the pages you want, then start capture.
-
-The page budget controls how many recommended pages you want to approve after discovery.
+Use this for normal design-system discovery. Enter the website URL and optional seed URLs. Choose either **Fast** discovery or **Full site exploration**. Fast discovery uses the current shallow sources. Full site exploration also follows sitemap indexes and internal links up to configured limits. Discovered candidates include page-type badges (homepage, pricing, product-detail, etc.) to help you select. Review the candidates, select the pages you want, then start capture.
 
 **Exact URLs**
 
@@ -135,13 +132,13 @@ After capture completes, the plugin renders:
 - navigation back to the index
 - source URL links in page navigation
 
-Generated screenshot pages store plugin data keys used by markup, styling, inventory, and sample links: `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHOT_WIDTH`, and `ORIGINAL_VIEWPORT_WIDTH`.
+Generated screenshot pages store plugin data keys used by markup, styling, mapping, and sample links: `URL`, `PROJECT_ID`, `PAGE_ID`, `SCREENSHOT_WIDTH`, and `ORIGINAL_VIEWPORT_WIDTH`.
 
-### 6. Prepare Inventory Workspace
+### 6. Prepare Mapping Workspace
 
 Open the `Inventory` tab.
 
-Click `Rebuild Inventory Workspace`.
+Click `Prepare Mapping`.
 
 The backend generates:
 
@@ -149,75 +146,76 @@ The backend generates:
 packages/backend/workspace/<projectId>/
 ```
 
-That workspace contains contact sheets, crop images, token tables, page metadata, element metadata, region hints, and decision file scaffolding. It is generated runtime data and is ignored by Git.
+That workspace contains DOM candidates, crop images, contact sheets, page metadata, and evidence files for the mapping agent. It is generated runtime data and is ignored by Git.
 
-The `Inventory` tab also shows:
+When preparation completes, the tab shows evidence status: page count, DOM candidate count, and preparation timestamp.
 
-- saved mapping inputs
-- repo and Storybook evidence status
-- read-only suggestion summaries
-- a copyable agent handoff block with the current mapping context
-
-### 7. Run The Agent Inventory Pass
+### 7. Run The Agent Mapping Pass
 
 From the repo root, run Claude Code and invoke:
 
 ```text
-/ds-inventory <projectId>
+/ds-mapping <projectId>
 ```
 
 Example:
 
 ```text
-/ds-inventory 4
+/ds-mapping 4
 ```
 
-The agent reads the workspace, including `mapping-context/`, and writes decisions to:
+The agent reads the workspace evidence, makes vision calls to detect component candidates across captured pages, and writes decisions to:
 
 ```text
-packages/backend/workspace/<projectId>/decisions/
+packages/backend/workspace/<projectId>/decisions/components.json
 ```
 
-Expected decision files:
+The decision file groups component candidates by component type (Buttons, Cards, Navigation, etc.), with each candidate carrying a source URL, bounding box, crop image, and confidence level. The detection policy biases toward over-delivery — false positives are cheap for the designer to prune, false negatives are expensive.
 
-- `clusters.json`
-- `tokens.json`
-- `inconsistencies.json`
-- `templates.json`
-- `notes.md`
-
-### 8. Render DS Inventory Boards
+### 8. Render Mapping
 
 Back in the plugin:
 
 1. Open `Inventory`.
 2. Click `Refresh`.
-3. Confirm decision counts appear.
-4. Click `Render Inventory Boards`.
+3. Confirm component type and instance counts appear.
+4. Click `Render Mapping`.
 
-The plugin creates or replaces a `DS Inventory` page. The board includes component clusters, token cards, inconsistencies, templates, notes, crop thumbnails where available, and `View sample` links back to the source screenshot pages.
+The plugin creates mapper pages in Figma — one page per component type (e.g. `Buttons`, `Cards`, `Navigation`). Each mapper page contains:
+
+- A title row and numbered rows of component instances
+- Rasterized component crops
+- Source back-links (Figma node hyperlinks) pointing to trail frames on the source screenshot pages
+
+The output matches the file format used by the external Tidy Mapper plugin, so designers can add missed components manually in the same file afterward.
 
 `View sample` links require the captured screenshot pages to exist in the same Figma file. If those pages were deleted, cards may show `Sample page not rendered`.
 
+### 9. Build Flows (Optional)
+
+The `Flows` tab lets you import navigation flows recorded with the companion Chrome extension. Drag-and-drop a flow trace file, then capture and render the flow as a Figma board. Saved flows can be re-rendered after recapture.
+
 ## Features
 
-- Recommended discovery flow for selecting a meaningful page set before capture
+- Recommended discovery flow with page-type classification for selecting a meaningful page set before capture
 - Exact URL capture for designer-provided page lists
 - Approved capture that only crawls selected URLs
-- Screenshot capture with automatic slicing for tall pages (>4096 px)
-- DOM and style extraction for inventory evidence
+- High-fidelity screenshot capture with 7-signal readiness wait, blank-region retry, and automatic slicing for tall pages (>4096 px)
+- DOM and style extraction for mapping evidence
+- Agent-driven component mapping: detects component candidates across captured pages and renders per-component-type mapper pages in Figma
+- Mapper pages include component crops, source back-links, and trail frames — compatible with Tidy Mapper for manual additions
+- Flow building from Chrome extension recordings, rendered as Figma boards
 - On-demand markup overlays filtered by element category
 - DB-first page lookup and single-page recrawl
-- Project snapshot rendering from stored data at any time
 - Authentication support: credentials, cookies, or manual login via visible browser
-- Agent-driven design-system inventory workspace with contact sheets, token tables, annotated screenshots, persisted decision files, and read-only mapping context/suggestion summaries
-- Figma `DS Inventory` board rendering from agent decisions, including component crops and links back to source screenshot samples
+- Full refresh mode that removes stale pages from both SQLite and the Figma canvas
 
 ## Repository structure
 
 ```
 packages/backend/    Fastify API + BullMQ worker + Playwright crawler + SQLite via Drizzle
 packages/plugin/     Figma plugin UI (React + Jotai) and canvas rendering code
+packages/extension/  Chrome extension for recording navigation flows
 docs/                Architecture, development, deployment, and roadmap docs
 ```
 
@@ -279,7 +277,7 @@ pnpm dev:plugin    # Figma plugin watcher
 Required processes:
 
 - Backend API: `http://localhost:3006`
-- Backend worker: processes crawl and inventory-prepare jobs
+- Backend worker: processes crawl and mapping-prepare jobs
 - Plugin watcher: rebuilds `packages/plugin/dist` for Figma Desktop
 
 Quick API sanity check:
@@ -313,14 +311,14 @@ Use this order for a normal run:
 4. Use `Recommended` discovery or `Exact URLs`.
 5. Approve/capture the chosen pages.
 6. Verify generated screenshot pages in Figma.
-7. Open `Inventory` and rebuild the workspace.
-8. Run `/ds-inventory <projectId>` in Claude Code.
+7. Open `Inventory` and click `Prepare Mapping`.
+8. Run `/ds-mapping <projectId>` in Claude Code.
 9. Refresh `Inventory`.
-10. Render `DS Inventory` boards.
+10. Click `Render Mapping`.
 
-## CLI Inventory Commands
+## CLI Commands
 
-The plugin can prepare and render inventory, but the backend also exposes CLI commands for debugging and manual runs:
+The plugin can prepare and render mapping, but the backend also exposes CLI commands for debugging and manual runs:
 
 ```bash
 pnpm --filter backend run inventory:prepare <projectId>
@@ -353,20 +351,20 @@ These are ignored by Git. Do not commit them unless you intentionally need a fix
 
 ## Troubleshooting
 
-**Plugin cannot start a crawl or prepare inventory**
+**Plugin cannot start a crawl or prepare mapping**
 
 - Confirm Redis is running: `docker compose up redis -d`.
 - Confirm API is running: `curl http://localhost:3006/`.
-- Confirm the worker process is running. Crawls and inventory preparation require the worker.
+- Confirm the worker process is running. Crawls and mapping preparation require the worker.
 
-**Inventory tab says workspace is missing**
+**Inventory tab says no mapping workspace**
 
-- Click `Prepare Inventory`.
+- Click `Prepare Mapping`.
 - Or run `pnpm --filter backend run inventory:prepare <projectId>`.
 
-**Inventory tab says waiting for agent decisions**
+**Inventory tab says waiting for decisions**
 
-- Run `/ds-inventory <projectId>` in Claude Code from the repo root.
+- Run `/ds-mapping <projectId>` in Claude Code from the repo root.
 - Then click `Refresh` in the plugin Inventory tab.
 
 **`View sample` links do not work**

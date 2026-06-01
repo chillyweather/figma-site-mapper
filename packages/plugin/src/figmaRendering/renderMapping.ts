@@ -23,6 +23,7 @@ import {
   mapperPageName,
   mappingFrameName,
 } from "./tidyMapper/constants";
+import { findScreenshotTargetByPageId, getScreenshotTargetScale } from "../plugin/handlers/screenshotTarget";
 import type { MappingRenderData, MappingRenderComponent, MappingRenderInstance } from "../plugin/types";
 
 const MAPPING_PAGE_ROLE = "mapping";
@@ -39,26 +40,6 @@ export interface MappingRenderResult {
   componentTypes: number;
   totalInstances: number;
   errors: string[];
-}
-
-function findRenderedPageByPageId(pageId: string): PageNode | null {
-  for (const page of figma.root.children) {
-    if (page.type === "PAGE" && page.getPluginData("PAGE_ID") === pageId) return page;
-  }
-  return null;
-}
-
-function getScaleForPage(page: PageNode): number {
-  const screenshotWidth = Number(page.getPluginData("SCREENSHOT_WIDTH"));
-  const originalWidth = Number(page.getPluginData("ORIGINAL_VIEWPORT_WIDTH"));
-  if (
-    Number.isFinite(screenshotWidth) &&
-    Number.isFinite(originalWidth) &&
-    originalWidth > 0
-  ) {
-    return screenshotWidth / originalWidth;
-  }
-  return 1;
 }
 
 async function loadFontSafe(family: string, style: string): Promise<void> {
@@ -96,7 +77,7 @@ function createAutoLayoutFrame(name: string, direction: "HORIZONTAL" | "VERTICAL
 // ── Trail creation ────────────────────────────────────────────────────────────
 
 function findOrCreateTrailFrame(
-  sourcePage: PageNode,
+  sourcePage: PageNode | FrameNode,
   type: string,
   instance: MappingRenderInstance,
   scale: number
@@ -137,7 +118,7 @@ function findOrCreateTrailFrame(
 // ── Rasterized image extraction ───────────────────────────────────────────────
 
 async function exportInstanceImage(
-  sourcePage: PageNode,
+  sourcePage: PageNode | FrameNode,
   instance: MappingRenderInstance,
   scale: number
 ): Promise<Uint8Array | null> {
@@ -364,13 +345,13 @@ export async function renderMapping(
       const instance = comp.instances[i];
       const rowNumber = existingRowCount + i + 1;
 
-      const sourcePage = findRenderedPageByPageId(instance.pageId);
+      const sourcePage = findScreenshotTargetByPageId(instance.pageId);
       let trailFrameId: string | null = null;
       let imageBytes: Uint8Array | null = null;
       let scale = 1;
 
       if (sourcePage) {
-        scale = getScaleForPage(sourcePage);
+        scale = getScreenshotTargetScale(sourcePage);
         try {
           const trailFrame = findOrCreateTrailFrame(sourcePage, comp.type, instance, scale);
           trailFrameId = trailFrame.id;

@@ -2,86 +2,17 @@ import fs from "fs";
 import path from "path";
 import { eq } from "drizzle-orm";
 import { db } from "../../db.js";
-import { elements, pages, projects } from "../../schema.js";
-import { parseJson } from "../../utils/parseJson.js";
+import { projects } from "../../schema.js";
 import { ensureDir, writeJson } from "../workspace/paths.js";
 import { mappingWorkspacePath, mappingManifestPath, mappingMetaPath, mappingPageDir, mappingReadmePath, mappingDecisionsDir, } from "./paths.js";
+import { loadProjectEvidence } from "./evidence.js";
+export { filterDomCandidates } from "./evidence.js";
 export function isValidProjectId(id) {
     const n = parseInt(id, 10);
     return !isNaN(n) && n > 0 && String(n) === id;
 }
-function isBbox(value) {
-    if (!value || typeof value !== "object")
-        return false;
-    const b = value;
-    return (typeof b.x === "number" &&
-        typeof b.y === "number" &&
-        typeof b.width === "number" &&
-        typeof b.height === "number" &&
-        b.width > 0 &&
-        b.height > 0);
-}
-export function filterDomCandidates(elementRows) {
-    return elementRows
-        .filter((row) => {
-        if (row.isVisible === false)
-            return false;
-        const bbox = parseJson(row.bbox, null);
-        if (!isBbox(bbox))
-            return false;
-        const tagName = (row.tagName ?? "").toLowerCase();
-        const role = (row.role ?? "").toLowerCase();
-        const type = (row.type ?? "").toLowerCase();
-        const isInteractive = tagName === "button" ||
-            tagName === "a" ||
-            tagName === "input" ||
-            tagName === "select" ||
-            tagName === "textarea" ||
-            role === "button" ||
-            role === "link" ||
-            role === "tab" ||
-            role === "checkbox" ||
-            role === "radio" ||
-            Boolean(row.href);
-        const isSemanticComponent = type === "button" ||
-            type === "link" ||
-            type === "input" ||
-            type === "select" ||
-            type === "textarea" ||
-            type === "image" ||
-            type === "heading" ||
-            type === "navigation" ||
-            type === "header" ||
-            type === "footer";
-        const isSizedBlock = bbox.width >= 24 &&
-            bbox.height >= 16 &&
-            bbox.width <= 1600 &&
-            bbox.height <= 1200 &&
-            Boolean(row.componentFingerprint || row.ariaLabel || row.text);
-        return isInteractive || isSemanticComponent || isSizedBlock;
-    })
-        .map((row) => {
-        const bbox = parseJson(row.bbox, { x: 0, y: 0, width: 0, height: 0 });
-        return {
-            id: String(row.id),
-            pageId: String(row.pageId),
-            type: row.type ?? "unknown",
-            selector: row.selector ?? undefined,
-            tagName: row.tagName ?? undefined,
-            elementId: row.elementId ?? undefined,
-            classes: parseJson(row.classes, []),
-            bbox,
-            text: row.text ?? undefined,
-            href: row.href ?? undefined,
-            ariaLabel: row.ariaLabel ?? undefined,
-            role: row.role ?? undefined,
-            cropPath: row.cropPath ?? undefined,
-            componentFingerprint: row.componentFingerprint ?? undefined,
-        };
-    });
-}
-function buildReadme(manifest, pages) {
-    const pageList = pages
+function buildReadme(manifest, pageEvidences) {
+    const pageList = pageEvidences
         .map((p, i) => `  ${i + 1}. Page ${p.id} — ${p.url} (${p.candidateCount} candidates)`)
         .join("\n");
     return `# Mapping Evidence — Project ${manifest.projectId}
@@ -163,39 +94,14 @@ export async function buildMappingWorkspace(projectId) {
         err.name = "ProjectNotFound";
         throw err;
     }
-    const pageRows = db
-        .select()
-        .from(pages)
-        .where(eq(pages.projectId, projectNumId))
-        .all()
-        .sort((a, b) => a.id - b.id);
-    const elementRows = db
-        .select()
-        .from(elements)
-        .where(eq(elements.projectId, projectNumId))
-        .all();
+    const { pages: pageEvidences, candidates } = await loadProjectEvidence(projectId);
     const workspaceRoot = mappingWorkspacePath(projectId);
     const generatedAt = new Date().toISOString();
-    const candidates = filterDomCandidates(elementRows);
-    const candidatesByPage = new Map();
-    for (const c of candidates) {
-        const arr = candidatesByPage.get(c.pageId) ?? [];
-        arr.push(c);
-        candidatesByPage.set(c.pageId, arr);
-    }
-    const pageEvidences = pageRows.map((row) => ({
-        id: String(row.id),
-        url: row.url,
-        title: row.title,
-        screenshotPaths: parseJson(row.screenshotPaths, []),
-        viewportWidth: row.viewportWidth ?? null,
-        candidateCount: (candidatesByPage.get(String(row.id)) ?? []).length,
-    }));
     const manifest = {
         schemaVersion: 1,
         projectId,
         generatedAt,
-        pageCount: pageRows.length,
+        pageCount: pageEvidences.length,
         candidateCount: candidates.length,
     };
     const meta = {
@@ -203,6 +109,12 @@ export async function buildMappingWorkspace(projectId) {
         generatedAt,
         projectId,
     };
+    const candidatesByPage = new Map();
+    for (const c of candidates) {
+        const arr = candidatesByPage.get(c.pageId) ?? [];
+        arr.push(c);
+        candidatesByPage.set(c.pageId, arr);
+    }
     // Materialise workspace (preserve existing decisions/)
     await ensureDir(workspaceRoot);
     await ensureDir(path.join(workspaceRoot, "pages"));
@@ -226,7 +138,7 @@ export async function buildMappingWorkspace(projectId) {
     return {
         projectId,
         mappingWorkspaceRoot: workspaceRoot,
-        pageCount: pageRows.length,
+        pageCount: pageEvidences.length,
         candidateCount: candidates.length,
         generatedAt,
     };

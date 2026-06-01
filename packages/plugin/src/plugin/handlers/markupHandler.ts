@@ -29,6 +29,7 @@ const MARKUP_CONTAINER_NAME = "Markup Highlights";
 import {
   getActiveScreenshotTarget,
   findScreenshotTargetByPageId,
+  getScreenshotTargetScale,
 } from "./screenshotTarget";
 
 function ensureMarkupContainer(overlay: FrameNode): FrameNode {
@@ -146,21 +147,7 @@ export async function handleRenderMarkupRequest({
 
   const markupContainer = ensureMarkupContainer(overlay);
 
-  const storedScreenshotWidth = Number(
-    targetPage.getPluginData("SCREENSHOT_WIDTH")
-  );
-  const storedOriginalWidth = Number(
-    targetPage.getPluginData("ORIGINAL_VIEWPORT_WIDTH")
-  );
-
-  const screenshotWidth = Number.isFinite(storedScreenshotWidth)
-    ? storedScreenshotWidth
-    : overlay.width;
-  const originalWidth = Number.isFinite(storedOriginalWidth)
-    ? storedOriginalWidth
-    : screenshotWidth;
-
-  const scaleFactor = originalWidth > 0 ? screenshotWidth / originalWidth : 1;
+  const scaleFactor = getScreenshotTargetScale(targetPage);
 
   figma.ui.postMessage({
     type: "markup-render-started",

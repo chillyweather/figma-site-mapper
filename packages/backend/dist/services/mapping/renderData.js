@@ -1,11 +1,34 @@
 import fs from "fs";
 import path from "path";
-import { eq } from "drizzle-orm";
-import { db } from "../../db.js";
-import { pages } from "../../schema.js";
-import { parseJson } from "../../utils/parseJson.js";
 import { mappingWorkspacePath, mappingLatestDecisionPath, mappingMetaPath, } from "./paths.js";
 import { loadAndValidateDecisionFile, extractDecisionFileMetadata } from "./validator.js";
+import { loadProjectEvidence } from "./evidence.js";
+export function buildRenderInstance(instance, pageEvidence) {
+    return {
+        instanceId: instance.instanceId ?? instance.elementId ?? `${instance.pageId}:vision`,
+        elementId: instance.elementId,
+        pageId: instance.pageId,
+        pageUrl: instance.sourceUrl ?? pageEvidence?.url ?? "",
+        bbox: instance.bbox,
+        source: instance.source,
+        confidence: instance.confidence,
+        rawLabel: instance.rawLabel,
+        label: instance.label,
+        notes: instance.notes,
+        screenshotPaths: pageEvidence?.screenshotPaths ?? [],
+        viewportWidth: pageEvidence?.viewportWidth ?? null,
+    };
+}
+export function buildRenderComponents(decisions, pageMap) {
+    return decisions.map((comp) => {
+        const instances = comp.instances.map((inst) => buildRenderInstance(inst, pageMap.get(inst.pageId)));
+        return {
+            type: comp.type,
+            instanceCount: instances.length,
+            instances,
+        };
+    });
+}
 async function readFileSafe(filePath) {
     try {
         return await fs.promises.readFile(filePath, "utf8");
@@ -104,41 +127,9 @@ export async function getMappingRenderData(projectId) {
     }
     const { valid, warnings } = loadAndValidateDecisionFile(latestContent);
     const meta = extractDecisionFileMetadata(tryParse(latestContent));
-    // Build page metadata lookup from SQLite
-    const projectNumId = parseInt(projectId, 10);
-    const pageRows = db.select().from(pages).where(eq(pages.projectId, projectNumId)).all();
-    const pageMap = new Map(pageRows.map((row) => [
-        String(row.id),
-        {
-            url: row.url,
-            screenshotPaths: parseJson(row.screenshotPaths, []),
-            viewportWidth: row.viewportWidth ?? null,
-        },
-    ]));
-    const components = valid.map((comp) => {
-        const instances = comp.instances.map((inst) => {
-            const pageData = pageMap.get(inst.pageId);
-            return {
-                instanceId: inst.instanceId ?? inst.elementId ?? `${inst.pageId}:vision`,
-                elementId: inst.elementId,
-                pageId: inst.pageId,
-                pageUrl: inst.sourceUrl ?? pageData?.url ?? "",
-                bbox: inst.bbox,
-                source: inst.source,
-                confidence: inst.confidence,
-                rawLabel: inst.rawLabel,
-                label: inst.label,
-                notes: inst.notes,
-                screenshotPaths: pageData?.screenshotPaths ?? [],
-                viewportWidth: pageData?.viewportWidth ?? null,
-            };
-        });
-        return {
-            type: comp.type,
-            instanceCount: instances.length,
-            instances,
-        };
-    });
+    const { pages: pageEvidences } = await loadProjectEvidence(projectId);
+    const pageMap = new Map(pageEvidences.map((p) => [p.id, p]));
+    const components = buildRenderComponents(valid, pageMap);
     return {
         projectId,
         hasMappingWorkspace: true,

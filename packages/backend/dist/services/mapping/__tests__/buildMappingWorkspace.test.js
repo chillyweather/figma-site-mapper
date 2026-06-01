@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { filterDomCandidates, isValidProjectId } from "../buildMappingWorkspace.js";
+import { filterDomCandidates } from "../evidence.js";
+import { isValidProjectId } from "../buildMappingWorkspace.js";
 const makeRow = (overrides = {}) => ({
     id: 1,
     pageId: 10,

@@ -8,13 +8,11 @@
 
 import { renderFlowBoard } from "../../figmaRendering/renderFlowBoard";
 import type { FlowDraftStep } from "../../types";
-import { getActiveScreenshotTarget, findScreenshotTargetByPageId } from "./screenshotTarget";
+import { getActiveScreenshotTarget, findScreenshotTargetByPageId, getScreenshotTargetScale } from "./screenshotTarget";
 
 const PAGE_ID_KEY = "PAGE_ID";
 const PROJECT_ID_KEY = "PROJECT_ID";
 const URL_KEY = "URL";
-const SCREENSHOT_WIDTH_KEY = "SCREENSHOT_WIDTH";
-const ORIGINAL_VIEWPORT_WIDTH_KEY = "ORIGINAL_VIEWPORT_WIDTH";
 const OVERLAY_CHILD_NAME = "Page Overlay";
 const FLOW_PREVIEW_KEY = "FLOW_PREVIEW";
 
@@ -78,24 +76,6 @@ function findOrCreateOverlay(page: ScreenshotContainer): FrameNode | null {
   return overlay;
 }
 
-/**
- * Get the scale factor for mapping element coordinates to canvas coordinates.
- */
-function getScaleFactor(page: ScreenshotContainer): number {
-  const screenshotWidth = getPluginData(page as any, SCREENSHOT_WIDTH_KEY);
-  const viewportWidth = getPluginData(page as any, ORIGINAL_VIEWPORT_WIDTH_KEY);
-  if (screenshotWidth && viewportWidth) {
-    const sw = parseFloat(screenshotWidth);
-    const vw = parseFloat(viewportWidth);
-    if (sw > 0 && vw > 0) {
-      const scale = sw / vw;
-      console.log(`${TAG} getScaleFactor — page "${page.name}": SCREENSHOT_WIDTH=${sw} ORIGINAL_VIEWPORT_WIDTH=${vw} → scale=${scale.toFixed(4)}`);
-      return scale;
-    }
-  }
-  console.warn(`${TAG} getScaleFactor — page "${page.name}" missing dimension plugin data (SCREENSHOT_WIDTH=${screenshotWidth ?? "none"}, ORIGINAL_VIEWPORT_WIDTH=${viewportWidth ?? "none"}); defaulting to 1`);
-  return 1;
-}
 
 /**
  * Clear any existing flow preview from a page.
@@ -146,7 +126,7 @@ export async function handlePreviewFlowElement(msg: {
   const overlay = findOrCreateOverlay(currentPage);
   if (!overlay) return;
 
-  const scale = getScaleFactor(currentPage);
+  const scale = getScreenshotTargetScale(currentPage);
 
   // Find the top-level screenshot frame(s) to determine vertical offset
   const frames = (currentPage as any).findAll((n: SceneNode) => n.type === "FRAME" && n.parent === currentPage);

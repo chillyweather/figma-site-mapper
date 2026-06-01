@@ -1,6 +1,7 @@
 import type { RenderCard, RenderLink, RenderSection } from "@sitemapper/shared";
 import { COLORS, createText } from "./shared";
-import { findOrCreateSampleAnchor, findRenderedPageByPageId } from "./sampleAnchors";
+import { findOrCreateSampleAnchor } from "./sampleAnchors";
+import { findScreenshotTargetByPageId } from "../../plugin/handlers/screenshotTarget";
 
 const TABLE_WIDTH = 1200;
 const TABLE_PADDING = 16;
@@ -192,7 +193,7 @@ function buildPreviewCell(card: RenderCard, category: TokenCategory): FrameNode 
 }
 
 function pageSlugForPageId(pageId: string): string {
-  const page = findRenderedPageByPageId(pageId);
+  const page = findScreenshotTargetByPageId(pageId);
   if (!page) return `Page ${pageId}`;
   const url = page.getPluginData("URL");
   if (!url) return page.name || `Page ${pageId}`;
