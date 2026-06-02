@@ -18,6 +18,12 @@ import {
   LINK_COLOR,
   LINK_FONT_SIZE,
   LINK_TEXT,
+  PROPS_ROW_SPACING,
+  PROPS_FONT_SIZE,
+  PROPS_LABEL_COLOR,
+  PROPS_VALUE_COLOR,
+  PROPS_LABEL_VALUE_SPACING,
+  PROPS_LABEL_MIN_WIDTH,
   MAPPING_TRAIL_KEY,
   trailFrameName,
   mapperPageName,
@@ -182,6 +188,34 @@ async function exportInstanceImage(
   }
 }
 
+// ── Props column (issue #58) ───────────────────────────────────────────────────
+
+async function buildPropsColumn(
+  props: ReadonlyArray<{ label: string; value: string }>
+): Promise<FrameNode> {
+  const col = createAutoLayoutFrame("props", "VERTICAL");
+  col.itemSpacing = PROPS_ROW_SPACING;
+  col.counterAxisAlignItems = "MIN";
+
+  for (const prop of props) {
+    const propRow = createAutoLayoutFrame("prop", "HORIZONTAL");
+    propRow.itemSpacing = PROPS_LABEL_VALUE_SPACING;
+    propRow.counterAxisAlignItems = "MIN";
+
+    const label = await createTextNode(prop.label, PROPS_FONT_SIZE, PROPS_LABEL_COLOR);
+    label.textAutoResize = "HEIGHT";
+    label.resize(PROPS_LABEL_MIN_WIDTH, label.height);
+
+    const value = await createTextNode(prop.value, PROPS_FONT_SIZE, PROPS_VALUE_COLOR);
+
+    propRow.appendChild(label);
+    propRow.appendChild(value);
+    col.appendChild(propRow);
+  }
+
+  return col;
+}
+
 // ── Row building ──────────────────────────────────────────────────────────────
 
 async function buildRow(
@@ -240,6 +274,12 @@ async function buildRow(
     wrapper.appendChild(imgFrame);
   }
   typeFrame.appendChild(wrapper);
+
+  // Props column — extracted element properties (DOM instances only)
+  if (instance.props && instance.props.length > 0) {
+    const propsColumn = await buildPropsColumn(instance.props);
+    typeFrame.appendChild(propsColumn);
+  }
 
   // Source back-link
   if (trailFrameId) {

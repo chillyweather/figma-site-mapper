@@ -2,7 +2,9 @@ import fs from "fs";
 import path from "path";
 import { eq } from "drizzle-orm";
 import { db } from "../../db.js";
-import { pages } from "../../schema.js";
+import { pages, elements } from "../../schema.js";
+import { parseJson } from "../../utils/parseJson.js";
+import { summarizeElementProps } from "./elementProps.js";
 import {
   mappingWorkspacePath,
   mappingLatestDecisionPath,
@@ -22,8 +24,15 @@ import { loadProjectEvidence } from "./evidence.js";
 
 export function buildRenderInstance(
   instance: MappingComponentInstance,
-  pageEvidence: MappingPageEvidence | null | undefined
+  pageEvidence: MappingPageEvidence | null | undefined,
+  stylesByElementId?: Map<string, Record<string, string>>
 ): MappingRenderInstance {
+  const styles =
+    instance.elementId && stylesByElementId
+      ? stylesByElementId.get(instance.elementId)
+      : undefined;
+  const props = styles ? summarizeElementProps(styles, instance.bbox) : undefined;
+
   return {
     instanceId: instance.instanceId ?? instance.elementId ?? `${instance.pageId}:vision`,
     elementId: instance.elementId,
@@ -37,16 +46,18 @@ export function buildRenderInstance(
     notes: instance.notes,
     screenshotPaths: pageEvidence?.screenshotPaths ?? [],
     viewportWidth: pageEvidence?.viewportWidth ?? null,
+    props: props && props.length > 0 ? props : undefined,
   };
 }
 
 export function buildRenderComponents(
   decisions: MappingComponentDecision[],
-  pageMap: Map<string, MappingPageEvidence>
+  pageMap: Map<string, MappingPageEvidence>,
+  stylesByElementId?: Map<string, Record<string, string>>
 ): MappingRenderComponent[] {
   return decisions.map((comp) => {
     const instances: MappingRenderInstance[] = comp.instances.map((inst) =>
-      buildRenderInstance(inst, pageMap.get(inst.pageId))
+      buildRenderInstance(inst, pageMap.get(inst.pageId), stylesByElementId)
     );
     return {
       type: comp.type,
@@ -54,6 +65,22 @@ export function buildRenderComponents(
       instances,
     };
   });
+}
+
+/** Load a map of elementId → raw computed styles for a project's elements. */
+function loadStylesByElementId(projectId: string): Map<string, Record<string, string>> {
+  const projectNumId = parseInt(projectId, 10);
+  const map = new Map<string, Record<string, string>>();
+  if (!Number.isFinite(projectNumId)) return map;
+  const rows = db
+    .select({ id: elements.id, styles: elements.styles })
+    .from(elements)
+    .where(eq(elements.projectId, projectNumId))
+    .all();
+  for (const row of rows) {
+    map.set(String(row.id), parseJson<Record<string, string>>(row.styles, {}));
+  }
+  return map;
 }
 
 async function readFileSafe(filePath: string): Promise<string | null> {
@@ -161,7 +188,8 @@ export async function getMappingRenderData(projectId: string): Promise<MappingRe
 
   const { pages: pageEvidences } = await loadProjectEvidence(projectId);
   const pageMap = new Map(pageEvidences.map((p) => [p.id, p]));
-  const components = buildRenderComponents(valid, pageMap);
+  const stylesByElementId = loadStylesByElementId(projectId);
+  const components = buildRenderComponents(valid, pageMap, stylesByElementId);
 
   return {
     projectId,

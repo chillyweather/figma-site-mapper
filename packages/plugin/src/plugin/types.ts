@@ -46,6 +46,11 @@ export interface StyleExtractionSettings {
 
 // ── Mapping types (shared between plugin UI and figmaRendering) ───────────────
 
+export interface ElementPropRow {
+  label: string;
+  value: string;
+}
+
 export interface MappingRenderInstance {
   instanceId: string;
   elementId?: string;
@@ -59,6 +64,8 @@ export interface MappingRenderInstance {
   notes?: string;
   screenshotPaths: string[];
   viewportWidth: number | null;
+  /** Curated, display-ready element properties (DOM instances only). */
+  props?: ElementPropRow[];
 }
 
 export interface MappingRenderComponent {

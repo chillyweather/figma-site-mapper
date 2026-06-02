@@ -34,6 +34,15 @@ export const WRAPPER_BORDER_WEIGHT = 1;
 
 export const IMAGE_SCALE = 2;
 
+// ── Props column (issue #58) ──────────────────────────────────────────────────
+
+export const PROPS_ROW_SPACING = 6;
+export const PROPS_FONT_SIZE = 16;
+export const PROPS_LABEL_COLOR: RGB = { r: 0.55, g: 0.55, b: 0.55 };
+export const PROPS_VALUE_COLOR: RGB = { r: 0.1, g: 0.1, b: 0.1 };
+export const PROPS_LABEL_VALUE_SPACING = 12;
+export const PROPS_LABEL_MIN_WIDTH = 72;
+
 // ── Link ──────────────────────────────────────────────────────────────────────
 
 export const LINK_COLOR: RGB = { r: 0, g: 0.45, b: 0.9 };
