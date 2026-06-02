@@ -117,6 +117,25 @@ function findOrCreateTrailFrame(
 
 // ── Rasterized image extraction ───────────────────────────────────────────────
 
+/**
+ * Locates the raw "<title> Screenshots" frame within a screenshot target.
+ *
+ * Screenshot pages stack the captured slices in this frame and layer a
+ * transparent "Page Overlay" (nav, markup, badges) as a sibling on top. A
+ * page-level slice export composites the overlay, so crops come back without
+ * screenshot pixels. We crop from the Screenshots frame in isolation instead.
+ */
+function findScreenshotsFrame(
+  sourcePage: PageNode | FrameNode
+): FrameNode | null {
+  if (sourcePage.type === "FRAME" && sourcePage.name.endsWith("Screenshots")) {
+    return sourcePage;
+  }
+  return sourcePage.findOne(
+    (n) => n.type === "FRAME" && n.name.endsWith("Screenshots")
+  ) as FrameNode | null;
+}
+
 async function exportInstanceImage(
   sourcePage: PageNode | FrameNode,
   instance: MappingRenderInstance,
@@ -129,21 +148,37 @@ async function exportInstanceImage(
   const scaledW = Math.max(4, width * scale);
   const scaledH = Math.max(4, height * scale);
 
+  const screenshotsFrame = findScreenshotsFrame(sourcePage);
+  if (!screenshotsFrame) {
+    return null;
+  }
+
+  // Clone the screenshots-only frame into a clipping frame offset to the
+  // target region. Cloning isolates the crop from the Page Overlay by
+  // construction and spans multiple stacked screenshot slices automatically.
+  let clip: FrameNode | null = null;
   try {
-    const slice = figma.createSlice();
-    slice.name = "_mapping_slice_tmp";
-    slice.x = scaledX;
-    slice.y = scaledY;
-    slice.resize(scaledW, scaledH);
-    sourcePage.appendChild(slice);
-    const result = await slice.exportAsync({
+    clip = figma.createFrame();
+    clip.name = "_mapping_crop_tmp";
+    clip.clipsContent = true;
+    clip.fills = [];
+    clip.resize(scaledW, scaledH);
+
+    const clone = screenshotsFrame.clone();
+    clip.appendChild(clone);
+    clone.x = -(scaledX - screenshotsFrame.x);
+    clone.y = -(scaledY - screenshotsFrame.y);
+
+    sourcePage.appendChild(clip);
+
+    return await clip.exportAsync({
       format: "PNG",
       constraint: { type: "SCALE", value: 2 },
     });
-    slice.remove();
-    return result;
   } catch {
     return null;
+  } finally {
+    if (clip) clip.remove();
   }
 }
 
