@@ -137,9 +137,12 @@ export async function handleRenderMappingRequest(msg: { projectId?: string | nul
       errors: result.errors,
     });
 
+    const skippedSuffix = result.skippedInstances > 0
+      ? ` ${result.skippedInstances} skipped (source pages not in this file).`
+      : "";
     const label = result.errors.length > 0
-      ? `Mapping rendered with ${result.errors.length} error(s).`
-      : `Mapping rendered: ${result.componentTypes} types, ${result.totalInstances} instances.`;
+      ? `Mapping rendered with ${result.errors.length} error(s).${skippedSuffix}`
+      : `Mapping rendered: ${result.componentTypes} types, ${result.totalInstances} instances.${skippedSuffix}`;
     figma.notify(label, { error: result.errors.length > 0 });
   } catch (error) {
     postToUI({

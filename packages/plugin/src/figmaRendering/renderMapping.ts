@@ -45,6 +45,9 @@ export type MappingProgressCallback = (progress: MappingRenderProgress) => void;
 export interface MappingRenderResult {
   componentTypes: number;
   totalInstances: number;
+  /** Instances skipped because their source screenshot page is not present
+   * in this Figma file (e.g. stale decisions for pages rendered elsewhere). */
+  skippedInstances: number;
   errors: string[];
 }
 
@@ -391,6 +394,7 @@ export async function renderMapping(
 ): Promise<MappingRenderResult> {
   const errors: string[] = [];
   let totalInstances = 0;
+  let skippedInstances = 0;
 
   const componentTypes = renderData.components.map((c) => c.type);
   const total = renderData.components.reduce((sum, c) => sum + c.instanceCount, 0) + componentTypes.length;
@@ -413,32 +417,42 @@ export async function renderMapping(
   for (const comp of renderData.components) {
     report(`Rendering ${comp.type}`);
 
+    // Resolve source pages up front. Instances whose screenshot page is not
+    // in this Figma file (stale decisions, pages rendered in another file)
+    // are skipped entirely — an empty placeholder row carries no information.
+    const renderable: Array<{ instance: MappingRenderInstance; sourcePage: PageNode | FrameNode }> = [];
+    for (const instance of comp.instances) {
+      const sourcePage = findScreenshotTargetByPageId(instance.pageId);
+      if (sourcePage) {
+        renderable.push({ instance, sourcePage });
+      } else {
+        // Not an error: decisions can reference pages rendered in another
+        // file or removed since. Counted and surfaced via skippedInstances.
+        skippedInstances += 1;
+      }
+    }
+    if (renderable.length === 0) continue;
+
     const mapperPage = await findOrCreateMapperPage(comp.type);
     const { contentFrame, existingRowCount } = await getOrCreateMappingFrame(mapperPage, comp.type);
 
-    for (let i = 0; i < comp.instances.length; i += 1) {
-      const instance = comp.instances[i];
+    for (let i = 0; i < renderable.length; i += 1) {
+      const { instance, sourcePage } = renderable[i];
       const rowNumber = existingRowCount + i + 1;
 
-      const sourcePage = findScreenshotTargetByPageId(instance.pageId);
       let trailFrameId: string | null = null;
       let imageBytes: Uint8Array | null = null;
-      let scale = 1;
+      const scale = getScreenshotTargetScale(sourcePage);
 
-      if (sourcePage) {
-        scale = getScreenshotTargetScale(sourcePage);
-        try {
-          const trailFrame = findOrCreateTrailFrame(sourcePage, comp.type, instance, scale);
-          trailFrameId = trailFrame.id;
-          imageBytes = await exportInstanceImage(sourcePage, instance, scale);
-          if (!imageBytes) {
-            errors.push(`Crop export failed for ${comp.type} instance ${instance.instanceId}`);
-          }
-        } catch (err) {
-          errors.push(`Trail/crop error for ${comp.type} instance ${instance.instanceId}: ${err instanceof Error ? err.message : String(err)}`);
+      try {
+        const trailFrame = findOrCreateTrailFrame(sourcePage, comp.type, instance, scale);
+        trailFrameId = trailFrame.id;
+        imageBytes = await exportInstanceImage(sourcePage, instance, scale);
+        if (!imageBytes) {
+          errors.push(`Crop export failed for ${comp.type} instance ${instance.instanceId}`);
         }
-      } else {
-        errors.push(`Source page not found for pageId ${instance.pageId} (${comp.type} instance ${i + 1})`);
+      } catch (err) {
+        errors.push(`Trail/crop error for ${comp.type} instance ${instance.instanceId}: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       try {
@@ -454,6 +468,7 @@ export async function renderMapping(
   return {
     componentTypes: componentTypes.length,
     totalInstances,
+    skippedInstances,
     errors,
   };
 }
